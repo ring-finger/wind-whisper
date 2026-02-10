@@ -48,7 +48,7 @@
   },
   "compileType": "miniprogram",
   "libVersion": "2.19.4",
-  "appid": "wxc676b779fc3c0a1a",
+  "appid": "tour-appid",
   "projectname": "ham-radio-log",
   "condition": {},
   "simulatorPluginLibVersion": {},
