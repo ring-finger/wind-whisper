@@ -1,0 +1,80 @@
+<view class="container">
+  <view class="search-toggle" bindtap="toggleSearch">
+    <text class="toggle-icon">{{searchExpanded ? '▼' : '▶'}}</text>
+    <text class="toggle-text">{{searchExpanded ? '收起搜索' : '展开搜索'}}</text>
+  </view>
+
+  <view wx:if="{{searchExpanded}}" class="search-section">
+    <view class="search-item">
+      <view class="search-label">呼号</view>
+      <input 
+        class="search-input" 
+        value="{{searchCallSign}}" 
+        bindinput="onSearchCallSign"
+        placeholder="输入呼号搜索"
+      />
+    </view>
+    <view class="search-item">
+      <view class="search-label">日期范围</view>
+      <view class="date-range">
+        <picker mode="date" value="{{startDate}}" bindchange="onStartDateChange">
+          <view class="date-picker">{{startDate || '开始日期'}}</view>
+        </picker>
+        <text class="date-separator">至</text>
+        <picker mode="date" value="{{endDate}}" bindchange="onEndDateChange">
+          <view class="date-picker">{{endDate || '结束日期'}}</view>
+        </picker>
+      </view>
+    </view>
+    <view class="search-actions">
+      <button class="search-btn" bindtap="handleSearch">搜索</button>
+      <button class="reset-btn" bindtap="handleReset">重置</button>
+    </view>
+  </view>
+
+  <view wx:if="{{filteredLogs.length > 0}}" class="log-list">
+    <view 
+      wx:for="{{filteredLogs}}" 
+      wx:key="id" 
+      class="log-item"
+      bindtap="viewLogDetail"
+      data-id="{{item.id}}"
+    >
+      <view class="log-header">
+        <view class="log-callsign">{{item.callSign}}</view>
+        <view class="log-date">{{item.date}} {{item.btcTime}} BJT</view>
+      </view>
+      <view class="log-detail">
+        <!-- 1. 频率 -->
+        <view wx:if="{{item.frequency}}" class="log-detail-item">
+          <text>📻 {{item.frequency}} MHz</text>
+        </view>
+        <!-- 2. 对方信号报告 -->
+        <view wx:if="{{item.rst.theirRst || (item.rst && (item.rst.r || item.rst.s || item.rst.t))}}" class="log-detail-item">
+          <text>RST: {{item.rst.theirRst ? (item.rst.theirRst.r || '-') + (item.rst.theirRst.s || '-') + (item.rst.theirRst.t ? item.rst.theirRst.t : '') : (item.rst.r || '-') + (item.rst.s || '-') + (item.rst.t ? item.rst.t : '')}}</text>
+        </view>
+        <!-- 3. 发射功率 -->
+        <view wx:if="{{item.power}}" class="log-detail-item">
+          <text>⚡ {{item.power}}W</text>
+        </view>
+        <!-- 4. 工作模式 -->
+        <view wx:if="{{item.mode}}" class="log-detail-item">
+          <text>📡 {{item.mode}}</text>
+        </view>
+        <!-- 5. 地址 -->
+        <view wx:if="{{item.qth}}" class="log-detail-item">
+          <text>📍 {{item.qth}}</text>
+        </view>
+      </view>
+      <view wx:if="{{item.weather}}" class="log-detail" style="margin-top: 10rpx;">
+        <view class="log-detail-item">
+          <text>{{getWeatherIcon(item.weather)}} {{getWeatherText(item.weather)}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+  <view wx:else class="empty-tip">
+    <text>{{searchCallSign || startDate || endDate ? '未找到匹配的日志' : '暂无通联日志'}}</text>
+    <text style="display: block; margin-top: 20rpx; font-size: 24rpx;">点击下方"通联"标签开始记录</text>
+  </view>
+</view>

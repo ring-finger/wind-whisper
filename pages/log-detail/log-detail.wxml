@@ -1,0 +1,91 @@
+<view class="container">
+  <view class="log-detail-card">
+    <view class="card-header">
+      <view class="callsign">{{log.callSign}}</view>
+      <view class="date">{{log.date}}</view>
+    </view>
+
+    <view class="info-section">
+      <view class="section-title">基础信息</view>
+      <view class="info-grid">
+        <view class="info-item">
+          <text class="info-label">频率</text>
+          <text class="info-value">{{log.frequency}} MHz</text>
+        </view>
+        <view class="info-item">
+          <text class="info-label">模式</text>
+          <text class="info-value">{{log.mode}}</text>
+        </view>
+        <view class="info-item">
+          <text class="info-label">BJT时间</text>
+          <text class="info-value">{{log.btcTime}}</text>
+        </view>
+        <view class="info-item">
+          <text class="info-label">UTC时间</text>
+          <text class="info-value">{{log.utcTime}}</text>
+        </view>
+        <view class="info-item" wx:if="{{log.qth}}">
+          <text class="info-label">位置</text>
+          <text class="info-value">{{log.qth}}</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="info-section" wx:if="{{log.equipment || log.antenna || log.power}}">
+      <view class="section-title">设备信息</view>
+      <view class="info-grid">
+        <view class="info-item" wx:if="{{log.equipment}}">
+          <text class="info-label">设备</text>
+          <text class="info-value">{{log.equipment}}</text>
+        </view>
+        <view class="info-item" wx:if="{{log.antenna}}">
+          <text class="info-label">天线</text>
+          <text class="info-value">{{log.antenna}}</text>
+        </view>
+        <view class="info-item" wx:if="{{log.power}}">
+          <text class="info-label">功率</text>
+          <text class="info-value">{{log.power}}W</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="info-section">
+      <view class="section-title">信号报告</view>
+      <view class="info-grid">
+        <view class="info-item">
+          <text class="info-label">己方 RST</text>
+          <text class="info-value">{{myRst}}</text>
+        </view>
+        <view class="info-item">
+          <text class="info-label">对方 RST</text>
+          <text class="info-value">{{theirRst}}</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="info-section" wx:if="{{log.weather || log.notes}}">
+      <view class="section-title">其他信息</view>
+      <view class="info-grid">
+        <view class="info-item" wx:if="{{log.weather}}">
+          <text class="info-label">天气</text>
+          <text class="info-value">
+            <text>{{weatherIcon}}</text>
+            <text wx:if="{{weatherText}}"> {{weatherText}}</text>
+          </text>
+        </view>
+        <view class="info-remarks" wx:if="{{log.notes}}">
+          <text class="info-label">备注</text>
+          <text class="info-value">{{log.notes}}</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="log-footer">
+      <text class="footer-text">记录时间: {{recordTime}}</text>
+    </view>
+  </view>
+
+  <view class="action-bar">
+    <button class="action-btn delete-btn" bindtap="deleteLog">删除日志</button>
+  </view>
+</view>

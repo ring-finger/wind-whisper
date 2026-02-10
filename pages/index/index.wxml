@@ -1,0 +1,322 @@
+<view class="container">
+  <view class="form-item date-time-row">
+    <view class="date-section">
+      <view class="form-label">日期 DATE</view>
+      <picker mode="date" value="{{formData.date}}" bindchange="onDateChange">
+        <view class="form-input picker-input">{{formData.date}}</view>
+      </picker>
+    </view>
+    
+    <view class="time-section">
+      <view class="form-label">时间</view>
+      <view class="time-input-wrapper">
+        <view class="time-type-toggle" bindtap="toggleTimeType">
+          <text>{{currentTimeType}}:</text>
+        </view>
+        <picker mode="time" value="{{formData[currentTimeType === 'BJT' ? 'bjcTime' : 'utcTime']}}" bindchange="on{{currentTimeType === 'BJT' ? 'Bjc' : 'Utc'}}TimeChange">
+          <view class="form-input picker-input" style="flex:1">{{formData[currentTimeType === 'BJT' ? 'bjcTime' : 'utcTime']}}</view>
+        </picker>
+        <view class="refresh-btn" bindtap="refreshTime">↻</view>
+      </view>
+    </view>
+  </view>
+
+  <view class="form-item">
+    <view class="form-label">频率 FREQUENCY (MHz)</view>
+    <input 
+      class="form-input" 
+      type="digit" 
+      value="{{formData.frequency}}" 
+      bindinput="onFrequencyInput"
+      placeholder="例如: 438.500"
+    />
+    <view wx:if="{{frequencySuggestions.length > 0}}" class="frequency-suggestions">
+      <view 
+        wx:for="{{frequencySuggestions}}" 
+        wx:key="index" 
+        class="suggestion-item"
+        bindtap="selectFrequency"
+        data-frequency="{{item}}"
+      >
+        {{item}} MHz
+      </view>
+    </view>
+  </view>
+
+  <view class="form-item">
+    <view class="form-label">呼号 CALLSIGN</view>
+    <input 
+      class="form-input" 
+      value="{{formData.callSign}}" 
+      bindinput="onCallSignInput"
+      placeholder="输入呼号"
+      confirm-type="done"
+    />
+    <view wx:if="{{callSuggestions.length > 0}}" class="call-suggestions">
+      <view 
+        wx:for="{{callSuggestions}}" 
+        wx:key="index" 
+        class="suggestion-item"
+        bindtap="selectCallSign"
+        data-callsign="{{item}}"
+      >
+        {{item}}
+      </view>
+    </view>
+  </view>
+
+  <view class="form-item">
+    <view class="form-label">天气 WX (可选)</view>
+    <view class="weather-icons">
+      <view 
+        wx:for="{{weatherIcons}}" 
+        wx:key="index" 
+        class="weather-icon {{formData.weather === item.value ? 'selected' : ''}}"
+        bindtap="selectWeather"
+        data-value="{{item.value}}"
+      >
+        {{item.icon}}
+      </view>
+    </view>
+  </view>
+
+  <view class="form-item">
+    <view class="form-label">工作模式 MODE</view>
+    <view class="mode-tags">
+      <view 
+        wx:for="{{modes}}" 
+        wx:key="index" 
+        class="mode-tag {{formData.mode === item ? 'selected' : ''}}"
+        bindtap="selectMode"
+        data-mode="{{item}}"
+      >
+        {{item}}
+      </view>
+    </view>
+  </view>
+
+  <view class="form-item">
+    <view class="form-label">信号报告 RST</view>
+    
+    <view class="rst-section">
+      <view class="rst-title">己方 RST</view>
+      <view class="rst-inputs">
+        <view class="rst-item">
+          <view class="rst-label">R (可读性)</view>
+          <input 
+            id="myRstR"
+            class="form-input {{inputFocus.myRstR ? 'input-focused' : ''}}" 
+            type="number" 
+            value="{{formData.rst.myRst.r}}" 
+            focus="{{inputFocus.myRstR}}"
+            bindinput="onRstInput"
+            bindfocus="onRstFocus"
+            bindblur="onRstBlur"
+            data-type="myRst"
+            data-field="r"
+            placeholder="1-5"
+            maxlength="1"
+          />
+        </view>
+        <view class="rst-item">
+          <view class="rst-label">S (强度)</view>
+          <input 
+            id="myRstS"
+            class="form-input {{inputFocus.myRstS ? 'input-focused' : ''}}" 
+            type="number" 
+            value="{{formData.rst.myRst.s}}" 
+            focus="{{inputFocus.myRstS}}"
+            bindinput="onRstInput"
+            bindfocus="onRstFocus"
+            bindblur="onRstBlur"
+            data-type="myRst"
+            data-field="s"
+            placeholder="1-9"
+            maxlength="1"
+          />
+        </view>
+        <view class="rst-item">
+          <view class="rst-label">T (音调)</view>
+          <!-- 条件判断顺序优化：先判断是否为UHF模式 -->
+          <block wx:if="{{isUHF}}">
+            <!-- UHF模式：仅当RS=59时显示+号按钮，否则不显示任何内容 -->
+            <view wx:if="{{formData.rst.myRst.r === '5' && formData.rst.myRst.s === '9'}}" class="rst-plus-toggle" bindtap="toggleRstPlus" data-type="myRst">
+              <view class="plus-checkbox {{rstPlusSelected.myRst ? 'checked' : ''}}">
+                <text class="plus-sign">+</text>
+              </view>
+            </view>
+            <!-- UHF模式下，RS不等于59时，不显示任何内容 -->
+          </block>
+          <input 
+            wx:elif="{{isVHF}}"
+            id="myRstT"
+            class="form-input {{inputFocus.myRstT ? 'input-focused' : ''}}" 
+            type="number" 
+            value="{{formData.rst.myRst.t}}" 
+            focus="{{inputFocus.myRstT}}"
+            bindinput="onRstInput"
+            bindfocus="onRstFocus"
+            bindblur="onRstBlur"
+            data-type="myRst"
+            data-field="t"
+            placeholder="1-9"
+            maxlength="1"
+          />
+          <input 
+            wx:else
+            id="myRstT"
+            class="form-input {{inputFocus.myRstT ? 'input-focused' : ''}}" 
+            type="text" 
+            value="{{formData.rst.myRst.t}}" 
+            focus="{{inputFocus.myRstT}}"
+            bindinput="onRstInput"
+            bindfocus="onRstFocus"
+            bindblur="onRstBlur"
+            data-type="myRst"
+            data-field="t"
+            placeholder="1-9或+"
+            maxlength="1"
+          />
+        </view>
+      </view>
+    </view>
+
+    <view class="rst-section">
+      <view class="rst-title">对方 RST</view>
+      <view class="rst-inputs">
+        <view class="rst-item">
+          <view class="rst-label">R (可读性)</view>
+          <input 
+            id="theirRstR"
+            class="form-input {{inputFocus.theirRstR ? 'input-focused' : ''}}" 
+            type="number" 
+            value="{{formData.rst.theirRst.r}}" 
+            focus="{{inputFocus.theirRstR}}"
+            bindinput="onRstInput"
+            bindfocus="onRstFocus"
+            bindblur="onRstBlur"
+            data-type="theirRst"
+            data-field="r"
+            placeholder="1-5"
+            maxlength="1"
+          />
+        </view>
+        <view class="rst-item">
+          <view class="rst-label">S (强度)</view>
+          <input 
+            id="theirRstS"
+            class="form-input {{inputFocus.theirRstS ? 'input-focused' : ''}}" 
+            type="number" 
+            value="{{formData.rst.theirRst.s}}" 
+            focus="{{inputFocus.theirRstS}}"
+            bindinput="onRstInput"
+            bindfocus="onRstFocus"
+            bindblur="onRstBlur"
+            data-type="theirRst"
+            data-field="s"
+            placeholder="1-9"
+            maxlength="1"
+          />
+        </view>
+        <view class="rst-item">
+          <view class="rst-label">T (音调)</view>
+          <!-- 条件判断顺序优化：先判断是否为UHF模式 -->
+          <block wx:if="{{isUHF}}">
+            <!-- UHF模式：仅当RS=59时显示+号按钮，否则不显示任何内容 -->
+            <view wx:if="{{formData.rst.theirRst.r === '5' && formData.rst.theirRst.s === '9'}}" class="rst-plus-toggle" bindtap="toggleRstPlus" data-type="theirRst">
+              <view class="plus-checkbox {{rstPlusSelected.theirRst ? 'checked' : ''}}">
+                <text class="plus-sign">+</text>
+              </view>
+            </view>
+            <!-- UHF模式下，RS不等于59时，不显示任何内容 -->
+          </block>
+          <input 
+            wx:elif="{{isVHF}}"
+            id="theirRstT"
+            class="form-input {{inputFocus.theirRstT ? 'input-focused' : ''}}" 
+            type="number" 
+            value="{{formData.rst.theirRst.t}}" 
+            focus="{{inputFocus.theirRstT}}"
+            bindinput="onRstInput"
+            bindfocus="onRstFocus"
+            bindblur="onRstBlur"
+            data-type="theirRst"
+            data-field="t"
+            placeholder="1-9"
+            maxlength="1"
+          />
+          <input 
+            wx:else
+            id="theirRstT"
+            class="form-input {{inputFocus.theirRstT ? 'input-focused' : ''}}" 
+            type="text" 
+            value="{{formData.rst.theirRst.t}}" 
+            focus="{{inputFocus.theirRstT}}"
+            bindinput="onRstInput"
+            bindfocus="onRstFocus"
+            bindblur="onRstBlur"
+            data-type="theirRst"
+            data-field="t"
+            placeholder="1-9或+"
+            maxlength="1"
+          />
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="form-item">
+    <view class="form-label">位置 QTH</view>
+    <input 
+      class="form-input" 
+      type="text"
+      value="{{formData.qth}}" 
+      bindinput="onQthInput"
+      placeholder="输入位置信息"
+    />
+  </view>
+
+  <view class="form-item">
+    <view class="form-label">功率 PWR (W)</view>
+    <input 
+      class="form-input" 
+      type="number" 
+      value="{{formData.power}}" 
+      bindinput="onPowerInput"
+      placeholder="输入功率"
+    />
+  </view>
+
+  <view class="form-item">
+    <view class="form-label">设备 EQUIPMENT</view>
+    <input 
+      class="form-input" 
+      value="{{formData.equipment}}" 
+      bindinput="onEquipmentInput"
+      placeholder="输入设备型号"
+    />
+  </view>
+
+  <view class="form-item">
+    <view class="form-label">天线 ANTENNA</view>
+    <input 
+      class="form-input" 
+      value="{{formData.antenna}}" 
+      bindinput="onAntennaInput"
+      placeholder="输入天线类型"
+    />
+  </view>
+
+  <view class="form-item">
+    <view class="form-label">备注 NOTES</view>
+    <textarea 
+      class="form-input" 
+      value="{{formData.notes}}" 
+      bindinput="onNotesInput"
+      placeholder="输入备注信息"
+      style="height: 150rpx;"
+    />
+  </view>
+
+  <button class="submit-btn" bindtap="submitLog">保存日志</button>
+</view>

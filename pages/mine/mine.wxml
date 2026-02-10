@@ -1,0 +1,76 @@
+<view class="container">
+  <view wx:if="{{easterEggMessage}}" class="easter-egg-message">{{easterEggMessage}}</view>
+
+  <view class="user-info">
+    <view class="avatar-section">
+      <view class="avatar">👤</view>
+      <view class="nickname">未设置昵称</view>
+    </view>
+
+    <view class="info-item">
+      <view class="info-label">个人呼号</view>
+      <view class="info-value">{{myCallSign || '未设置'}}</view>
+      <view class="edit-btn" bindtap="editCallSign">编辑</view>
+    </view>
+
+    <view class="info-item">
+      <view class="info-label">通联次数</view>
+      <view class="info-value">{{contactCount}} 次</view>
+    </view>
+  </view>
+
+  <view class="action-section">
+    <view class="action-item" bindtap="exportLogs">
+      <text class="action-icon">📤</text>
+      <text class="action-text">导出日志</text>
+    </view>
+    <view class="action-item" bindtap="clearLogs">
+      <text class="action-icon">🗑️</text>
+      <text class="action-text">清空日志</text>
+    </view>
+    <view class="action-item" bindtap="toggleAuthorInfo">
+      <text class="action-icon">👨‍💻</text>
+      <text class="action-text">联系作者</text>
+    </view>
+    <!-- <view class="action-item" bindtap="toggleThanksInfo">
+      <text class="action-icon">🙏</text>
+      <text class="action-text">感谢支持</text>
+    </view> -->
+  </view>
+
+  <view wx:if="{{showAuthorInfo}}" class="author-card">
+    <view class="author-header">
+      <text class="author-label">作者：</text>
+      <text class="author-name easter-egg-trigger" bindtap="onAuthorTap">{{authorCallSign}}</text>
+    </view>
+    <view class="author-contact-btn" bindtap="contactAuthor">
+      <text class="contact-icon">📱</text>
+      <text class="contact-text">联系作者</text>
+    </view>
+    <view class="author-tip">关注公众号【饮月听风】</view>
+  </view>
+
+  <!-- <view wx:if="{{showThanksInfo}}" class="thanks-card">
+    <view class="thanks-title">感谢支持</view>
+    <view class="thanks-content">
+      <text class="thanks-label">开发利器：</text>
+      <text class="thanks-value">TREA</text>
+    </view>
+    <view class="partners-grid">
+      <view class="partner-column">
+        <view class="partner-type">中继台</view>
+        <view class="type-divider"></view>
+        <block wx:for="{{repeaters}}" wx:key="index">
+          <view class="partner-item repeater-item clickable" bindtap="showRepeaterMessage" data-index="{{index}}">{{item.name}}</view>
+        </block>
+      </view>
+      <view class="partner-column">
+        <view class="partner-type">HAM</view>
+        <view class="type-divider"></view>
+        <block wx:for="{{hams}}" wx:key="index">
+          <view class="partner-item clickable" bindtap="showHamMessage" data-index="{{index}}">{{item.name}}</view>
+        </block>
+      </view>
+    </view>
+  </view> -->
+</view>

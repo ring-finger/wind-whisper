@@ -1,0 +1,102 @@
+.call-suggestions {
+  margin-top: 10rpx;
+  background: #fff;
+  border-radius: 8rpx;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.frequency-suggestions {
+  margin-top: 10rpx;
+  background: #fff;
+  border-radius: 8rpx;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.suggestion-item {
+  padding: 20rpx 30rpx;
+  border-bottom: 1rpx solid #f0f0f0;
+  font-size: 28rpx;
+  color: #333;
+}
+
+.suggestion-item:last-child {
+  border-bottom: none;
+}
+
+.suggestion-item:active {
+  background: #f5f5f5;
+}
+
+.rst-section {
+  margin-bottom: 12rpx;
+  padding: 16rpx;
+  background: #f9f9f9;
+  border-radius: 8rpx;
+}
+
+.rst-title {
+  font-size: 22rpx;
+  color: #666;
+  margin-bottom: 10rpx;
+  font-weight: 500;
+}
+
+.rst-item .form-input {
+  text-align: left;
+  font-size: 32rpx;
+  font-weight: bold;
+  letter-spacing: 0;
+}
+
+.rst-item .form-input.input-focused {
+  border-color: #1890ff;
+  box-shadow: 0 0 0 4rpx rgba(24, 144, 255, 0.1);
+}
+
+/* RST+号切换样式 */
+.rst-plus-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.plus-checkbox {
+  width: 70rpx;
+  height: 70rpx;
+  border: 2rpx solid #d9d9d9;
+  border-radius: 20rpx; /* 增大圆角 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #fff;
+  box-shadow: 0 4rpx 8rpx rgba(0, 0, 0, 0.1); /* 添加阴影效果 */
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); /* 平滑过渡 */
+  transform: translateY(0); /* 初始位置 */
+}
+
+.plus-checkbox:active {
+  transform: translateY(2rpx); /* 点击时的下沉效果 */
+  box-shadow: 0 2rpx 4rpx rgba(0, 0, 0, 0.1);
+}
+
+.plus-checkbox.checked {
+  border-color: #1890ff;
+  background-color: #e6f7ff;
+  box-shadow: 
+    0 6rpx 12rpx rgba(24, 144, 255, 0.15), /* 外阴影增强 */
+    inset 0 2rpx 4rpx rgba(255, 255, 255, 0.8); /* 内阴影，营造3D效果 */
+  transform: translateY(-2rpx); /* 上浮效果，增强3D感 */
+}
+
+.plus-sign {
+  font-size: 40rpx;
+  font-weight: bold;
+  color: #1890ff;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); /* 平滑过渡 */
+  line-height: 1;
+  margin-top: -2rpx; /* 微调垂直位置，使其居中 */
+  text-shadow: 0 2rpx 4rpx rgba(24, 144, 255, 0.2); /* 文字阴影，增强立体感 */
+}
