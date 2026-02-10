@@ -204,3 +204,7 @@ ham/
 ## 许可证
 
 MIT License
+=======
+# wind-whisper
+业余无线电通联日志小程序
+>>>>>>> c022ce6acb203dfa75faa9bb4b2806b0f33160cd
