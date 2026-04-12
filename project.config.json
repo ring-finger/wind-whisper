@@ -47,7 +47,7 @@
     "disableSWC": true
   },
   "compileType": "miniprogram",
-  "libVersion": "2.19.4",
+  "libVersion": "3.13.2",
   "appid": "tour-appid",
   "projectname": "ham-radio-log",
   "condition": {},
