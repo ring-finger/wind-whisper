@@ -1,45 +1,53 @@
 .container {
-  padding: 20rpx;
+  padding: 24rpx;
+  box-sizing: border-box;
+  min-height: 100vh;
+  background: var(--bg-main);
 }
 
 .log-detail-card {
-  background: #fff;
+  background: var(--card-bg);
   border-radius: 16rpx;
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.05);
+  box-shadow: 0 4rpx 24rpx rgba(0, 0, 0, 0.06);
   overflow: hidden;
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 12rpx;
   padding: 30rpx 30rpx 20rpx;
-  border-bottom: 1rpx solid #f0f0f0;
+  border-bottom: 1rpx solid rgba(0, 0, 0, 0.06);
 }
 
 .callsign {
   font-size: 40rpx;
   font-weight: bold;
-  color: #1890ff;
+  color: var(--primary-color);
 }
 
 .date {
-  font-size: 28rpx;
-  color: #999;
+  font-size: 26rpx;
+  color: var(--text-sec);
+  text-align: right;
+  max-width: 100%;
+  word-break: break-all;
 }
 
 .info-section {
   padding: 20rpx 30rpx;
-  border-bottom: 1rpx solid #f5f5f5;
+  border-bottom: 1rpx solid rgba(0, 0, 0, 0.05);
 }
 
 .section-title {
   font-size: 26rpx;
-  font-weight: 500;
-  color: #333;
+  font-weight: 600;
+  color: var(--text-main);
   margin-bottom: 20rpx;
   padding-left: 16rpx;
-  border-left: 6rpx solid #1890ff;
+  border-left: 6rpx solid var(--primary-color);
 }
 
 .info-grid {
@@ -55,14 +63,37 @@
   gap: 8rpx;
 }
 
+.info-item-block {
+  width: 100%;
+}
+
+.weather-detail-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+
+.weather-detail-emoji {
+  font-size: 44rpx;
+  line-height: 1;
+}
+
+.weather-detail-text {
+  font-size: 28rpx;
+  color: var(--text-main);
+  font-weight: 500;
+}
+
 .info-label {
   font-size: 24rpx;
-  color: #999;
+  color: var(--text-sec);
 }
 
 .info-value {
   font-size: 28rpx;
-  color: #333;
+  color: var(--text-main);
   word-break: break-all;
 }
 
@@ -74,38 +105,20 @@
   margin-top: 10rpx;
 }
 
-.rst-section {
-  display: flex;
-  gap: 40rpx;
-}
-
-.rst-item {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 8rpx;
-}
-
-.rst-label {
-  font-size: 24rpx;
-  color: #999;
-}
-
-.rst-value {
-  font-size: 36rpx;
-  font-weight: bold;
-  color: #333;
-  letter-spacing: 4rpx;
+.rst-accent {
+  color: var(--accent-orange);
+  font-weight: 700;
+  letter-spacing: 2rpx;
 }
 
 .log-footer {
   padding: 20rpx 30rpx;
-  background: #f9f9f9;
+  background: var(--bg-main);
 }
 
 .footer-text {
   font-size: 24rpx;
-  color: #999;
+  color: var(--text-sec);
 }
 
 .action-bar {
@@ -127,12 +140,12 @@
 }
 
 .delete-btn {
-  background: #fff;
-  color: #ff4d4f;
-  border: 2rpx solid #ff4d4f;
+  background: var(--card-bg);
+  color: #ff3b30;
+  border: 2rpx solid #ff3b30;
 }
 
 .edit-btn {
-  background: #1890ff;
+  background: var(--primary-color);
   color: #fff;
 }

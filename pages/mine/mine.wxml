@@ -1,76 +1,71 @@
-<view class="container">
+<view class="mine-page">
   <view wx:if="{{easterEggMessage}}" class="easter-egg-message">{{easterEggMessage}}</view>
 
-  <view class="user-info">
-    <view class="avatar-section">
-      <view class="avatar">👤</view>
-      <view class="nickname">未设置昵称</view>
+  <view class="mine-card profile-row">
+    <view class="avatar-stack">
+      <view class="avatar-face">
+        <image wx:if="{{userAvatarUrl}}" class="user-avatar-img" src="{{userAvatarUrl}}" mode="aspectFill" />
+        <view wx:else class="user-avatar-placeholder" />
+      </view>
+      <button
+        class="avatar-tap"
+        open-type="chooseAvatar"
+        bindchooseavatar="onChooseAvatar"
+        hover-class="button-hover"
+      />
     </view>
+    <input
+      class="nickname-input"
+      type="nickname"
+      value="{{userNickName}}"
+      placeholder="昵称"
+      bindinput="onNicknameInput"
+      bindblur="onNicknameBlur"
+    />
+  </view>
 
-    <view class="info-item">
-      <view class="info-label">个人呼号</view>
-      <view class="info-value">{{myCallSign || '未设置'}}</view>
-      <view class="edit-btn" bindtap="editCallSign">编辑</view>
+  <view class="mine-card mine-group">
+    <view class="cell cell-tap" hover-class="cell-hover" bindtap="editCallSign">
+      <view class="cell-primary-block">
+        <text class="cell-label cell-label-strong">无线电呼号</text>
+      </view>
+      <text class="cell-value cell-value-callsign font-mono">{{myCallSign || '未设置'}}</text>
+      <text class="cell-chevron">›</text>
     </view>
-
-    <view class="info-item">
-      <view class="info-label">通联次数</view>
-      <view class="info-value">{{contactCount}} 次</view>
+    <view class="cell cell-static">
+      <text class="cell-label cell-label-strong">通联记录次数</text>
+      <text class="cell-value cell-value-count">{{contactCount}} 次</text>
+      <text class="cell-chevron cell-chevron-placeholder" aria-hidden="true">›</text>
     </view>
   </view>
 
-  <view class="action-section">
-    <view class="action-item" bindtap="exportLogs">
-      <text class="action-icon">📤</text>
-      <text class="action-text">导出日志</text>
+  <view class="mine-card mine-group">
+    <view class="cell cell-tap" hover-class="cell-hover" bindtap="exportLogs">
+      <text class="cell-label cell-label-full">导出日志</text>
+      <text class="cell-chevron">›</text>
     </view>
-    <view class="action-item" bindtap="clearLogs">
-      <text class="action-icon">🗑️</text>
-      <text class="action-text">清空日志</text>
+    <view class="cell cell-tap" hover-class="cell-hover" bindtap="clearLogs">
+      <text class="cell-label cell-label-full">清空日志</text>
+      <text class="cell-chevron">›</text>
     </view>
-    <view class="action-item" bindtap="toggleAuthorInfo">
-      <text class="action-icon">👨‍💻</text>
-      <text class="action-text">联系作者</text>
-    </view>
-    <!-- <view class="action-item" bindtap="toggleThanksInfo">
-      <text class="action-icon">🙏</text>
-      <text class="action-text">感谢支持</text>
-    </view> -->
   </view>
 
-  <view wx:if="{{showAuthorInfo}}" class="author-card">
+  <view class="mine-card mine-group">
+    <view class="cell cell-tap" hover-class="cell-hover" bindtap="toggleAuthorInfo">
+      <text class="cell-label cell-label-full">联系作者</text>
+      <text class="cell-chevron">›</text>
+    </view>
+  </view>
+
+  <view wx:if="{{showAuthorInfo}}" class="mine-card author-card">
     <view class="author-header">
-      <text class="author-label">作者：</text>
-      <text class="author-name easter-egg-trigger" bindtap="onAuthorTap">{{authorCallSign}}</text>
+      <text class="author-label">作者</text>
+      <text class="author-name font-mono easter-egg-trigger" bindtap="onAuthorTap">{{authorCallSign}}</text>
     </view>
-    <view class="author-contact-btn" bindtap="contactAuthor">
-      <text class="contact-icon">📱</text>
-      <text class="contact-text">联系作者</text>
+    <view class="author-action" hover-class="button-hover" bindtap="contactAuthor">
+      <text class="author-action-text">打开公众号文章</text>
+      <text class="author-action-chevron">›</text>
     </view>
-    <view class="author-tip">关注公众号【饮月听风】</view>
+    <text class="author-hint">关注公众号【饮月听风】</text>
   </view>
-
-  <!-- <view wx:if="{{showThanksInfo}}" class="thanks-card">
-    <view class="thanks-title">感谢支持</view>
-    <view class="thanks-content">
-      <text class="thanks-label">开发利器：</text>
-      <text class="thanks-value">TREA</text>
-    </view>
-    <view class="partners-grid">
-      <view class="partner-column">
-        <view class="partner-type">中继台</view>
-        <view class="type-divider"></view>
-        <block wx:for="{{repeaters}}" wx:key="index">
-          <view class="partner-item repeater-item clickable" bindtap="showRepeaterMessage" data-index="{{index}}">{{item.name}}</view>
-        </block>
-      </view>
-      <view class="partner-column">
-        <view class="partner-type">HAM</view>
-        <view class="type-divider"></view>
-        <block wx:for="{{hams}}" wx:key="index">
-          <view class="partner-item clickable" bindtap="showHamMessage" data-index="{{index}}">{{item.name}}</view>
-        </block>
-      </view>
-    </view>
-  </view> -->
 </view>

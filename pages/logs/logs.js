@@ -1,155 +1,32 @@
-const app = getApp()
+const VIBRATE_TYPE = 'medium'
 
-// 分享标题常量
-const SHARE_TITLE = '风语纪<电波有痕，风语为纪> - 查看我的通联记录'
+function formatRstBlock(rst) {
+  if (!rst) return { my: '', their: '' }
+  let my = ''
+  let their = ''
+  if (rst.myRst) {
+    my = `${rst.myRst.r || ''}${rst.myRst.s || ''}${rst.myRst.t || ''}`
+  } else if (rst.r || rst.s || rst.t) {
+    my = `${rst.r || ''}${rst.s || ''}${rst.t || ''}`
+  }
+  if (rst.theirRst) {
+    their = `${rst.theirRst.r || ''}${rst.theirRst.s || ''}${rst.theirRst.t || ''}`
+  }
+  return { my, their }
+}
 
 Page({
   data: {
-    logs: [],
     filteredLogs: [],
-    searchCallSign: '',
-    startDate: '',
-    endDate: '',
+    _allLogs: [],
+    searchQuery: '',
+    dateFrom: '',
+    dateTo: '',
     searchExpanded: false
-  },
-
-  onLoad() {
-    this.loadLogs()
   },
 
   onShow() {
     this.loadLogs()
-  },
-
-  loadLogs() {
-    try {
-      const logs = wx.getStorageSync('contactLogs') || []
-      const formattedLogs = logs.map(log => {
-        if (log.rst && !log.rst.myRst && !log.rst.theirRst) {
-          var result = {}
-          for (var key in log) {
-            result[key] = log[key]
-          }
-          result.rst = {
-            myRst: { r: log.rst.r || '', s: log.rst.s || '', t: log.rst.t || '' },
-            theirRst: { r: '', s: '', t: '' }
-          }
-          return result
-        }
-        return log
-      })
-      this.setData({
-        logs: formattedLogs,
-        filteredLogs: formattedLogs
-      })
-    } catch (e) {
-      console.error('加载日志失败', e)
-      this.setData({
-        logs: [],
-        filteredLogs: []
-      })
-    }
-  },
-
-  onSearchCallSign(e) {
-    this.setData({
-      searchCallSign: e.detail.value.toUpperCase()
-    })
-  },
-
-  onStartDateChange(e) {
-    this.setData({
-      startDate: e.detail.value
-    })
-  },
-
-  onEndDateChange(e) {
-    this.setData({
-      endDate: e.detail.value
-    })
-  },
-
-  handleSearch() {
-    const logs = this.data.logs
-    const searchCallSign = this.data.searchCallSign
-    const startDate = this.data.startDate
-    const endDate = this.data.endDate
-    let filtered = logs
-
-    if (searchCallSign) {
-      filtered = filtered.filter(log => 
-        log.callSign.toUpperCase().includes(searchCallSign.toUpperCase())
-      )
-    }
-
-    if (startDate) {
-      filtered = filtered.filter(log => log.date >= startDate)
-    }
-
-    if (endDate) {
-      filtered = filtered.filter(log => log.date <= endDate)
-    }
-
-    this.setData({
-      filteredLogs: filtered
-    })
-
-    if (filtered.length === 0) {
-      wx.showToast({
-        title: '未找到匹配的日志',
-        icon: 'none'
-      })
-    }
-  },
-
-  handleReset() {
-    this.setData({
-      searchCallSign: '',
-      startDate: '',
-      endDate: '',
-      filteredLogs: this.data.logs
-    })
-  },
-
-  toggleSearch() {
-    this.setData({
-      searchExpanded: !this.data.searchExpanded
-    })
-  },
-
-  getWeatherIcon(value) {
-    const icons = {
-      'sunny': '☀️',
-      'cloudy': '⛅',
-      'rainy': '🌧️',
-      'stormy': '⛈️',
-      'snowy': '❄️',
-      'foggy': '🌫️',
-      'windy': '💨',
-      'night': '🌙'
-    }
-    return icons[value] || ''
-  },
-
-  getWeatherText(value) {
-    const texts = {
-      'sunny': '晴天',
-      'cloudy': '多云',
-      'rainy': '雨天',
-      'stormy': '雷雨',
-      'snowy': '雪天',
-      'foggy': '雾天',
-      'windy': '大风',
-      'night': '夜晚'
-    }
-    return texts[value] || ''
-  },
-
-  viewLogDetail(e) {
-    const id = e.currentTarget.dataset.id
-    wx.navigateTo({
-      url: '/pages/log-detail/log-detail?id=' + id
-    })
   },
 
   onPullDownRefresh() {
@@ -157,19 +34,90 @@ Page({
     wx.stopPullDownRefresh()
   },
 
-  onShareAppMessage() {
-    return {
-      title: SHARE_TITLE,
-      path: '/pages/logs/logs',
-      imageUrl: '/images/cover.jpg'
+  loadLogs() {
+    try {
+      const logs = wx.getStorageSync('contactLogs') || []
+      this.setData({ _allLogs: logs })
+      this.applyFilter(logs)
+    } catch (e) {
+      console.error(e)
+      this.setData({ filteredLogs: [] })
     }
   },
 
-  onShareTimeline() {
-    return {
-      title: SHARE_TITLE,
-      query: 'page=logs',
-      imageUrl: '/images/cover.jpg'
-    }
+  applyFilter(sourceLogs) {
+    const logs = sourceLogs || this.data._allLogs || []
+    let q = (this.data.searchQuery || '').trim().toUpperCase()
+    const from = this.data.dateFrom
+    const to = this.data.dateTo
+
+    const filtered = logs.filter((log) => {
+      if (q) {
+        const cs = (log.callSign || '').toUpperCase()
+        const freq = String(log.frequency || '')
+        const mode = String(log.mode || '')
+        if (!cs.includes(q) && !freq.includes(q) && !mode.toUpperCase().includes(q)) {
+          return false
+        }
+      }
+      const d = log.date || ''
+      if (from && d && d < from) return false
+      if (to && d && d > to) return false
+      return true
+    })
+
+    const list = filtered.map((log) => {
+      const { my, their } = formatRstBlock(log.rst)
+      return {
+        ...log,
+        rstMy: my,
+        rstTheir: their,
+        rstSummary: [my, their].filter(Boolean).join(' / ')
+      }
+    })
+
+    this.setData({ filteredLogs: list })
+  },
+
+  onSearchInput(e) {
+    const searchQuery = e.detail.value
+    this.setData({ searchQuery }, () => this.applyFilter())
+  },
+
+  onSearchConfirm() {
+    this.applyFilter()
+  },
+
+  toggleSearchExpanded() {
+    wx.vibrateShort({ type: VIBRATE_TYPE })
+    this.setData({
+      searchExpanded: !this.data.searchExpanded
+    })
+  },
+
+  onDateFromChange(e) {
+    this.setData({ dateFrom: e.detail.value })
+  },
+
+  onDateToChange(e) {
+    this.setData({ dateTo: e.detail.value })
+  },
+
+  onDateSearch() {
+    wx.vibrateShort({ type: VIBRATE_TYPE })
+    this.applyFilter()
+  },
+
+  onDateReset() {
+    wx.vibrateShort({ type: VIBRATE_TYPE })
+    this.setData({ dateFrom: '', dateTo: '' }, () => this.applyFilter())
+  },
+
+  openDetail(e) {
+    const id = e.currentTarget.dataset.id
+    wx.vibrateShort({ type: VIBRATE_TYPE })
+    wx.navigateTo({
+      url: '/pages/log-detail/log-detail?id=' + id
+    })
   }
 })

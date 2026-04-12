@@ -7,15 +7,15 @@
     "pages/web-view/web-view"
   ],
   "window": {
-    "backgroundTextStyle": "light",
-    "navigationBarBackgroundColor": "#1890ff",
+    "backgroundTextStyle": "dark",
+    "navigationBarBackgroundColor": "#007AFF",
     "navigationBarTitleText": "业余无线电通联日志",
     "navigationBarTextStyle": "white",
-    "backgroundColor": "#f5f5f5"
+    "backgroundColor": "#F5F7FA"
   },
   "tabBar": {
-    "color": "#999999",
-    "selectedColor": "#1890ff",
+    "color": "#8E8E93",
+    "selectedColor": "#007AFF",
     "backgroundColor": "#ffffff",
     "borderStyle": "black",
     "list": [

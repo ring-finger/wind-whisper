@@ -1,23 +1,53 @@
 page {
-  background-color: #f5f5f5;
+  --primary-color: #007aff;
+  --bg-main: #f5f7fa;
+  --card-bg: #ffffff;
+  --text-main: #1c1c1e;
+  --text-sec: #8e8e93;
+  --accent-orange: #ff9500;
+  --primary-soft: rgba(0, 122, 255, 0.12);
+  --lcd-bg: #e8f2ff;
+
+  background-color: var(--bg-main);
+  color: var(--text-main);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
 }
 
+.font-mono {
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+}
+
+.button-hover {
+  opacity: 0.82;
+  transform: scale(0.98);
+}
+
 .container {
-  padding: 20rpx;
+  padding: 24rpx;
+  box-sizing: border-box;
+}
+
+.float-card {
+  background: var(--card-bg);
+  border-radius: 16rpx;
+  padding: 24rpx;
+  margin-bottom: 20rpx;
+  box-shadow: 0 4rpx 24rpx rgba(0, 0, 0, 0.06);
+  box-sizing: border-box;
 }
 
 .form-item {
-  background: #fff;
-  margin-bottom: 12rpx;
-  padding: 20rpx;
-  border-radius: 8rpx;
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.05);
+  background: var(--card-bg);
+  margin-bottom: 20rpx;
+  padding: 24rpx;
+  border-radius: 16rpx;
+  box-shadow: 0 4rpx 24rpx rgba(0, 0, 0, 0.06);
+  box-sizing: border-box;
 }
 
 .form-label {
   font-size: 24rpx;
-  color: #333;
+  color: var(--text-sec);
   margin-bottom: 12rpx;
   font-weight: 500;
 }
@@ -25,13 +55,15 @@ page {
 .form-input {
   width: 100%;
   height: 80rpx;
-  border: 2rpx solid #e8e8e8;
-  border-radius: 8rpx;
+  border: 1rpx solid rgba(0, 0, 0, 0.08);
+  border-radius: 12rpx;
   padding: 0 20rpx;
   font-size: 28rpx;
+  color: var(--text-main);
   box-sizing: border-box;
   text-align: left;
   line-height: 76rpx;
+  background: var(--card-bg);
 }
 
 .picker-input {
@@ -39,7 +71,7 @@ page {
 }
 
 .form-input:focus {
-  border-color: #1890ff;
+  border-color: var(--primary-color);
 }
 
 .time-row {
@@ -65,16 +97,16 @@ page {
 }
 
 .time-type-toggle {
-  padding: 10rpx 20rpx;
-  background: #f0f0f0;
-  border-radius: 8rpx;
-  font-size: 24rpx;
-  font-weight: 500;
-  cursor: pointer;
+  padding: 10rpx 16rpx;
+  background: var(--bg-main);
+  border-radius: 12rpx;
+  font-size: 22rpx;
+  font-weight: 600;
+  color: var(--text-main);
 }
 
 .time-type-toggle:active {
-  background: #e0e0e0;
+  opacity: 0.85;
 }
 
 .time-input-wrapper {
@@ -90,13 +122,14 @@ page {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f0f0f0;
-  border-radius: 8rpx;
-  font-size: 32rpx;
+  background: var(--bg-main);
+  border-radius: 12rpx;
+  font-size: 30rpx;
+  color: var(--primary-color);
 }
 
 .refresh-btn:active {
-  background: #e0e0e0;
+  opacity: 0.85;
 }
 
 .weather-icons {
@@ -108,20 +141,20 @@ page {
 }
 
 .weather-icon {
-  height: 90rpx;
+  height: 96rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f5f5f5;
-  border-radius: 12rpx;
-  font-size: 44rpx;
-  border: 2rpx solid transparent;
+  background: var(--bg-main);
+  border-radius: 50%;
+  border: none;
   box-sizing: border-box;
+  transition: all 0.3s ease;
 }
 
 .weather-icon.selected {
-  border-color: #1890ff;
-  background: #e6f7ff;
+  background: var(--primary-soft);
+  box-shadow: 0 0 0 3rpx var(--primary-color);
 }
 
 .mode-tags {
@@ -131,22 +164,23 @@ page {
 }
 
 .mode-tag {
-  padding: 16rpx 32rpx;
-  background: #f5f5f5;
-  border-radius: 40rpx;
+  padding: 14rpx 28rpx;
+  background: rgba(142, 142, 147, 0.15);
+  border-radius: 12rpx;
   font-size: 26rpx;
-  color: #666;
-  border: 2rpx solid transparent;
+  color: var(--text-main);
+  border: none;
+  transition: all 0.2s ease;
 }
 
 .mode-tag.selected {
-  background: #1890ff;
+  background: var(--primary-color);
   color: #fff;
 }
 
 .rst-inputs {
   display: flex;
-  gap: 20rpx;
+  gap: 16rpx;
 }
 
 .rst-item {
@@ -154,33 +188,41 @@ page {
 }
 
 .rst-label {
-  font-size: 24rpx;
-  color: #999;
+  font-size: 22rpx;
+  color: var(--text-sec);
   margin-bottom: 10rpx;
   text-align: center;
 }
 
 .submit-btn {
   width: 100%;
-  height: 90rpx;
-  background: #1890ff;
+  height: 96rpx;
+  line-height: 96rpx;
+  background: var(--primary-color);
   color: #fff;
-  border-radius: 12rpx;
+  border-radius: 999rpx;
   font-size: 32rpx;
-  font-weight: 500;
-  margin-top: 40rpx;
+  font-weight: 600;
+  margin-top: 32rpx;
+  border: none;
+  box-shadow: 0 8rpx 28rpx rgba(0, 122, 255, 0.35);
+  text-align: center;
+}
+
+.submit-btn::after {
+  border: none;
 }
 
 .submit-btn:active {
-  background: #096dd9;
+  opacity: 0.92;
 }
 
 .log-item {
-  background: #fff;
+  background: var(--card-bg);
   margin-bottom: 20rpx;
   padding: 30rpx;
-  border-radius: 12rpx;
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.05);
+  border-radius: 16rpx;
+  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.06);
 }
 
 .log-header {
@@ -193,12 +235,12 @@ page {
 .log-callsign {
   font-size: 36rpx;
   font-weight: bold;
-  color: #1890ff;
+  color: var(--primary-color);
 }
 
 .log-date {
   font-size: 24rpx;
-  color: #999;
+  color: var(--text-sec);
 }
 
 .log-detail {
@@ -206,7 +248,7 @@ page {
   flex-wrap: wrap;
   gap: 20rpx;
   font-size: 26rpx;
-  color: #666;
+  color: var(--text-sec);
 }
 
 .log-detail-item {
@@ -218,6 +260,6 @@ page {
 .empty-tip {
   text-align: center;
   padding: 100rpx 0;
-  color: #999;
+  color: var(--text-sec);
   font-size: 28rpx;
 }

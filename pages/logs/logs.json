@@ -1,3 +1,6 @@
 {
-  "navigationBarTitleText": "通联日志"
+  "navigationBarTitleText": "通联列表",
+  "enablePullDownRefresh": true,
+  "backgroundTextStyle": "dark",
+  "usingComponents": {}
 }

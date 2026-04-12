@@ -1,102 +1,297 @@
-.call-suggestions {
-  margin-top: 10rpx;
-  background: #fff;
-  border-radius: 8rpx;
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.1);
-  overflow: hidden;
+.page-index {
+  padding: 20rpx 24rpx 48rpx;
+  box-sizing: border-box;
+  min-height: 100vh;
+  background: var(--bg-main);
 }
 
+.submit-actions {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  margin-top: 32rpx;
+  padding: 0 8rpx;
+  box-sizing: border-box;
+}
+
+.submit-actions .submit-btn {
+  width: 88%;
+  max-width: 640rpx;
+  margin-top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.header-card {
+  padding: 20rpx 24rpx;
+}
+
+.header-strip {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.header-tz-btns {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  padding: 4rpx;
+  background: var(--bg-main);
+  border-radius: 12rpx;
+}
+
+.header-tz-btn {
+  padding: 10rpx 22rpx;
+  border-radius: 10rpx;
+  font-size: 24rpx;
+  font-weight: 600;
+  color: var(--text-sec);
+  background: transparent;
+}
+
+.header-tz-btn-active {
+  background: var(--primary-color);
+  color: #fff;
+  font-weight: 700;
+}
+
+.header-datetime-row {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 20rpx;
+  min-width: 0;
+}
+
+.header-date {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: var(--text-main);
+  letter-spacing: 1rpx;
+}
+
+.header-time {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: var(--text-main);
+  letter-spacing: 2rpx;
+}
+
+.header-strip .refresh-btn {
+  flex-shrink: 0;
+}
+
+.lcd-wrap {
+  display: flex;
+  align-items: center;
+  background: var(--lcd-bg);
+  border-radius: 12rpx;
+  padding: 8rpx 20rpx 8rpx 24rpx;
+  box-shadow: inset 0 2rpx 8rpx rgba(0, 122, 255, 0.08);
+  border: 1rpx solid rgba(0, 122, 255, 0.12);
+}
+
+.lcd-input {
+  flex: 1;
+  height: 88rpx;
+  font-size: 40rpx;
+  font-weight: 700;
+  text-align: right;
+  color: var(--text-main);
+  border: none;
+  background: transparent;
+}
+
+.lcd-suffix {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: var(--text-sec);
+  margin-left: 12rpx;
+  flex-shrink: 0;
+}
+
+.callsign-input {
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 2rpx;
+}
+
+.input-minimal {
+  border: none;
+  border-bottom: 1rpx solid rgba(0, 0, 0, 0.08);
+  border-radius: 0;
+  background: transparent;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.textarea-minimal {
+  min-height: 160rpx;
+  height: auto;
+  line-height: 1.5;
+  border: none;
+  border-radius: 12rpx;
+  background: var(--bg-main);
+  padding: 20rpx;
+  box-sizing: border-box;
+}
+
+.call-suggestions,
 .frequency-suggestions {
-  margin-top: 10rpx;
-  background: #fff;
-  border-radius: 8rpx;
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.1);
+  margin-top: 12rpx;
+  background: var(--card-bg);
+  border-radius: 12rpx;
+  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.06);
   overflow: hidden;
 }
 
 .suggestion-item {
-  padding: 20rpx 30rpx;
-  border-bottom: 1rpx solid #f0f0f0;
+  padding: 20rpx 28rpx;
+  border-bottom: 1rpx solid rgba(0, 0, 0, 0.05);
   font-size: 28rpx;
-  color: #333;
+  color: var(--text-main);
 }
 
 .suggestion-item:last-child {
   border-bottom: none;
 }
 
-.suggestion-item:active {
-  background: #f5f5f5;
+.page-index .weather-icons {
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12rpx;
 }
 
-.rst-section {
-  margin-bottom: 12rpx;
-  padding: 16rpx;
-  background: #f9f9f9;
-  border-radius: 8rpx;
+.page-index .weather-icon-real {
+  height: auto;
+  min-height: 120rpx;
+  flex-direction: column;
+  padding: 12rpx 6rpx 14rpx;
+  border-radius: 16rpx;
+  gap: 6rpx;
 }
 
-.rst-title {
+.page-index .weather-icon-real .weather-emoji {
+  font-size: 52rpx;
+  line-height: 1.1;
+}
+
+.page-index .weather-icon-real .weather-label {
   font-size: 22rpx;
-  color: #666;
-  margin-bottom: 10rpx;
+  color: var(--text-sec);
   font-weight: 500;
 }
 
-.rst-item .form-input {
-  text-align: left;
-  font-size: 32rpx;
-  font-weight: bold;
-  letter-spacing: 0;
+.page-index .weather-icon-real.selected .weather-label {
+  color: var(--primary-color);
 }
 
-.rst-item .form-input.input-focused {
-  border-color: #1890ff;
-  box-shadow: 0 0 0 4rpx rgba(24, 144, 255, 0.1);
+.rst-card {
+  padding-bottom: 28rpx;
 }
 
-/* RST+号切换样式 */
+.rst-gauge {
+  display: flex;
+  align-items: flex-start;
+  gap: 12rpx;
+}
+
+.rst-col {
+  flex: 1;
+  min-width: 0;
+}
+
+.rst-col-title {
+  font-size: 22rpx;
+  color: var(--text-sec);
+  text-align: center;
+  margin-bottom: 16rpx;
+  font-weight: 600;
+}
+
+.rst-col-divider {
+  width: 1rpx;
+  align-self: stretch;
+  min-height: 200rpx;
+  background: rgba(0, 0, 0, 0.06);
+  margin-top: 40rpx;
+}
+
+.stepper-block {
+  margin-bottom: 20rpx;
+}
+
+.stepper-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-main);
+  border-radius: 12rpx;
+  padding: 8rpx 4rpx;
+}
+
+.stepper-btn {
+  width: 56rpx;
+  height: 56rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36rpx;
+  font-weight: 300;
+  color: var(--primary-color);
+}
+
+.stepper-val {
+  flex: 1;
+  text-align: center;
+  font-size: 34rpx;
+  font-weight: 700;
+  color: var(--accent-orange);
+}
+
+.stepper-sub {
+  display: block;
+  text-align: center;
+  font-size: 20rpx;
+  color: var(--text-sec);
+  margin-top: 6rpx;
+}
+
+.rst-t-placeholder {
+  height: 100rpx;
+  margin-bottom: 20rpx;
+}
+
 .rst-plus-toggle {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 100%;
 }
 
 .plus-checkbox {
-  width: 70rpx;
-  height: 70rpx;
-  border: 2rpx solid #d9d9d9;
-  border-radius: 20rpx; /* 增大圆角 */
+  min-width: 120rpx;
+  height: 64rpx;
+  padding: 0 16rpx;
+  border: 2rpx solid rgba(0, 122, 255, 0.25);
+  border-radius: 12rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #fff;
-  box-shadow: 0 4rpx 8rpx rgba(0, 0, 0, 0.1); /* 添加阴影效果 */
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); /* 平滑过渡 */
-  transform: translateY(0); /* 初始位置 */
-}
-
-.plus-checkbox:active {
-  transform: translateY(2rpx); /* 点击时的下沉效果 */
-  box-shadow: 0 2rpx 4rpx rgba(0, 0, 0, 0.1);
+  background-color: var(--card-bg);
+  transition: all 0.25s ease;
 }
 
 .plus-checkbox.checked {
-  border-color: #1890ff;
-  background-color: #e6f7ff;
-  box-shadow: 
-    0 6rpx 12rpx rgba(24, 144, 255, 0.15), /* 外阴影增强 */
-    inset 0 2rpx 4rpx rgba(255, 255, 255, 0.8); /* 内阴影，营造3D效果 */
-  transform: translateY(-2rpx); /* 上浮效果，增强3D感 */
+  border-color: var(--primary-color);
+  background-color: var(--primary-soft);
 }
 
 .plus-sign {
-  font-size: 40rpx;
-  font-weight: bold;
-  color: #1890ff;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); /* 平滑过渡 */
-  line-height: 1;
-  margin-top: -2rpx; /* 微调垂直位置，使其居中 */
-  text-shadow: 0 2rpx 4rpx rgba(24, 144, 255, 0.2); /* 文字阴影，增强立体感 */
+  font-size: 26rpx;
+  font-weight: 700;
+  color: var(--primary-color);
 }

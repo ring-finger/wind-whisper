@@ -1,11 +1,15 @@
 const app = getApp()
 const AUTHOR_CALL_SIGN = 'BA4IWA'
+const VIBRATE_TYPE = 'medium'
 
-// 分享标题常量
 const SHARE_TITLE = '风语纪<电波有痕，风语为纪> - 我的设置'
+const STORAGE_AVATAR = 'wxMineAvatarUrl'
+const STORAGE_NICK = 'wxMineNickName'
 
 Page({
   data: {
+    userAvatarUrl: '',
+    userNickName: '',
     myCallSign: '',
     contactCount: 0,
     authorCallSign: AUTHOR_CALL_SIGN,
@@ -23,12 +27,65 @@ Page({
   },
 
   onLoad() {
+    this.loadUserProfile()
     this.loadMyCallSign()
     this.loadContactCount()
   },
 
   onShow() {
+    this.loadUserProfile()
     this.loadContactCount()
+  },
+
+  loadUserProfile() {
+    try {
+      const userAvatarUrl = wx.getStorageSync(STORAGE_AVATAR) || ''
+      const userNickName = wx.getStorageSync(STORAGE_NICK) || ''
+      this.setData({ userAvatarUrl, userNickName })
+    } catch (e) {
+      console.error('加载用户资料失败', e)
+    }
+  },
+
+  onChooseAvatar(e) {
+    wx.vibrateShort({ type: VIBRATE_TYPE })
+    const avatarUrl = e.detail.avatarUrl
+    if (!avatarUrl) return
+    const persist = (path) => {
+      try {
+        wx.setStorageSync(STORAGE_AVATAR, path)
+        this.setData({ userAvatarUrl: path })
+      } catch (err) {
+        console.error('保存头像路径失败', err)
+      }
+    }
+    const fs = wx.getFileSystemManager()
+    const dest = `${wx.env.USER_DATA_PATH}/wx_mine_avatar.jpg`
+    try {
+      fs.unlinkSync(dest)
+    } catch (e) {
+      /* 不存在则忽略 */
+    }
+    fs.copyFile({
+      srcPath: avatarUrl,
+      destPath: dest,
+      success: () => persist(dest),
+      fail: () => persist(avatarUrl)
+    })
+  },
+
+  onNicknameInput(e) {
+    this.setData({ userNickName: e.detail.value || '' })
+  },
+
+  onNicknameBlur(e) {
+    const v = (e.detail.value || '').trim()
+    try {
+      wx.setStorageSync(STORAGE_NICK, v)
+      this.setData({ userNickName: v })
+    } catch (err) {
+      console.error('保存昵称失败', err)
+    }
   },
 
   loadMyCallSign() {
@@ -54,6 +111,7 @@ Page({
   },
 
   editCallSign() {
+    wx.vibrateShort({ type: VIBRATE_TYPE })
     wx.showModal({
       title: '设置个人呼号',
       editable: true,
@@ -87,6 +145,7 @@ Page({
   },
 
   exportLogs() {
+    wx.vibrateShort({ type: VIBRATE_TYPE })
     try {
       const myCallSign = wx.getStorageSync('myCallSign') || ''
       if (!myCallSign) {
@@ -234,6 +293,7 @@ Page({
   },
 
   clearLogs() {
+    wx.vibrateShort({ type: VIBRATE_TYPE })
     wx.showModal({
       title: '确认清空',
       content: '确定要清空所有通联日志吗？此操作不可恢复。',
@@ -286,6 +346,7 @@ Page({
   },
 
   contactAuthor() {
+    wx.vibrateShort({ type: VIBRATE_TYPE })
     const url = 'https://mp.weixin.qq.com/s/-ADGZLEDFymzWFU3euFraw'
     wx.navigateTo({
       url: '/pages/web-view/web-view?url=' + encodeURIComponent(url),
@@ -300,6 +361,7 @@ Page({
   },
 
   onAuthorTap() {
+    wx.vibrateShort({ type: VIBRATE_TYPE })
     const tapCount = this.data.tapCount + 1
     this.setData({
       tapCount: tapCount
@@ -361,6 +423,7 @@ Page({
   },
 
   toggleAuthorInfo() {
+    wx.vibrateShort({ type: VIBRATE_TYPE })
     this.setData({
       showAuthorInfo: !this.data.showAuthorInfo
     })

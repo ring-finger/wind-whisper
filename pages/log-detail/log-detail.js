@@ -1,13 +1,43 @@
-const app = getApp()
-
-// 分享标题常量
 const SHARE_TITLE_PREFIX = '风语纪: '
+const VIBRATE_TYPE = 'medium'
+
+function pad2(n) {
+  return String(n).padStart(2, '0')
+}
+
+function instantFromBjtWall(dateStr, timeStr) {
+  if (!dateStr) return null
+  const t = ((timeStr || '') + '').trim().slice(0, 5) || '00:00'
+  const ms = new Date(`${dateStr}T${t}:00+08:00`).getTime()
+  return isNaN(ms) ? null : ms
+}
+
+function formatUtcDateTime(ms) {
+  const d = new Date(ms)
+  return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())} ${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}`
+}
+
+function buildBjtDateTimeFull(log) {
+  const d = log.date || ''
+  const t = (log.btcTime || log.bjcTime || '').trim() || '00:00'
+  const timePart = t.slice(0, 5)
+  return d ? `${d} ${timePart}` : timePart
+}
+
+function buildUtcDateTimeFull(log) {
+  const ms = instantFromBjtWall(log.date, log.btcTime || log.bjcTime)
+  if (ms != null) return formatUtcDateTime(ms)
+  const u = (log.utcTime || '').trim().slice(0, 5)
+  return u ? `— ${u}` : '—'
+}
 
 Page({
   data: {
     log: null,
     myRst: '',
-    theirRst: ''
+    theirRst: '',
+    bjtDateTimeFull: '',
+    utcDateTimeFull: ''
   },
 
   onLoad(options) {
@@ -60,17 +90,20 @@ Page({
           recordTime = this.formatDate(new Date().toISOString())
         }
         
-        // 计算天气图标和文本
         const weatherIcon = this.getWeatherIcon(log.weather)
         const weatherText = this.getWeatherText(log.weather)
-        
+        const bjtDateTimeFull = buildBjtDateTimeFull(log)
+        const utcDateTimeFull = buildUtcDateTimeFull(log)
+
         this.setData({
           log: log,
           myRst: myRst,
           theirRst: theirRst,
           recordTime: recordTime,
           weatherIcon: weatherIcon,
-          weatherText: weatherText
+          weatherText: weatherText,
+          bjtDateTimeFull: bjtDateTimeFull,
+          utcDateTimeFull: utcDateTimeFull
         })
       } else {
         wx.showToast({
@@ -96,7 +129,7 @@ Page({
       'cloudy': '⛅',
       'rainy': '🌧️',
       'stormy': '⛈️',
-      'snowy': '❄️',
+      'snowy': '🌨️',
       'foggy': '🌫️',
       'windy': '💨',
       'night': '🌙'
@@ -135,6 +168,7 @@ Page({
   },
 
   deleteLog() {
+    wx.vibrateShort({ type: VIBRATE_TYPE })
     wx.showModal({
       title: '确认删除',
       content: '确定要删除这条日志吗？此操作不可恢复。',
@@ -167,17 +201,23 @@ Page({
   },
 
   onShareAppMessage() {
+    const log = this.data.log
+    const title = log ? SHARE_TITLE_PREFIX + log.callSign : SHARE_TITLE_PREFIX
     return {
-      title: SHARE_TITLE_PREFIX + this.data.log.callSign,
+      title: title,
       path: '/pages/logs/logs',
       imageUrl: '/images/cover.jpg'
     }
   },
 
   onShareTimeline() {
+    const log = this.data.log
+    if (!log) {
+      return { title: SHARE_TITLE_PREFIX, query: '', imageUrl: '/images/cover.jpg' }
+    }
     return {
-      title: SHARE_TITLE_PREFIX + this.data.log.callSign,
-      query: `page=log-detail&id=${this.data.log.id}`,
+      title: SHARE_TITLE_PREFIX + log.callSign,
+      query: `page=log-detail&id=${log.id}`,
       imageUrl: '/images/cover.jpg'
     }
   }

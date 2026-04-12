@@ -1,14 +1,76 @@
 const app = getApp()
 
-// 分享标题常量
 const SHARE_TITLE = '风语纪<电波有痕，风语为纪> - 记录您的每一次通联'
-// 振动类型常量
 const VIBRATE_TYPE = 'medium'
+
+const BJT_OFFSET_MS = 8 * 60 * 60 * 1000
+
+function pad2(n) {
+  return String(n).padStart(2, '0')
+}
+
+function ymdFromParts(y, m, day) {
+  return `${y}-${pad2(m)}-${pad2(day)}`
+}
+
+function hmFromParts(h, min) {
+  return `${pad2(h)}:${pad2(min)}`
+}
+
+/** BJT 墙钟分量（与存储 log.date / bjcTime 一致） */
+function bjtWallFromInstant(ms) {
+  const wd = new Date(ms + BJT_OFFSET_MS)
+  return {
+    y: wd.getUTCFullYear(),
+    m: wd.getUTCMonth() + 1,
+    day: wd.getUTCDate(),
+    h: wd.getUTCHours(),
+    min: wd.getUTCMinutes()
+  }
+}
+
+function utcWallFromInstant(ms) {
+  const wd = new Date(ms)
+  return {
+    y: wd.getUTCFullYear(),
+    m: wd.getUTCMonth() + 1,
+    day: wd.getUTCDate(),
+    h: wd.getUTCHours(),
+    min: wd.getUTCMinutes()
+  }
+}
+
+function instantFromBjt(dateStr, timeStr) {
+  if (!dateStr || !timeStr) return null
+  const t = new Date(`${dateStr}T${timeStr}:00+08:00`).getTime()
+  return isNaN(t) ? null : t
+}
+
+function instantFromUtc(dateStr, timeStr) {
+  if (!dateStr || !timeStr) return null
+  const t = new Date(`${dateStr}T${timeStr}:00Z`).getTime()
+  return isNaN(t) ? null : t
+}
+
+/** 与界面、落库字段一致的时间快照（不含 utcDate） */
+function buildTimeFields(ms) {
+  const b = bjtWallFromInstant(ms)
+  const u = utcWallFromInstant(ms)
+  return {
+    contactInstantMs: ms,
+    date: ymdFromParts(b.y, b.m, b.day),
+    utcDate: ymdFromParts(u.y, u.m, u.day),
+    bjcTime: hmFromParts(b.h, b.min),
+    utcTime: hmFromParts(u.h, u.min)
+  }
+}
 
 Page({
   data: {
+    contactInstantMs: 0,
     formData: {
       date: '',
+      utcDate: '',
       bjcTime: '',
       utcTime: '',
       callSign: '',
@@ -27,29 +89,20 @@ Page({
     },
     currentTimeType: 'BJT',
     weatherIcons: [
-      { icon: '☀️', value: 'sunny' },
-      { icon: '⛅', value: 'cloudy' },
-      { icon: '🌧️', value: 'rainy' },
-      { icon: '⛈️', value: 'stormy' },
-      { icon: '❄️', value: 'snowy' },
-      { icon: '🌫️', value: 'foggy' },
-      { icon: '💨', value: 'windy' },
-      { icon: '🌙', value: 'night' }
+      { emoji: '☀️', label: '晴', value: 'sunny' },
+      { emoji: '⛅', label: '多云', value: 'cloudy' },
+      { emoji: '🌧️', label: '雨', value: 'rainy' },
+      { emoji: '⛈️', label: '雷雨', value: 'stormy' },
+      { emoji: '🌨️', label: '雪', value: 'snowy' },
+      { emoji: '🌫️', label: '雾', value: 'foggy' },
+      { emoji: '💨', label: '大风', value: 'windy' },
+      { emoji: '🌙', label: '夜间', value: 'night' }
     ],
     modes: ['SSB', 'CW', 'FM', 'AM', 'PSK31', 'FT8', 'RTTY', 'SSTV', 'ATV'],
     callSuggestions: [],
     frequencySuggestions: [],
-    inputFocus: {
-      myRstR: false,
-      myRstS: false,
-      myRstT: false,
-      theirRstR: false,
-      theirRstS: false,
-      theirRstT: false
-    },
-    // 频率范围判断状态
-    isUHF: false, // 300-3000MHz
-    isVHF: false, // 30-300MHz
+    isUHF: false,
+    isVHF: false,
     rstPlusSelected: {
       myRst: false,
       theirRst: false
@@ -65,75 +118,70 @@ Page({
   },
 
   initDateTime() {
-    const now = new Date()
-    const date = this.formatDate(now)
-    const bjcTime = this.formatTime(now)
-    const utcTime = this.formatUTCTime(now)
+    this.syncTimeFromInstant(Date.now())
+  },
 
+  /** 由绝对时刻同步 BJT/UTC 的日期与时间（单一真相） */
+  syncTimeFromInstant(ms) {
+    const t = buildTimeFields(ms)
     this.setData({
-      'formData.date': date,
-      'formData.bjcTime': bjcTime,
-      'formData.utcTime': utcTime
+      contactInstantMs: t.contactInstantMs,
+      'formData.date': t.date,
+      'formData.utcDate': t.utcDate,
+      'formData.bjcTime': t.bjcTime,
+      'formData.utcTime': t.utcTime
     })
-  },
-
-  formatDate(date) {
-    const year = date.getFullYear()
-    const month = String(date.getMonth() + 1).padStart(2, '0')
-    const day = String(date.getDate()).padStart(2, '0')
-    return `${year}-${month}-${day}`
-  },
-
-  formatTime(date) {
-    const hours = String(date.getHours()).padStart(2, '0')
-    const minutes = String(date.getMinutes()).padStart(2, '0')
-    return `${hours}:${minutes}`
-  },
-
-  formatUTCTime(date) {
-    const hours = String(date.getUTCHours()).padStart(2, '0')
-    const minutes = String(date.getUTCMinutes()).padStart(2, '0')
-    return `${hours}:${minutes}`
   },
 
   onDateChange(e) {
-    this.setData({
-      'formData.date': e.detail.value
-    })
+    wx.vibrateShort({ type: VIBRATE_TYPE })
+    const cal = e.detail.value
+    const { currentTimeType, formData } = this.data
+    const timeStr =
+      currentTimeType === 'BJT'
+        ? formData.bjcTime || '00:00'
+        : formData.utcTime || '00:00'
+    const ms =
+      currentTimeType === 'BJT'
+        ? instantFromBjt(cal, timeStr)
+        : instantFromUtc(cal, timeStr)
+    if (ms == null) return
+    this.syncTimeFromInstant(ms)
   },
 
   onBjcTimeChange(e) {
-    this.setData({
-      'formData.bjcTime': e.detail.value
-    })
+    wx.vibrateShort({ type: VIBRATE_TYPE })
+    const { formData } = this.data
+    const ms = instantFromBjt(formData.date, e.detail.value)
+    if (ms == null) return
+    this.syncTimeFromInstant(ms)
   },
 
   onUtcTimeChange(e) {
-    this.setData({
-      'formData.utcTime': e.detail.value
-    })
+    wx.vibrateShort({ type: VIBRATE_TYPE })
+    const { formData } = this.data
+    const ms = instantFromUtc(formData.utcDate, e.detail.value)
+    if (ms == null) return
+    this.syncTimeFromInstant(ms)
   },
 
   refreshTime() {
-    const now = new Date()
-    const bjcTime = this.formatTime(now)
-    const utcTime = this.formatUTCTime(now)
-    this.setData({
-      'formData.bjcTime': bjcTime,
-      'formData.utcTime': utcTime
-    })
+    wx.vibrateShort({ type: VIBRATE_TYPE })
+    this.syncTimeFromInstant(Date.now())
   },
 
-  toggleTimeType() {
-    const newTimeType = this.data.currentTimeType === 'BJT' ? 'UTC' : 'BJT'
+  setTimeType(e) {
+    const type = e.currentTarget.dataset.type
+    if (!type || this.data.currentTimeType === type) return
+    wx.vibrateShort({ type: VIBRATE_TYPE })
     this.setData({
-      currentTimeType: newTimeType
+      currentTimeType: type
     })
   },
 
   onCallSignInput(e) {
     const value = e.detail.value.toUpperCase()
-    
+
     if (value && /[^A-Z0-9]/.test(value)) {
       wx.showToast({
         title: '呼号只能包含字母和数字',
@@ -142,7 +190,7 @@ Page({
       })
       return
     }
-    
+
     this.setData({
       'formData.callSign': value
     })
@@ -160,7 +208,7 @@ Page({
 
   filterCallSuggestions(input) {
     const history = app.globalData.callHistory || []
-    const filtered = history.filter(item => 
+    const filtered = history.filter(item =>
       item.toUpperCase().includes(input.toUpperCase())
     ).slice(0, 5)
 
@@ -205,14 +253,13 @@ Page({
     if (parts[1] && parts[1].length > 3) {
       value = parts[0] + '.' + parts[1].substring(0, 3)
     }
-    
+
     this.setData({
       'formData.frequency': value
     })
-    
-    // 调用频率范围判断逻辑，更新RST显示方式
+
     this.updateFrequencyRangeStatus(value)
-    
+
     wx.vibrateShort({ type: VIBRATE_TYPE })
 
     if (value.length > 0) {
@@ -231,7 +278,7 @@ Page({
       const logs = wx.getStorageSync('contactLogs') || []
       const frequencySet = new Set(logs.map(log => log.frequency).filter(f => f))
       const frequencies = Array.from(frequencySet)
-      const filtered = frequencies.filter(freq => 
+      const filtered = frequencies.filter(freq =>
         freq.includes(input)
       ).slice(0, 5)
 
@@ -249,19 +296,17 @@ Page({
       'formData.frequency': frequency,
       frequencySuggestions: []
     })
-    
-    // 调用频率范围判断逻辑，更新RST显示方式
+
     this.updateFrequencyRangeStatus(frequency)
-    
+
     wx.vibrateShort({ type: VIBRATE_TYPE })
   },
-  
-  // 更新频率范围状态
+
   updateFrequencyRangeStatus(frequency) {
     const freq = parseFloat(frequency)
     const isUHF = !isNaN(freq) && freq >= 300 && freq <= 3000
     const isVHF = !isNaN(freq) && freq >= 30 && freq < 300
-    
+
     this.setData({
       isUHF: isUHF,
       isVHF: isVHF
@@ -292,109 +337,81 @@ Page({
     wx.vibrateShort({ type: VIBRATE_TYPE })
   },
 
-  onRstInput(e) {
+  stepRst(e) {
+    wx.vibrateShort({ type: VIBRATE_TYPE })
     const type = e.currentTarget.dataset.type
     const field = e.currentTarget.dataset.field
-    let value = e.detail.value
-    
-    if (field === 't') {
-      if (this.data.isVHF) {
-        // VHF模式：只允许输入1-9的数字
-        value = value.replace(/[^\d]/g, '')
-        if (value > 9) value = '9'
-      } else if (this.data.isUHF) {
-        // UHF模式：不处理输入，通过+号选中状态控制
-        return
+    const delta = parseInt(e.currentTarget.dataset.delta, 10) || 0
+    const { isUHF, isVHF, formData } = this.data
+
+    if (field === 't' && isUHF) return
+
+    const rst = {
+      myRst: { ...formData.rst.myRst },
+      theirRst: { ...formData.rst.theirRst }
+    }
+    const cur = { ...rst[type] }
+
+    if (field === 'r') {
+      const n = cur.r === '' ? 0 : parseInt(cur.r, 10)
+      let next = n
+      if (delta > 0) {
+        next = n < 1 ? 1 : Math.min(5, n + 1)
       } else {
-        // 其他情况：允许输入数字和+号
-        value = value.replace(/[^\d+]/g, '')
-        // 限制为1位数字或+号
-        if (value.length > 1) {
-          // 如果是'+'号，只保留'+'
-          if (value.includes('+')) {
-            value = '+'
-          } else {
-            // 否则只保留第一位数字
-            value = value[0]
-          }
-        }
+        next = n <= 1 ? 0 : n - 1
       }
-    } else {
-      // 其他字段只允许数字
-      value = value.replace(/[^\d]/g, '')
-      if (field === 'r' && value > 5) value = '5'
-      if (field === 's' && value > 9) value = '9'
-    }
-    
-    const dataKey = 'formData.rst.' + type + '.' + field
-    const data = {}
-    data[dataKey] = value
-    this.setData(data)
-    
-    wx.vibrateShort({ type: VIBRATE_TYPE })
-    
-    if (value.length >= 1) {
-      if (field === 'r') {
-        this.focusNextInput(type, 's')
-      } else if (field === 's') {
-        this.focusNextInput(type, 't')
-      } else if (field === 't' && type === 'myRst' && value !== '+') {
-        // 如果最后一项不是'+'，则聚焦到下一个RST的第一个输入框
-        this.focusNextInput('theirRst', 'r')
+      cur.r = next === 0 ? '' : String(next)
+    } else if (field === 's') {
+      const n = cur.s === '' ? 0 : parseInt(cur.s, 10)
+      let next = n
+      if (delta > 0) {
+        next = n < 1 ? 1 : Math.min(9, n + 1)
+      } else {
+        next = n <= 1 ? 0 : n - 1
       }
+      cur.s = next === 0 ? '' : String(next)
+    } else if (field === 't' && isVHF) {
+      const n = cur.t === '' ? 0 : parseInt(cur.t, 10)
+      let next = n
+      if (delta > 0) {
+        next = n < 1 ? 1 : Math.min(9, n + 1)
+      } else {
+        next = n <= 1 ? 0 : n - 1
+      }
+      cur.t = next === 0 ? '' : String(next)
+    } else if (field === 't' && !isUHF) {
+      const order = ['', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+']
+      let idx = order.indexOf(cur.t)
+      if (idx < 0) idx = 0
+      idx = (idx + delta + order.length) % order.length
+      cur.t = order[idx]
     }
+
+    if (isUHF && (cur.r !== '5' || cur.s !== '9')) {
+      cur.t = ''
+    }
+
+    rst[type] = cur
+
+    const patch = { 'formData.rst': rst }
+    if (isUHF && (cur.r !== '5' || cur.s !== '9')) {
+      patch['rstPlusSelected.' + type] = false
+    }
+
+    this.setData(patch)
   },
-  
-  // 切换RST+号选中状态
+
   toggleRstPlus(e) {
     const type = e.currentTarget.dataset.type
     const isSelected = this.data.rstPlusSelected[type]
     const data = {}
     data['rstPlusSelected.' + type] = !isSelected
-    
-    // 更新T字段的值
+
     const tDataKey = 'formData.rst.' + type + '.t'
     data[tDataKey] = !isSelected ? '+' : ''
-    
+
     this.setData(data)
     wx.vibrateShort({ type: VIBRATE_TYPE })
-  },
-
-  focusNextInput(type, nextField) {
-    const nextFieldFocusKey = 'inputFocus.' + type + this.getFieldUpper(nextField)
-    
-    const data = {}
-    data['inputFocus.myRstR'] = false
-    data['inputFocus.myRstS'] = false
-    data['inputFocus.myRstT'] = false
-    data['inputFocus.theirRstR'] = false
-    data['inputFocus.theirRstS'] = false
-    data['inputFocus.theirRstT'] = false
-    data[nextFieldFocusKey] = true
-    this.setData(data)
-  },
-
-  getFieldUpper(field) {
-    if (field === 'r') return 'R'
-    if (field === 's') return 'S'
-    if (field === 't') return 'T'
-    return ''
-  },
-
-  onRstFocus(e) {
-    const inputId = e.currentTarget.id
-    const dataKey = 'inputFocus.' + inputId
-    const data = {}
-    data[dataKey] = true
-    this.setData(data)
-  },
-
-  onRstBlur(e) {
-    const inputId = e.currentTarget.id
-    const dataKey = 'inputFocus.' + inputId
-    const data = {}
-    data[dataKey] = false
-    this.setData(data)
   },
 
   onQthInput(e) {
@@ -419,7 +436,15 @@ Page({
   },
 
   submitLog() {
-    const formData = this.data.formData
+    const ms = this.data.contactInstantMs || Date.now()
+    const timeSnap = buildTimeFields(ms)
+    const formData = {
+      ...this.data.formData,
+      date: timeSnap.date,
+      utcDate: timeSnap.utcDate,
+      bjcTime: timeSnap.bjcTime,
+      utcTime: timeSnap.utcTime
+    }
 
     if (!formData.callSign) {
       wx.showToast({
@@ -445,7 +470,6 @@ Page({
       return
     }
 
-    // 验证己方RST
     if (!formData.rst.myRst.r || !formData.rst.myRst.s) {
       wx.showToast({
         title: '请填写己方信号报告RS',
@@ -454,7 +478,6 @@ Page({
       return
     }
 
-    // 验证对方RST
     if (!formData.rst.theirRst.r || !formData.rst.theirRst.s) {
       wx.showToast({
         title: '请填写对方信号报告RS',
@@ -463,26 +486,9 @@ Page({
       return
     }
 
-    if (!formData.utcTime) {
-      const now = new Date()
-      const utcTime = this.formatUTCTime(now)
-      this.setData({
-        'formData.utcTime': utcTime
-      })
-      formData.utcTime = utcTime
-    }
-
-    if (!formData.bjcTime) {
-      const now = new Date()
-      const bjcTime = this.formatTime(now)
-      this.setData({
-        'formData.bjcTime': bjcTime
-      })
-      formData.bjcTime = bjcTime
-    }
-
     var log = {}
     for (var key in formData) {
+      if (key === 'utcDate') continue
       log[key] = formData[key]
     }
     log.btcTime = formData.bjcTime
@@ -492,6 +498,7 @@ Page({
     this.saveLog(log)
     app.saveCallHistory(formData.callSign)
 
+    wx.vibrateShort({ type: VIBRATE_TYPE })
     wx.showToast({
       title: '保存成功',
       icon: 'success'
@@ -520,13 +527,14 @@ Page({
   resetForm() {
     this.initDateTime()
     this.setData({
+      currentTimeType: 'BJT',
       'formData.callSign': '',
       'formData.weather': '',
       'formData.frequency': '',
       'formData.mode': '',
       'formData.equipment': '',
       'formData.antenna': '',
-      'formData.rst': { 
+      'formData.rst': {
         myRst: { r: '', s: '', t: '' },
         theirRst: { r: '', s: '', t: '' }
       },
@@ -535,13 +543,11 @@ Page({
       'formData.notes': '',
       callSuggestions: [],
       frequencySuggestions: [],
-      inputFocus: {
-        myRstR: false,
-        myRstS: false,
-        myRstT: false,
-        theirRstR: false,
-        theirRstS: false,
-        theirRstT: false
+      isUHF: false,
+      isVHF: false,
+      rstPlusSelected: {
+        myRst: false,
+        theirRst: false
       }
     })
   },
