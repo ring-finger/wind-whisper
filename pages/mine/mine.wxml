@@ -1,71 +1,87 @@
-<view class="mine-page">
-  <view wx:if="{{easterEggMessage}}" class="easter-egg-message">{{easterEggMessage}}</view>
+<view class="theme-wrapper {{currentTheme === 'morandi' ? 'theme-morandi' : ''}}">
+  <view class="mine-page">
+    <view wx:if="{{easterEggMessage}}" class="easter-egg-message">{{easterEggMessage}}</view>
 
-  <view class="mine-card profile-row">
-    <view class="avatar-stack">
-      <view class="avatar-face">
-        <image wx:if="{{userAvatarUrl}}" class="user-avatar-img" src="{{userAvatarUrl}}" mode="aspectFill" />
-        <view wx:else class="user-avatar-placeholder" />
+    <view class="mine-card profile-row">
+      <view class="avatar-stack">
+        <view class="avatar-face">
+          <image wx:if="{{userAvatarUrl}}" class="user-avatar-img" src="{{userAvatarUrl}}" mode="aspectFill" />
+          <view wx:else class="user-avatar-placeholder" />
+        </view>
+        <button
+          class="avatar-tap"
+          open-type="chooseAvatar"
+          bindchooseavatar="onChooseAvatar"
+          hover-class="button-hover"
+        />
       </view>
-      <button
-        class="avatar-tap"
-        open-type="chooseAvatar"
-        bindchooseavatar="onChooseAvatar"
-        hover-class="button-hover"
+      <input
+        class="nickname-input"
+        type="nickname"
+        value="{{userNickName}}"
+        placeholder="昵称"
+        bindinput="onNicknameInput"
+        bindblur="onNicknameBlur"
       />
     </view>
-    <input
-      class="nickname-input"
-      type="nickname"
-      value="{{userNickName}}"
-      placeholder="昵称"
-      bindinput="onNicknameInput"
-      bindblur="onNicknameBlur"
-    />
-  </view>
 
-  <view class="mine-card mine-group">
-    <view class="cell cell-tap" hover-class="cell-hover" bindtap="editCallSign">
-      <view class="cell-primary-block">
-        <text class="cell-label cell-label-strong">无线电呼号</text>
+    <view class="mine-card mine-group">
+      <view class="cell cell-tap" hover-class="cell-hover" bindtap="editCallSign">
+        <view class="cell-primary-block">
+          <text class="cell-label cell-label-strong">无线电呼号</text>
+        </view>
+        <text class="cell-value cell-value-callsign font-mono">{{myCallSign || '未设置'}}</text>
+        <text class="cell-chevron">›</text>
       </view>
-      <text class="cell-value cell-value-callsign font-mono">{{myCallSign || '未设置'}}</text>
-      <text class="cell-chevron">›</text>
+      <view class="cell cell-static">
+        <text class="cell-label cell-label-strong">通联记录次数</text>
+        <text class="cell-value cell-value-count">{{contactCount}} 次</text>
+        <text class="cell-chevron cell-chevron-placeholder" aria-hidden="true">›</text>
+      </view>
     </view>
-    <view class="cell cell-static">
-      <text class="cell-label cell-label-strong">通联记录次数</text>
-      <text class="cell-value cell-value-count">{{contactCount}} 次</text>
-      <text class="cell-chevron cell-chevron-placeholder" aria-hidden="true">›</text>
-    </view>
-  </view>
 
-  <view class="mine-card mine-group">
-    <view class="cell cell-tap" hover-class="cell-hover" bindtap="exportLogs">
-      <text class="cell-label cell-label-full">导出日志</text>
-      <text class="cell-chevron">›</text>
+    <view class="mine-card mine-group">
+      <view class="cell cell-tap" hover-class="cell-hover" bindtap="exportLogs">
+        <text class="cell-label cell-label-full">导出日志</text>
+        <text class="cell-chevron">›</text>
+      </view>
+      <view class="cell cell-tap" hover-class="cell-hover" bindtap="clearLogs">
+        <text class="cell-label cell-label-full">清空日志</text>
+        <text class="cell-chevron">›</text>
+      </view>
     </view>
-    <view class="cell cell-tap" hover-class="cell-hover" bindtap="clearLogs">
-      <text class="cell-label cell-label-full">清空日志</text>
-      <text class="cell-chevron">›</text>
-    </view>
-  </view>
 
-  <view class="mine-card mine-group">
-    <view class="cell cell-tap" hover-class="cell-hover" bindtap="toggleAuthorInfo">
-      <text class="cell-label cell-label-full">联系作者</text>
-      <text class="cell-chevron">›</text>
+    <view class="mine-card mine-group">
+      <view class="cell cell-tap" hover-class="cell-hover" bindtap="toggleTheme">
+        <view class="cell-primary-block">
+          <text class="cell-label cell-label-strong">主题</text>
+        </view>
+        <view class="theme-indicator">
+          <view class="theme-dot {{currentTheme === 'radio' ? 'theme-dot-active' : ''}}" style="background: #2C5C97;"></view>
+          <view class="theme-dot {{currentTheme === 'morandi' ? 'theme-dot-active' : ''}}" style="background: #C4643E;"></view>
+        </view>
+        <text class="cell-value">{{currentThemeName}}</text>
+        <text class="cell-chevron">›</text>
+      </view>
     </view>
-  </view>
 
-  <view wx:if="{{showAuthorInfo}}" class="mine-card author-card">
-    <view class="author-header">
-      <text class="author-label">作者</text>
-      <text class="author-name font-mono easter-egg-trigger" bindtap="onAuthorTap">{{authorCallSign}}</text>
+    <view class="mine-card mine-group">
+      <view class="cell cell-tap" hover-class="cell-hover" bindtap="toggleAuthorInfo">
+        <text class="cell-label cell-label-full">联系作者</text>
+        <text class="cell-chevron">›</text>
+      </view>
     </view>
-    <view class="author-action" hover-class="button-hover" bindtap="contactAuthor">
-      <text class="author-action-text">打开公众号文章</text>
-      <text class="author-action-chevron">›</text>
+
+    <view wx:if="{{showAuthorInfo}}" class="mine-card author-card">
+      <view class="author-header">
+        <text class="author-label">作者</text>
+        <text class="author-name font-mono easter-egg-trigger" bindtap="onAuthorTap">{{authorCallSign}}</text>
+      </view>
+      <view class="author-action" hover-class="button-hover" bindtap="contactAuthor">
+        <text class="author-action-text">打开公众号文章</text>
+        <text class="author-action-chevron">›</text>
+      </view>
+      <text class="author-hint">关注公众号【饮月听风】</text>
     </view>
-    <text class="author-hint">关注公众号【饮月听风】</text>
   </view>
 </view>

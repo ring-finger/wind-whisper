@@ -1,16 +1,15 @@
-/* 与 app.wxss 令牌一致：--bg-main / --card-bg / --text-* / --primary-* */
-
+/* 奶油莫兰迪主题 - 个人信息页面 */
 .mine-page {
   min-height: 100vh;
   padding: 24rpx 24rpx 48rpx;
   box-sizing: border-box;
-  background: var(--bg-main);
+  background: var(--bg-primary);
 }
 
 .mine-card {
   background: var(--card-bg);
   border-radius: 16rpx;
-  box-shadow: 0 4rpx 24rpx rgba(0, 0, 0, 0.06);
+  box-shadow: 0 4rpx 24rpx var(--shadow-color);
   margin-bottom: 20rpx;
   overflow: hidden;
 }
@@ -31,7 +30,7 @@
   flex-grow: 0;
   border-radius: 50%;
   overflow: hidden;
-  background: var(--bg-main);
+  background: var(--bg-primary);
   box-shadow: 0 0 0 2rpx var(--primary-soft);
 }
 
@@ -44,7 +43,7 @@
   border-radius: 50%;
   overflow: hidden;
   pointer-events: none;
-  background: var(--bg-main);
+  background: var(--bg-primary);
 }
 
 .user-avatar-img {
@@ -58,7 +57,7 @@
   height: 120rpx;
   border-radius: 50%;
   background: var(--lcd-bg);
-  border: 1rpx solid rgba(0, 0, 0, 0.06);
+  border: 1rpx solid var(--border-color);
   box-sizing: border-box;
 }
 
@@ -89,10 +88,10 @@
   padding: 0 20rpx;
   font-size: 34rpx;
   font-weight: 600;
-  color: var(--text-main);
+  color: var(--text-primary);
   background: var(--card-bg);
   border-radius: 12rpx;
-  border: 1rpx solid rgba(0, 0, 0, 0.08);
+  border: 1rpx solid var(--border-color);
   box-sizing: border-box;
 }
 
@@ -104,7 +103,7 @@
   min-height: 100rpx;
   padding: 20rpx 28rpx;
   box-sizing: border-box;
-  border-bottom: 1rpx solid rgba(0, 0, 0, 0.06);
+  border-bottom: 1rpx solid var(--border-color);
 }
 
 .mine-group .cell:last-child {
@@ -121,20 +120,20 @@
 
 .cell-label-strong {
   font-weight: 600;
-  color: var(--text-main);
+  color: var(--text-primary);
 }
 
 .cell-value-callsign {
   font-size: 36rpx;
   font-weight: 700;
   letter-spacing: 2rpx;
-  color: var(--primary-color);
+  color: var(--accent-primary);
 }
 
 .cell-value-count {
   font-size: 32rpx;
   font-weight: 600;
-  color: var(--text-main);
+  color: var(--text-primary);
 }
 
 .cell-hover {
@@ -144,7 +143,7 @@
 .cell-label {
   flex-shrink: 0;
   font-size: 30rpx;
-  color: var(--text-main);
+  color: var(--text-primary);
   font-weight: 500;
 }
 
@@ -156,7 +155,7 @@
   flex: 1;
   text-align: right;
   font-size: 30rpx;
-  color: var(--text-main);
+  color: var(--text-primary);
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -166,7 +165,7 @@
 .cell-chevron {
   flex-shrink: 0;
   font-size: 32rpx;
-  color: var(--text-sec);
+  color: var(--text-secondary);
   font-weight: 300;
   line-height: 1;
 }
@@ -184,9 +183,9 @@
   text-align: center;
   font-size: 28rpx;
   padding: 20rpx 40rpx;
-  background: rgba(0, 0, 0, 0.82);
+  background: rgba(58, 50, 38, 0.9);
   border-radius: 40rpx;
-  color: #fff;
+  color: var(--text-inverse);
   z-index: 9999;
   white-space: nowrap;
   max-width: 90%;
@@ -202,7 +201,7 @@
   }
 }
 
-/* 联系作者展开区：与全局令牌一致，层次参考稿 */
+/* 联系作者展开区 */
 .author-card {
   padding: 32rpx 28rpx 28rpx;
 }
@@ -218,14 +217,14 @@
 
 .author-label {
   font-size: 28rpx;
-  color: var(--text-sec);
+  color: var(--text-secondary);
   font-weight: 500;
 }
 
 .author-name {
   font-size: 34rpx;
   font-weight: 700;
-  color: var(--primary-color);
+  color: var(--accent-primary);
   letter-spacing: 2rpx;
 }
 
@@ -239,7 +238,7 @@
   margin-bottom: 20rpx;
   border-radius: 12rpx;
   background: var(--lcd-bg);
-  border: 1rpx solid rgba(0, 122, 255, 0.12);
+  border: 1rpx solid var(--border-color);
   box-sizing: border-box;
 }
 
@@ -248,7 +247,7 @@
   text-align: center;
   font-size: 30rpx;
   font-weight: 600;
-  color: var(--primary-color);
+  color: var(--accent-primary);
 }
 
 .author-action-chevron {
@@ -258,7 +257,7 @@
   transform: translateY(-50%);
   font-size: 32rpx;
   font-weight: 300;
-  color: var(--primary-color);
+  color: var(--accent-primary);
   line-height: 1;
 }
 
@@ -266,7 +265,34 @@
   display: block;
   text-align: center;
   font-size: 24rpx;
-  color: var(--text-sec);
+  color: var(--text-secondary);
   line-height: 1.45;
   padding: 0 8rpx;
+}
+
+/* 主题选择器 */
+.theme-indicator {
+  display: flex;
+  gap: 12rpx;
+  margin-right: 16rpx;
+}
+
+.theme-dot {
+  width: 32rpx;
+  height: 32rpx;
+  border-radius: 50%;
+  opacity: 0.4;
+  transition: all 0.25s ease;
+  box-shadow: 0 2rpx 6rpx rgba(0, 0, 0, 0.15);
+}
+
+.theme-dot-active {
+  opacity: 1;
+  transform: scale(1.15);
+  box-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.25);
+}
+
+/* 主题切换动画 */
+.theme-wrapper {
+  transition: background-color 0.3s ease, color 0.3s ease;
 }

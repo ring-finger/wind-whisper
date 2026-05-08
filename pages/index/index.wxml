@@ -1,241 +1,105 @@
-<view class="page-index">
-  <view class="float-card header-card">
-    <view class="header-strip">
-      <view class="header-tz-btns font-mono">
-        <view
-          class="header-tz-btn {{currentTimeType === 'BJT' ? 'header-tz-btn-active' : ''}}"
-          hover-class="button-hover"
-          bindtap="setTimeType"
-          data-type="BJT"
-        >BJT</view>
-        <view
-          class="header-tz-btn {{currentTimeType === 'UTC' ? 'header-tz-btn-active' : ''}}"
-          hover-class="button-hover"
-          bindtap="setTimeType"
-          data-type="UTC"
-        >UTC</view>
-      </view>
-      <view class="header-datetime-row">
-        <picker mode="date" value="{{currentTimeType === 'BJT' ? formData.date : formData.utcDate}}" bindchange="onDateChange">
-          <view class="header-date font-mono" hover-class="button-hover">{{currentTimeType === 'BJT' ? formData.date : formData.utcDate}}</view>
-        </picker>
-        <picker mode="time" value="{{formData[currentTimeType === 'BJT' ? 'bjcTime' : 'utcTime']}}" bindchange="on{{currentTimeType === 'BJT' ? 'Bjc' : 'Utc'}}TimeChange">
-          <view class="header-time font-mono" hover-class="button-hover">{{formData[currentTimeType === 'BJT' ? 'bjcTime' : 'utcTime']}}</view>
-        </picker>
-      </view>
-      <view class="refresh-btn font-mono" hover-class="button-hover" bindtap="refreshTime">↻</view>
+<view class="theme-wrapper {{currentTheme === 'morandi' ? 'theme-morandi' : ''}}">
+  <view class="page-home">
+  <!-- 顶部：个人资料卡片 -->
+  <view class="profile-card" hover-class="button-hover" bindtap="goToMine">
+    <view class="profile-avatar">
+      <image wx:if="{{userAvatarUrl}}" class="avatar-img" src="{{userAvatarUrl}}" mode="aspectFill" />
+      <text wx:else class="avatar-icon">📡</text>
+    </view>
+    <view class="profile-info">
+      <text class="profile-title">业余无线电</text>
+      <text class="profile-subtitle">{{userCallsign || '设置呼号'}}</text>
+    </view>
+    <view class="profile-badge">
+      <text class="badge-text">{{stats.totalLogs || 0}} 通联</text>
     </view>
   </view>
 
-  <view class="float-card">
-    <view class="form-label">频率 FREQUENCY</view>
-    <view class="lcd-wrap">
-      <input
-        class="lcd-input font-mono"
-        type="digit"
-        value="{{formData.frequency}}"
-        bindinput="onFrequencyInput"
-        placeholder="0.000"
-      />
-      <text class="lcd-suffix font-mono">MHz</text>
+  <!-- 统计卡片区域 -->
+  <view class="stats-grid">
+    <view class="stat-card">
+      <text class="stat-value">{{stats.todayLogs || 0}}</text>
+      <text class="stat-label">今日通联</text>
     </view>
-    <view wx:if="{{frequencySuggestions.length > 0}}" class="frequency-suggestions">
-      <view
-        wx:for="{{frequencySuggestions}}"
-        wx:key="*this"
-        class="suggestion-item"
+    <view class="stat-card">
+      <text class="stat-value">{{stats.weekLogs || 0}}</text>
+      <text class="stat-label">本周通联</text>
+    </view>
+    <view class="stat-card">
+      <text class="stat-value">{{stats.monthLogs || 0}}</text>
+      <text class="stat-label">本月通联</text>
+    </view>
+    <view class="stat-card">
+      <text class="stat-value">{{stats.bandCount || 0}}</text>
+      <text class="stat-label">频段数</text>
+    </view>
+  </view>
+
+  <!-- 功能卡片区域 -->
+  <view class="feature-section">
+    <view class="feature-grid">
+      <!-- 通联卡片 -->
+      <view class="feature-card feature-qso" hover-class="button-hover" bindtap="goToQSO">
+        <view class="feature-icon-wrap">
+          <text class="feature-icon">📻</text>
+        </view>
+        <view class="feature-content">
+          <text class="feature-title">通联日志</text>
+          <text class="feature-desc">记录和管理通联记录</text>
+        </view>
+      </view>
+
+      <!-- SSTV卡片 -->
+      <view class="feature-card feature-sstv" hover-class="button-hover" bindtap="goToSSTV">
+        <view class="feature-icon-wrap">
+          <text class="feature-icon">🖼️</text>
+        </view>
+        <view class="feature-content">
+          <text class="feature-title">SSTV图像传输</text>
+          <text class="feature-desc">慢扫描电视编码解码</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 快速操作区域 -->
+  <view class="quick-section">
+    <view class="section-title">最近通联</view>
+    <view class="recent-list" wx:if="{{recentLogs.length > 0}}">
+      <view 
+        wx:for="{{recentLogs}}" 
+        wx:key="id"
+        class="recent-item"
         hover-class="button-hover"
-        bindtap="selectFrequency"
-        data-frequency="{{item}}"
+        bindtap="viewLogDetail"
+        data-id="{{item.id}}"
       >
-        {{item}} MHz
-      </view>
-    </view>
-  </view>
-
-  <view class="float-card">
-    <view class="form-label">呼号 CALLSIGN</view>
-    <input
-      class="form-input font-mono callsign-input"
-      value="{{formData.callSign}}"
-      bindinput="onCallSignInput"
-      placeholder="CALLSIGN"
-      confirm-type="done"
-    />
-    <view wx:if="{{callSuggestions.length > 0}}" class="call-suggestions">
-      <view
-        wx:for="{{callSuggestions}}"
-        wx:key="*this"
-        class="suggestion-item"
-        hover-class="button-hover"
-        bindtap="selectCallSign"
-        data-callsign="{{item}}"
-      >
-        {{item}}
-      </view>
-    </view>
-  </view>
-
-  <view class="float-card">
-    <view class="form-label">天气 WX（可选）</view>
-    <view class="weather-icons">
-      <view
-        wx:for="{{weatherIcons}}"
-        wx:key="value"
-        class="weather-icon weather-icon-real {{formData.weather === item.value ? 'selected' : ''}}"
-        hover-class="button-hover"
-        bindtap="selectWeather"
-        data-value="{{item.value}}"
-      >
-        <text class="weather-emoji">{{item.emoji}}</text>
-        <text class="weather-label">{{item.label}}</text>
-      </view>
-    </view>
-  </view>
-
-  <view class="float-card">
-    <view class="form-label">工作模式 MODE</view>
-    <view class="mode-tags">
-      <view
-        wx:for="{{modes}}"
-        wx:key="*this"
-        class="mode-tag {{formData.mode === item ? 'selected' : ''}}"
-        hover-class="button-hover"
-        bindtap="selectMode"
-        data-mode="{{item}}"
-      >
-        {{item}}
-      </view>
-    </view>
-  </view>
-
-  <view class="float-card rst-card">
-    <view class="form-label">信号报告 RST</view>
-    <view class="rst-gauge">
-      <view class="rst-col">
-        <view class="rst-col-title">己方</view>
-        <view class="stepper-block">
-          <view class="stepper-row">
-            <view class="stepper-btn" hover-class="button-hover" bindtap="stepRst" data-type="myRst" data-field="r" data-delta="-1">−</view>
-            <text class="stepper-val font-mono">{{formData.rst.myRst.r || '·'}}</text>
-            <view class="stepper-btn" hover-class="button-hover" bindtap="stepRst" data-type="myRst" data-field="r" data-delta="1">+</view>
-          </view>
-          <text class="stepper-sub">R</text>
+        <view class="recent-left">
+          <text class="recent-callsign">{{item.callSign}}</text>
+          <text class="recent-mode">{{item.mode}}</text>
         </view>
-        <view class="stepper-block">
-          <view class="stepper-row">
-            <view class="stepper-btn" hover-class="button-hover" bindtap="stepRst" data-type="myRst" data-field="s" data-delta="-1">−</view>
-            <text class="stepper-val font-mono">{{formData.rst.myRst.s || '·'}}</text>
-            <view class="stepper-btn" hover-class="button-hover" bindtap="stepRst" data-type="myRst" data-field="s" data-delta="1">+</view>
-          </view>
-          <text class="stepper-sub">S</text>
-        </view>
-        <block wx:if="{{isUHF}}">
-          <view wx:if="{{formData.rst.myRst.r === '5' && formData.rst.myRst.s === '9'}}" class="stepper-block">
-            <view class="rst-plus-toggle" hover-class="button-hover" bindtap="toggleRstPlus" data-type="myRst">
-              <view class="plus-checkbox {{rstPlusSelected.myRst ? 'checked' : ''}}">
-                <text class="plus-sign font-mono">59+</text>
-              </view>
-            </view>
-            <text class="stepper-sub">T</text>
-          </view>
-          <view wx:else class="rst-t-placeholder"></view>
-        </block>
-        <view wx:elif="{{isVHF}}" class="stepper-block">
-          <view class="stepper-row">
-            <view class="stepper-btn" hover-class="button-hover" bindtap="stepRst" data-type="myRst" data-field="t" data-delta="-1">−</view>
-            <text class="stepper-val font-mono">{{formData.rst.myRst.t || '·'}}</text>
-            <view class="stepper-btn" hover-class="button-hover" bindtap="stepRst" data-type="myRst" data-field="t" data-delta="1">+</view>
-          </view>
-          <text class="stepper-sub">T</text>
-        </view>
-        <view wx:else class="stepper-block">
-          <view class="stepper-row">
-            <view class="stepper-btn" hover-class="button-hover" bindtap="stepRst" data-type="myRst" data-field="t" data-delta="-1">−</view>
-            <text class="stepper-val font-mono">{{formData.rst.myRst.t || '·'}}</text>
-            <view class="stepper-btn" hover-class="button-hover" bindtap="stepRst" data-type="myRst" data-field="t" data-delta="1">+</view>
-          </view>
-          <text class="stepper-sub">T</text>
-        </view>
-      </view>
-
-      <view class="rst-col-divider"></view>
-
-      <view class="rst-col">
-        <view class="rst-col-title">对方</view>
-        <view class="stepper-block">
-          <view class="stepper-row">
-            <view class="stepper-btn" hover-class="button-hover" bindtap="stepRst" data-type="theirRst" data-field="r" data-delta="-1">−</view>
-            <text class="stepper-val font-mono">{{formData.rst.theirRst.r || '·'}}</text>
-            <view class="stepper-btn" hover-class="button-hover" bindtap="stepRst" data-type="theirRst" data-field="r" data-delta="1">+</view>
-          </view>
-          <text class="stepper-sub">R</text>
-        </view>
-        <view class="stepper-block">
-          <view class="stepper-row">
-            <view class="stepper-btn" hover-class="button-hover" bindtap="stepRst" data-type="theirRst" data-field="s" data-delta="-1">−</view>
-            <text class="stepper-val font-mono">{{formData.rst.theirRst.s || '·'}}</text>
-            <view class="stepper-btn" hover-class="button-hover" bindtap="stepRst" data-type="theirRst" data-field="s" data-delta="1">+</view>
-          </view>
-          <text class="stepper-sub">S</text>
-        </view>
-        <block wx:if="{{isUHF}}">
-          <view wx:if="{{formData.rst.theirRst.r === '5' && formData.rst.theirRst.s === '9'}}" class="stepper-block">
-            <view class="rst-plus-toggle" hover-class="button-hover" bindtap="toggleRstPlus" data-type="theirRst">
-              <view class="plus-checkbox {{rstPlusSelected.theirRst ? 'checked' : ''}}">
-                <text class="plus-sign font-mono">59+</text>
-              </view>
-            </view>
-            <text class="stepper-sub">T</text>
-          </view>
-          <view wx:else class="rst-t-placeholder"></view>
-        </block>
-        <view wx:elif="{{isVHF}}" class="stepper-block">
-          <view class="stepper-row">
-            <view class="stepper-btn" hover-class="button-hover" bindtap="stepRst" data-type="theirRst" data-field="t" data-delta="-1">−</view>
-            <text class="stepper-val font-mono">{{formData.rst.theirRst.t || '·'}}</text>
-            <view class="stepper-btn" hover-class="button-hover" bindtap="stepRst" data-type="theirRst" data-field="t" data-delta="1">+</view>
-          </view>
-          <text class="stepper-sub">T</text>
-        </view>
-        <view wx:else class="stepper-block">
-          <view class="stepper-row">
-            <view class="stepper-btn" hover-class="button-hover" bindtap="stepRst" data-type="theirRst" data-field="t" data-delta="-1">−</view>
-            <text class="stepper-val font-mono">{{formData.rst.theirRst.t || '·'}}</text>
-            <view class="stepper-btn" hover-class="button-hover" bindtap="stepRst" data-type="theirRst" data-field="t" data-delta="1">+</view>
-          </view>
-          <text class="stepper-sub">T</text>
+        <view class="recent-right">
+          <text class="recent-freq font-mono">{{item.frequency}}</text>
+          <text class="recent-time font-mono">{{item.btcTime || item.bjcTime}}</text>
         </view>
       </view>
     </view>
+    <view class="empty-recent" wx:else>
+      <text class="empty-icon">📭</text>
+      <text class="empty-text">暂无通联记录</text>
+      <text class="empty-hint">点击上方"通联日志"开始记录</text>
+    </view>
   </view>
 
-  <view class="float-card">
-    <view class="form-label">位置 QTH</view>
-    <input class="form-input input-minimal" type="text" value="{{formData.qth}}" bindinput="onQthInput" placeholder="位置" />
-  </view>
+  <!-- 底部安全区 -->
+  <view class="safe-area-bottom"></view>
 
-  <view class="float-card">
-    <view class="form-label">功率 PWR (W)</view>
-    <input class="form-input input-minimal font-mono" type="number" value="{{formData.power}}" bindinput="onPowerInput" placeholder="W" />
+  <!-- 底部悬浮添加按钮 -->
+  <view class="fab-container">
+    <view class="fab-btn" hover-class="fab-hover" bindtap="goToAddQSO">
+      <text class="fab-icon">+</text>
+    </view>
+    <view class="copyright">@BA4IWA</view>
   </view>
-
-  <view class="float-card">
-    <view class="form-label">设备 EQUIPMENT</view>
-    <input class="form-input input-minimal" value="{{formData.equipment}}" bindinput="onEquipmentInput" placeholder="设备" />
-  </view>
-
-  <view class="float-card">
-    <view class="form-label">天线 ANTENNA</view>
-    <input class="form-input input-minimal" value="{{formData.antenna}}" bindinput="onAntennaInput" placeholder="天线" />
-  </view>
-
-  <view class="float-card">
-    <view class="form-label">备注 NOTES</view>
-    <textarea class="form-input textarea-minimal" value="{{formData.notes}}" bindinput="onNotesInput" placeholder="备注" auto-height />
-  </view>
-
-  <view class="submit-actions">
-    <button class="submit-btn" hover-class="button-hover" bindtap="submitLog">保存日志</button>
   </view>
 </view>

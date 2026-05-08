@@ -1,12 +1,54 @@
 App({
+  STORAGE_THEME: 'appTheme',
+  THEMES: {
+    radio: {
+      name: '无线电',
+      navColor: '#2C5C97'
+    },
+    morandi: {
+      name: '奶油莫兰迪',
+      navColor: '#C4643E'
+    }
+  },
+
+  onLaunch() {
+    wx.cloud.init({
+      env: "wind-d9gv5b4ca9c4129ba"
+    });
+    this.loadCallHistory()
+    this.getDeviceInfo()
+    this.initTheme()
+  },
   globalData: {
     callHistory: [],
     deviceInfo: null,
     platform: ''
   },
-  onLaunch() {
-    this.loadCallHistory()
-    this.getDeviceInfo()
+  initTheme() {
+    try {
+      // 设置统一的导航栏背景色为浅灰色
+      wx.setNavigationBarColor({
+        frontColor: '#000000',
+        backgroundColor: '#F9F7F4',
+        animation: {
+          duration: 0,
+          timingFunc: 'linear'
+        }
+      })
+      
+      const savedTheme = wx.getStorageSync(this.STORAGE_THEME) || 'radio'
+      if (savedTheme === 'morandi') {
+        const pages = getCurrentPages()
+        if (pages.length > 0) {
+          const currentPage = pages[pages.length - 1]
+          if (currentPage && currentPage.setData) {
+            currentPage.setData({})
+          }
+        }
+      }
+    } catch (e) {
+      console.error('初始化主题失败', e)
+    }
   },
   getDeviceInfo() {
     try {

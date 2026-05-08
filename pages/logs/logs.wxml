@@ -1,63 +1,208 @@
-<view class="logs-page">
-  <view class="search-immersive">
-    <view class="search-inner">
-      <text class="search-icon">⌕</text>
-      <input
-        class="search-input font-mono"
-        type="text"
-        placeholder="呼号 / 频率 / 模式"
-        value="{{searchQuery}}"
-        bindinput="onSearchInput"
-        confirm-type="search"
-        bindconfirm="onSearchConfirm"
-      />
-    </view>
-    <view
-      class="filter-toggle font-mono"
+<view class="theme-wrapper {{currentTheme === 'morandi' ? 'theme-morandi' : ''}}">
+  <view class="logs-page">
+  <!-- 顶部Tab切换 -->
+  <view class="page-tabs">
+    <view 
+      class="page-tab {{currentTab === 'add' ? 'active' : ''}}"
       hover-class="button-hover"
-      bindtap="toggleSearchExpanded"
+      bindtap="switchTab"
+      data-tab="add"
     >
-      {{searchExpanded ? '收起' : '日期筛选'}}
+      <text class="tab-icon">✏️</text>
+      <text class="tab-text">添加</text>
+    </view>
+    <view 
+      class="page-tab {{currentTab === 'list' ? 'active' : ''}}"
+      hover-class="button-hover"
+      bindtap="switchTab"
+      data-tab="list"
+    >
+      <text class="tab-icon">📋</text>
+      <text class="tab-text">列表</text>
     </view>
   </view>
 
-  <view class="filter-panel {{searchExpanded ? 'filter-panel-open' : ''}}">
-    <view class="filter-panel-inner">
-      <text class="filter-bjt-hint">按 BJT 记录日期筛选，选好后点击「搜索」</text>
-      <view class="filter-row">
-        <text class="filter-label">从</text>
-        <picker mode="date" value="{{dateFrom}}" bindchange="onDateFromChange">
-          <view class="filter-picker font-mono">{{dateFrom || '不限'}}</view>
-        </picker>
+  <!-- 添加通联表单 -->
+  <view class="tab-panel {{currentTab === 'add' ? 'tab-panel-show' : ''}}" wx:if="{{currentTab === 'add'}}">
+    <view class="float-card header-card">
+      <view class="header-strip">
+        <view class="header-tz-btns font-mono">
+          <view
+            class="header-tz-btn {{currentTimeType === 'BJT' ? 'header-tz-btn-active' : ''}}"
+            hover-class="button-hover"
+            bindtap="setTimeType"
+            data-type="BJT"
+          >BJT</view>
+          <view
+            class="header-tz-btn {{currentTimeType === 'UTC' ? 'header-tz-btn-active' : ''}}"
+            hover-class="button-hover"
+            bindtap="setTimeType"
+            data-type="UTC"
+          >UTC</view>
+        </view>
+        <view class="header-datetime-row">
+          <picker mode="date" value="{{currentTimeType === 'BJT' ? formData.date : formData.utcDate}}" bindchange="onDateChange">
+            <view class="header-date font-mono" hover-class="button-hover">{{currentTimeType === 'BJT' ? formData.date : formData.utcDate}}</view>
+          </picker>
+          <picker mode="time" value="{{formData[currentTimeType === 'BJT' ? 'bjcTime' : 'utcTime']}}" bindchange="on{{currentTimeType === 'BJT' ? 'Bjc' : 'Utc'}}TimeChange">
+            <view class="header-time font-mono" hover-class="button-hover">{{formData[currentTimeType === 'BJT' ? 'bjcTime' : 'utcTime']}}</view>
+          </picker>
+        </view>
+        <view class="refresh-btn font-mono" hover-class="button-hover" bindtap="refreshTime">↻</view>
       </view>
-      <view class="filter-row">
-        <text class="filter-label">至</text>
-        <picker mode="date" value="{{dateTo}}" bindchange="onDateToChange">
-          <view class="filter-picker font-mono">{{dateTo || '不限'}}</view>
-        </picker>
+    </view>
+
+    <view class="float-card">
+      <view class="form-label">频率 FREQUENCY</view>
+      <view class="lcd-wrap">
+        <input class="lcd-input font-mono" type="digit" value="{{formData.frequency}}" bindinput="onFrequencyInput" placeholder="0.000" />
+        <text class="lcd-suffix font-mono">MHz</text>
       </view>
-      <view class="filter-actions">
-        <button class="filter-btn filter-btn-primary" hover-class="button-hover" bindtap="onDateSearch">搜索</button>
-        <button class="filter-btn filter-btn-ghost" hover-class="button-hover" bindtap="onDateReset">重置</button>
+      <view wx:if="{{frequencySuggestions.length > 0}}" class="frequency-suggestions">
+        <view wx:for="{{frequencySuggestions}}" wx:key="*this" class="suggestion-item" hover-class="button-hover" bindtap="selectFrequency" data-frequency="{{item}}">{{item}} MHz</view>
       </view>
+    </view>
+
+    <view class="float-card">
+      <view class="form-label">呼号 CALLSIGN</view>
+      <input class="form-input font-mono callsign-input" value="{{formData.callSign}}" bindinput="onCallSignInput" placeholder="CALLSIGN" confirm-type="done" />
+      <view wx:if="{{callSuggestions.length > 0}}" class="call-suggestions">
+        <view wx:for="{{callSuggestions}}" wx:key="*this" class="suggestion-item" hover-class="button-hover" bindtap="selectCallSign" data-callsign="{{item}}">{{item}}</view>
+      </view>
+    </view>
+
+    <view class="float-card">
+      <view class="form-label">天气 WX（可选）</view>
+      <view class="weather-icons">
+        <view wx:for="{{weatherIcons}}" wx:key="value" class="weather-icon weather-icon-real {{formData.weather === item.value ? 'selected' : ''}}" hover-class="button-hover" bindtap="selectWeather" data-value="{{item.value}}">
+          <text class="weather-emoji">{{item.emoji}}</text>
+          <text class="weather-label">{{item.label}}</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="float-card">
+      <view class="form-label">工作模式 MODE</view>
+      <view class="mode-tags">
+        <view wx:for="{{modes}}" wx:key="*this" class="mode-tag {{formData.mode === item ? 'selected' : ''}}" hover-class="button-hover" bindtap="selectMode" data-mode="{{item}}">{{item}}</view>
+      </view>
+    </view>
+
+    <view class="float-card">
+      <view class="form-label">信号报告 RST</view>
+      <view class="rst-inputs-row">
+        <view class="rst-group">
+          <text class="rst-group-label">对方</text>
+          <view class="rst-inputs">
+            <input class="rst-input font-mono" type="number" maxlength="1" value="{{formData.rst.theirRst.r}}" bindinput="onRstInput" data-type="theirRst" data-field="r" placeholder="R" />
+            <input class="rst-input font-mono" type="number" maxlength="1" value="{{formData.rst.theirRst.s}}" bindinput="onRstInput" data-type="theirRst" data-field="s" placeholder="S" />
+            <input class="rst-input font-mono" type="text" maxlength="1" value="{{formData.rst.theirRst.t}}" bindinput="onRstInput" data-type="theirRst" data-field="t" placeholder="T" />
+          </view>
+        </view>
+        <view class="rst-group">
+          <text class="rst-group-label">己方</text>
+          <view class="rst-inputs">
+            <input class="rst-input font-mono" type="number" maxlength="1" value="{{formData.rst.myRst.r}}" bindinput="onRstInput" data-type="myRst" data-field="r" placeholder="R" />
+            <input class="rst-input font-mono" type="number" maxlength="1" value="{{formData.rst.myRst.s}}" bindinput="onRstInput" data-type="myRst" data-field="s" placeholder="S" />
+            <input class="rst-input font-mono" type="text" maxlength="1" value="{{formData.rst.myRst.t}}" bindinput="onRstInput" data-type="myRst" data-field="t" placeholder="T" />
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="float-card">
+      <view class="form-label">位置 QTH</view>
+      <input class="form-input input-minimal" type="text" value="{{formData.qth}}" bindinput="onQthInput" placeholder="位置" />
+    </view>
+
+    <view class="float-card">
+      <view class="form-label">功率 PWR (W)</view>
+      <input class="form-input input-minimal font-mono" type="number" value="{{formData.power}}" bindinput="onPowerInput" placeholder="W" />
+    </view>
+
+    <view class="float-card">
+      <view class="form-label">设备 EQUIPMENT</view>
+      <input class="form-input input-minimal" value="{{formData.equipment}}" bindinput="onEquipmentInput" placeholder="设备" />
+    </view>
+
+    <view class="float-card">
+      <view class="form-label">天线 ANTENNA</view>
+      <input class="form-input input-minimal" value="{{formData.antenna}}" bindinput="onAntennaInput" placeholder="天线" />
+    </view>
+
+    <view class="float-card">
+      <view class="form-label">备注 NOTES</view>
+      <textarea class="form-input textarea-minimal" value="{{formData.notes}}" bindinput="onNotesInput" placeholder="备注" auto-height />
+    </view>
+
+    <view class="submit-actions">
+      <button class="submit-btn" hover-class="button-hover" bindtap="submitLog">保存通联</button>
     </view>
   </view>
 
-  <view wx:if="{{filteredLogs.length === 0}}" class="empty-tip">暂无记录</view>
-
-  <view
-    wx:for="{{filteredLogs}}"
-    wx:key="id"
-    class="log-row-card"
-    hover-class="button-hover"
-    bindtap="openDetail"
-    data-id="{{item.id}}"
-  >
-    <view class="log-row-left font-mono">{{item.callSign}}</view>
-    <view class="log-row-mid">
-      <text class="log-row-line1 font-mono">{{item.frequency}} MHz · {{item.mode}}</text>
-      <text class="log-row-line2 font-mono">BJT {{item.date}} {{item.btcTime || item.bjcTime}}</text>
+  <!-- 通联列表 -->
+  <view class="tab-panel {{currentTab === 'list' ? 'tab-panel-show' : ''}}" wx:if="{{currentTab === 'list'}}">
+    <view class="search-immersive">
+      <view class="search-inner">
+        <text class="search-icon">⌕</text>
+        <input
+          class="search-input font-mono"
+          type="text"
+          placeholder="呼号 / 频率 / 模式"
+          value="{{searchQuery}}"
+          bindinput="onSearchInput"
+          confirm-type="search"
+          bindconfirm="onSearchConfirm"
+        />
+      </view>
+      <view
+        class="filter-toggle font-mono"
+        hover-class="button-hover"
+        bindtap="toggleSearchExpanded"
+      >
+        {{searchExpanded ? '收起' : '日期筛选'}}
+      </view>
     </view>
-    <view class="log-row-rst font-mono">{{item.rstSummary}}</view>
+
+    <view class="filter-panel {{searchExpanded ? 'filter-panel-open' : ''}}">
+      <view class="filter-panel-inner">
+        <text class="filter-bjt-hint">按 BJT 记录日期筛选，选好后点击「搜索」</text>
+        <view class="filter-row">
+          <text class="filter-label">从</text>
+          <picker mode="date" value="{{dateFrom}}" bindchange="onDateFromChange">
+            <view class="filter-picker font-mono">{{dateFrom || '不限'}}</view>
+          </picker>
+        </view>
+        <view class="filter-row">
+          <text class="filter-label">至</text>
+          <picker mode="date" value="{{dateTo}}" bindchange="onDateToChange">
+            <view class="filter-picker font-mono">{{dateTo || '不限'}}</view>
+          </picker>
+        </view>
+        <view class="filter-actions">
+          <button class="filter-btn filter-btn-primary" hover-class="button-hover" bindtap="onDateSearch">搜索</button>
+          <button class="filter-btn filter-btn-ghost" hover-class="button-hover" bindtap="onDateReset">重置</button>
+        </view>
+      </view>
+    </view>
+
+    <view wx:if="{{filteredLogs.length === 0}}" class="empty-tip">暂无记录</view>
+
+    <view
+      wx:for="{{filteredLogs}}"
+      wx:key="id"
+      class="log-row-card"
+      hover-class="button-hover"
+      bindtap="openDetail"
+      data-id="{{item.id}}"
+    >
+      <view class="log-row-left font-mono">{{item.callSign}}</view>
+      <view class="log-row-mid">
+        <text class="log-row-line1 font-mono">{{item.frequency}} MHz · {{item.mode}}</text>
+        <text class="log-row-line2 font-mono">BJT {{item.date}} {{item.btcTime || item.bjcTime}}</text>
+      </view>
+      <view class="log-row-rst font-mono">{{item.rstSummary}}</view>
+    </view>
+  </view>
   </view>
 </view>

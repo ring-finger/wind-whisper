@@ -5,6 +5,16 @@ const VIBRATE_TYPE = 'medium'
 const SHARE_TITLE = '风语纪<电波有痕，风语为纪> - 我的设置'
 const STORAGE_AVATAR = 'wxMineAvatarUrl'
 const STORAGE_NICK = 'wxMineNickName'
+const STORAGE_THEME = 'appTheme'
+
+const THEMES = {
+  radio: {
+    name: '无线电'
+  },
+  morandi: {
+    name: '奶油莫兰迪'
+  }
+}
 
 Page({
   data: {
@@ -23,18 +33,78 @@ Page({
       { name: 'BA4IWA', message: 'CQ CQ CQ 这里是BA4IWA，呼叫频率上的友台' }
     ],
     showAuthorInfo: false,
-    showThanksInfo: false
+    showThanksInfo: false,
+    currentTheme: 'radio',
+    currentThemeName: '无线电',
+    showThemePicker: false
   },
 
   onLoad() {
     this.loadUserProfile()
     this.loadMyCallSign()
     this.loadContactCount()
+    this.loadTheme()
   },
 
   onShow() {
     this.loadUserProfile()
     this.loadContactCount()
+  },
+
+  loadTheme() {
+    try {
+      const savedTheme = wx.getStorageSync(STORAGE_THEME) || 'radio'
+      const theme = THEMES[savedTheme] ? savedTheme : 'radio'
+      const themeData = THEMES[theme]
+      this.setData({
+        currentTheme: theme,
+        currentThemeName: themeData.name
+      })
+      this.applyTheme(theme)
+      // 设置统一的导航栏背景色
+      wx.setNavigationBarColor({
+        frontColor: '#000000',
+        backgroundColor: '#F9F7F4',
+        animation: {
+          duration: 0,
+          timingFunc: 'linear'
+        }
+      })
+    } catch (e) {
+      console.error('加载主题失败', e)
+    }
+  },
+
+  applyTheme(theme) {
+    try {
+      wx.setStorageSync(STORAGE_THEME, theme)
+    } catch (e) {
+      console.error('保存主题失败', e)
+    }
+  },
+
+  toggleTheme() {
+    wx.vibrateShort({ type: VIBRATE_TYPE })
+    const currentTheme = this.data.currentTheme
+    const newTheme = currentTheme === 'radio' ? 'morandi' : 'radio'
+    const themeData = THEMES[newTheme]
+
+    this.setData({
+      currentTheme: newTheme,
+      currentThemeName: themeData.name
+    })
+
+    try {
+      wx.setStorageSync(STORAGE_THEME, newTheme)
+    } catch (e) {
+      console.error('保存主题失败', e)
+    }
+
+    wx.showToast({
+      title: `已切换至${themeData.name}主题`,
+      icon: 'none',
+      duration: 1500
+    })
   },
 
   loadUserProfile() {
@@ -55,6 +125,9 @@ Page({
       try {
         wx.setStorageSync(STORAGE_AVATAR, path)
         this.setData({ userAvatarUrl: path })
+        const userInfo = wx.getStorageSync('userInfo') || {}
+        userInfo.avatarUrl = path
+        wx.setStorageSync('userInfo', userInfo)
       } catch (err) {
         console.error('保存头像路径失败', err)
       }
@@ -120,12 +193,15 @@ Page({
       success: (res) => {
         if (res.confirm && res.content) {
           const callSign = res.content.toUpperCase().replace(/[^A-Z0-9]/g, '')
-          if (callSign) {
+            if (callSign) {
             this.setData({
               myCallSign: callSign
             })
             try {
               wx.setStorageSync('myCallSign', callSign)
+              const userInfo = wx.getStorageSync('userInfo') || {}
+              userInfo.callSign = callSign
+              wx.setStorageSync('userInfo', userInfo)
               wx.showToast({
                 title: '设置成功',
                 icon: 'success'
@@ -318,6 +394,20 @@ Page({
             })
           }
         }
+      }
+    })
+  },
+
+  goToSstv() {
+    wx.vibrateShort({ type: VIBRATE_TYPE })
+    wx.navigateTo({
+      url: '/pages/sstv/sstv',
+      fail: (err) => {
+        console.error('导航到SSTV页面失败', err)
+        wx.showToast({
+          title: '打开失败，请重试',
+          icon: 'none'
+        })
       }
     })
   },

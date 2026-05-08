@@ -2,36 +2,17 @@
   "pages": [
     "pages/index/index",
     "pages/logs/logs",
+    "pages/sstv/sstv",
     "pages/log-detail/log-detail",
     "pages/mine/mine",
     "pages/web-view/web-view"
   ],
   "window": {
     "backgroundTextStyle": "dark",
-    "navigationBarBackgroundColor": "#007AFF",
-    "navigationBarTitleText": "业余无线电通联日志",
-    "navigationBarTextStyle": "white",
+    "navigationBarBackgroundColor": "#F9F7F4",
+    "navigationBarTitleText": "风语纪",
+    "navigationBarTextStyle": "black",
     "backgroundColor": "#F5F7FA"
-  },
-  "tabBar": {
-    "color": "#8E8E93",
-    "selectedColor": "#007AFF",
-    "backgroundColor": "#ffffff",
-    "borderStyle": "black",
-    "list": [
-      {
-        "pagePath": "pages/index/index",
-        "text": "通联"
-      },
-      {
-        "pagePath": "pages/logs/logs",
-        "text": "列表"
-      },
-      {
-        "pagePath": "pages/mine/mine",
-        "text": "我的"
-      }
-    ]
   },
   "style": "v2",
   "lazyCodeLoading": "requiredComponents",

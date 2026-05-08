@@ -43,11 +43,30 @@ Page({
   onLoad(options) {
     const logId = parseInt(options.id)
     this.loadLogDetail(logId)
+    this.loadTheme()
   },
 
   onShow() {
     if (this.data.log) {
       this.loadLogDetail(this.data.log.id)
+    }
+    this.loadTheme()
+  },
+
+  loadTheme() {
+    try {
+      const savedTheme = wx.getStorageSync('appTheme') || 'radio'
+      // 设置统一的导航栏背景色
+      wx.setNavigationBarColor({
+        frontColor: '#000000',
+        backgroundColor: '#F9F7F4',
+        animation: {
+          duration: 0,
+          timingFunc: 'linear'
+        }
+      })
+    } catch (e) {
+      console.error('加载主题失败', e)
     }
   },
 

@@ -1,17 +1,87 @@
+/* 默认使用无线电主题 */
 page {
-  --primary-color: #007aff;
-  --bg-main: #f5f7fa;
-  --card-bg: #ffffff;
-  --text-main: #1c1c1e;
-  --text-sec: #8e8e93;
-  --accent-orange: #ff9500;
-  --primary-soft: rgba(0, 122, 255, 0.12);
-  --lcd-bg: #e8f2ff;
+  /* 无线电主题 - Radio Theme */
+  --bg-primary: #F4F7FA;
+  --bg-main: #F4F7FA;
+  --card-bg: #FFFFFF;
+  --border-color: #D4E0ED;
+  --shadow-color: rgba(58, 85, 130, 0.1);
+  --text-primary: #1A2B42;
+  --text-main: #1A2B42;
+  --text-secondary: #5B697F;
+  --text-sec: #5B697F;
+  --text-placeholder: #8E99A8;
+  --text-inverse: #FFFFFF;
+  --color-log: #E6F0F8;
+  --color-decode: #E8F5E9;
+  --color-qso: #FFF3E0;
+  --color-profile: #E8EAF6;
+  --accent-primary: #2C5C97;
+  --primary-color: #2C5C97;
+  --primary-soft: rgba(44, 92, 151, 0.12);
+  --accent-active: #388E3C;
+  --accent-secondary: #D84315;
+  --accent-orange: #D84315;
+  --lcd-bg: #E8EEF4;
+  --success: #388E3C;
+  --warning: #F57C00;
+  --error: #D32F2F;
+  --info: #2C5C97;
+  /* 导航栏背景色 - 统一浅色系 */
+  --nav-bg: #F9F7F4;           /* 超浅暖灰背景 */
+  --nav-text: #443D33;         /* 中性文字色 */
+  --nav-text-active: #2C5C97;  /* 激活色 */
+  --nav-border: #EAE5DD;       /* 浅边框 */
 
-  background-color: var(--bg-main);
-  color: var(--text-main);
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
 }
+
+/* 主题包装器 - 用于主题切换 */
+.theme-wrapper {
+  min-height: 100vh;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+/* 奶油莫兰迪主题 - 应用于包装器 */
+.theme-wrapper.theme-morandi {
+  --bg-primary: #F5F0E6;
+  --bg-main: #F5F0E6;
+  --card-bg: #F8F2E9;
+  --border-color: #E8DED0;
+  --shadow-color: rgba(180, 169, 150, 0.15);
+  --text-primary: #3A3226;
+  --text-main: #3A3226;
+  --text-secondary: #7A6F5F;
+  --text-sec: #7A6F5F;
+  --text-placeholder: #B5A996;
+  --text-inverse: #F8F2E9;
+  --color-log: #F2E3C6;
+  --color-decode: #DDE8D2;
+  --color-qso: #F0D8C8;
+  --color-profile: #E8DDCC;
+  --accent-primary: #C4643E;
+  --primary-color: #C4643E;
+  --primary-soft: rgba(196, 100, 62, 0.12);
+  --accent-active: #85A877;
+  --accent-secondary: #6B8EAE;
+  --accent-orange: #C4643E;
+  --lcd-bg: #EDE6DA;
+  --success: #85A877;
+  --warning: #D4A373;
+  --error: #BB6464;
+  --info: #6B8EAE;
+  /* 导航栏背景色 - 统一使用浅色系，不随主题变化 */
+
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+/* ============================================
+   全局基础样式
+   ============================================ */
 
 .font-mono {
   font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
@@ -32,7 +102,7 @@ page {
   border-radius: 16rpx;
   padding: 24rpx;
   margin-bottom: 20rpx;
-  box-shadow: 0 4rpx 24rpx rgba(0, 0, 0, 0.06);
+  box-shadow: 0 4rpx 24rpx var(--shadow-color);
   box-sizing: border-box;
 }
 
@@ -41,13 +111,13 @@ page {
   margin-bottom: 20rpx;
   padding: 24rpx;
   border-radius: 16rpx;
-  box-shadow: 0 4rpx 24rpx rgba(0, 0, 0, 0.06);
+  box-shadow: 0 4rpx 24rpx var(--shadow-color);
   box-sizing: border-box;
 }
 
 .form-label {
   font-size: 24rpx;
-  color: var(--text-sec);
+  color: var(--text-secondary);
   margin-bottom: 12rpx;
   font-weight: 500;
 }
@@ -55,11 +125,11 @@ page {
 .form-input {
   width: 100%;
   height: 80rpx;
-  border: 1rpx solid rgba(0, 0, 0, 0.08);
+  border: 1rpx solid var(--border-color);
   border-radius: 12rpx;
   padding: 0 20rpx;
   font-size: 28rpx;
-  color: var(--text-main);
+  color: var(--text-primary);
   box-sizing: border-box;
   text-align: left;
   line-height: 76rpx;
@@ -71,7 +141,7 @@ page {
 }
 
 .form-input:focus {
-  border-color: var(--primary-color);
+  border-color: var(--accent-primary);
 }
 
 .time-row {
@@ -98,11 +168,11 @@ page {
 
 .time-type-toggle {
   padding: 10rpx 16rpx;
-  background: var(--bg-main);
+  background: var(--bg-primary);
   border-radius: 12rpx;
   font-size: 22rpx;
   font-weight: 600;
-  color: var(--text-main);
+  color: var(--text-primary);
 }
 
 .time-type-toggle:active {
@@ -122,10 +192,10 @@ page {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg-main);
+  background: var(--bg-primary);
   border-radius: 12rpx;
   font-size: 30rpx;
-  color: var(--primary-color);
+  color: var(--accent-primary);
 }
 
 .refresh-btn:active {
@@ -145,7 +215,7 @@ page {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg-main);
+  background: var(--bg-primary);
   border-radius: 50%;
   border: none;
   box-sizing: border-box;
@@ -154,7 +224,7 @@ page {
 
 .weather-icon.selected {
   background: var(--primary-soft);
-  box-shadow: 0 0 0 3rpx var(--primary-color);
+  box-shadow: 0 0 0 3rpx var(--accent-primary);
 }
 
 .mode-tags {
@@ -165,17 +235,17 @@ page {
 
 .mode-tag {
   padding: 14rpx 28rpx;
-  background: rgba(142, 142, 147, 0.15);
+  background: rgba(122, 111, 95, 0.12);
   border-radius: 12rpx;
   font-size: 26rpx;
-  color: var(--text-main);
+  color: var(--text-primary);
   border: none;
   transition: all 0.2s ease;
 }
 
 .mode-tag.selected {
-  background: var(--primary-color);
-  color: #fff;
+  background: var(--accent-primary);
+  color: var(--text-inverse);
 }
 
 .rst-inputs {
@@ -189,7 +259,7 @@ page {
 
 .rst-label {
   font-size: 22rpx;
-  color: var(--text-sec);
+  color: var(--text-secondary);
   margin-bottom: 10rpx;
   text-align: center;
 }
@@ -198,14 +268,14 @@ page {
   width: 100%;
   height: 96rpx;
   line-height: 96rpx;
-  background: var(--primary-color);
-  color: #fff;
+  background: var(--accent-primary);
+  color: var(--text-inverse);
   border-radius: 999rpx;
   font-size: 32rpx;
   font-weight: 600;
   margin-top: 32rpx;
   border: none;
-  box-shadow: 0 8rpx 28rpx rgba(0, 122, 255, 0.35);
+  box-shadow: 0 8rpx 28rpx rgba(44, 92, 151, 0.35);
   text-align: center;
 }
 
@@ -222,7 +292,7 @@ page {
   margin-bottom: 20rpx;
   padding: 30rpx;
   border-radius: 16rpx;
-  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.06);
+  box-shadow: 0 4rpx 16rpx var(--shadow-color);
 }
 
 .log-header {
@@ -235,12 +305,12 @@ page {
 .log-callsign {
   font-size: 36rpx;
   font-weight: bold;
-  color: var(--primary-color);
+  color: var(--accent-primary);
 }
 
 .log-date {
   font-size: 24rpx;
-  color: var(--text-sec);
+  color: var(--text-secondary);
 }
 
 .log-detail {
@@ -248,7 +318,7 @@ page {
   flex-wrap: wrap;
   gap: 20rpx;
   font-size: 26rpx;
-  color: var(--text-sec);
+  color: var(--text-secondary);
 }
 
 .log-detail-item {
@@ -260,6 +330,6 @@ page {
 .empty-tip {
   text-align: center;
   padding: 100rpx 0;
-  color: var(--text-sec);
+  color: var(--text-secondary);
   font-size: 28rpx;
 }

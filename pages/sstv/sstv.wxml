@@ -1,0 +1,140 @@
+<view class="theme-wrapper {{currentTheme === 'morandi' ? 'theme-morandi' : ''}}">
+  <view class="container">
+    <canvas type="2d" id="resizeCanvas" class="hidden-canvas" style="width: 320px; height: 240px;"></canvas>
+    <canvas type="2d" id="encodeCanvas" class="hidden-canvas" style="width: 320px; height: 240px;"></canvas>
+    <canvas type="2d" id="tempCanvas" class="hidden-canvas" style="width: 320px; height: 240px;"></canvas>
+    <canvas type="2d" id="pixelCanvas" class="hidden-canvas" style="width: 320px; height: 240px;"></canvas>
+
+    <view class="tab-bar">
+      <view class="tab-item {{currentTab === 'encode' ? 'active' : ''}}" bindtap="switchTab" data-tab="encode">
+        <text>编码</text>
+      </view>
+      <view class="tab-item {{currentTab === 'decode' ? 'active' : ''}}" bindtap="switchTab" data-tab="decode">
+        <text>解码</text>
+      </view>
+    </view>
+
+    <!-- 编码界面 -->
+    <view class="encode-panel" wx:if="{{currentTab === 'encode'}}">
+      <view class="upload-area" bindtap="chooseImage">
+        <view class="upload-icon">📷</view>
+        <text class="upload-text">{{uploadImage ? '点击更换图片' : '点击上传图片'}}</text>
+        <text class="upload-hint">支持拍照或从相册选择</text>
+      </view>
+      
+      <image wx:if="{{uploadImage}}" class="preview-image" src="{{uploadImage}}" mode="aspectFit" />
+      
+      <view class="image-info" wx:if="{{uploadImage}}">
+        <text>图片尺寸: {{imageWidth}} x {{imageHeight}}</text>
+      </view>
+
+      <view class="control-group">
+        <button class="action-btn primary" bindtap="startEncode" disabled="{{!uploadImage || isEncoding}}">
+          {{isEncoding ? '正在生成音频...' : '生成SSTV音频'}}
+        </button>
+      </view>
+
+      <view class="audio-player" wx:if="{{audioFilePath}}">
+        <text class="audio-label">生成的音频</text>
+        <audio src="{{audioFilePath}}" controls />
+      </view>
+
+      <view class="encode-settings">
+        <view class="setting-item">
+          <text class="setting-label">图片质量:</text>
+          <slider class="setting-slider" min="1" max="100" value="{{quality}}" bindchange="onQualityChange" />
+          <text class="setting-value">{{quality}}%</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 解码界面 -->
+    <view class="decode-panel" wx:if="{{currentTab === 'decode'}}">
+      <view class="decode-status">
+        <view class="status-circle {{isDecoding ? 'active' : ''}}">
+          <text class="status-icon">{{isDecoding ? '🎤' : '⏹️'}}</text>
+        </view>
+        <text class="status-text">{{isDecoding ? '正在监听...' : '点击开始监听'}}</text>
+        <text class="status-hint" wx:if="{{isDecoding}}">请将音频源靠近麦克风</text>
+      </view>
+
+      <!-- 音频波形显示 -->
+      <view class="waveform-container" wx:if="{{isDecoding}}">
+        <view class="waveform-header">
+          <text class="waveform-title">🎵 音频波形</text>
+        </view>
+        <view class="waveform">
+          <view 
+            wx:for="{{waveformData}}" 
+            wx:key="index" 
+            class="waveform-bar"
+            style="height: {{item}}%;"
+          ></view>
+        </view>
+      </view>
+
+      <view class="decode-controls">
+        <button class="action-btn {{isDecoding ? 'danger' : 'primary'}}" bindtap="toggleDecode">
+          {{isDecoding ? '停止监听' : '开始监听'}}
+        </button>
+      </view>
+
+      <!-- 实时解码图片预览 -->
+      <view class="decode-preview" wx:if="{{isDecoding}}">
+        <view class="preview-header">
+          <text class="preview-title">📺 实时解码</text>
+        </view>
+        <canvas 
+          class="preview-canvas" 
+          type="2d" 
+          id="decodeCanvas"
+          style="width: 320rpx; height: 240rpx;"
+        ></canvas>
+        <view class="preview-info">
+          <text>扫描线: {{scanLine}} / 240</text>
+        </view>
+      </view>
+
+      <view class="decode-progress" wx:if="{{isDecoding}}">
+        <view class="progress-bar">
+          <view class="progress-fill" style="width: {{decodeProgress}}%"></view>
+        </view>
+        <text class="progress-text">解码进度: {{decodeProgress}}%</text>
+      </view>
+
+      <view class="result-image-container" wx:if="{{decodedImage}}">
+        <text class="result-label">解码结果</text>
+        <image class="result-image" src="{{decodedImage}}" mode="aspectFit" />
+        <view class="result-actions">
+          <button class="action-btn primary" bindtap="saveToAlbum">保存到相册</button>
+          <button class="action-btn secondary" bindtap="clearResult">删除</button>
+        </view>
+      </view>
+
+      <view class="decode-settings">
+        <view class="setting-item">
+          <text class="setting-label">灵敏度:</text>
+          <slider class="setting-slider" min="10" max="100" value="{{sensitivity}}" bindchange="onSensitivityChange" />
+          <text class="setting-value">{{sensitivity}}%</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 提示信息 -->
+    <view class="tips">
+      <text class="tips-title">💡 使用提示</text>
+      <view class="tips-content" wx:if="{{currentTab === 'encode'}}">
+        <text>1. 点击上传区域选择图片</text>
+        <text>2. 图片会被自动调整为SSTV格式</text>
+        <text>3. 点击生成按钮创建音频</text>
+        <text>4. 通过无线电发射音频信号</text>
+      </view>
+      <view class="tips-content" wx:if="{{currentTab === 'decode'}}">
+        <text>1. 确保环境安静，减少背景噪音</text>
+        <text>2. 将音频源靠近手机麦克风</text>
+        <text>3. 点击开始监听按钮</text>
+        <text>4. 等待解码完成后保存图片</text>
+      </view>
+    </view>
+  </view>
+</view>

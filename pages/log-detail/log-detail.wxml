@@ -1,5 +1,6 @@
-<view class="container">
-  <view class="log-detail-card">
+<view class="theme-wrapper">
+  <view class="container">
+    <view class="log-detail-card">
     <view class="card-header">
       <view class="callsign font-mono">{{log.callSign}}</view>
       <view class="date font-mono">{{bjtDateTimeFull}}</view>
@@ -82,6 +83,7 @@
 
     <view class="log-footer">
       <text class="footer-text">记录时间: {{recordTime}}</text>
+    </view>
     </view>
   </view>
 
