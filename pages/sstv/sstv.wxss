@@ -222,42 +222,6 @@
   padding: 0 20rpx;
 }
 
-/* 波形显示 */
-.waveform-container {
-  background: var(--card-bg);
-  margin: 20rpx;
-  padding: 20rpx;
-  border-radius: 16rpx;
-}
-
-.waveform-header {
-  margin-bottom: 15rpx;
-}
-
-.waveform-title {
-  font-size: 26rpx;
-  color: var(--text-primary);
-  font-weight: 600;
-}
-
-.waveform {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 120rpx;
-  gap: 4rpx;
-  background: var(--bg-primary);
-  border-radius: 12rpx;
-  padding: 10rpx;
-}
-
-.waveform-bar {
-  width: 6rpx;
-  background: linear-gradient(180deg, var(--accent-active), var(--accent-secondary));
-  border-radius: 3rpx;
-  transition: height 0.1s ease;
-}
-
 /* 解码预览 */
 .decode-preview {
   background: var(--card-bg);

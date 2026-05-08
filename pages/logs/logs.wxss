@@ -516,8 +516,9 @@
   font-weight: 600;
   border: none;
   box-shadow: 0 4rpx 20rpx rgba(196, 100, 62, 0.3);
-  text-align: center;
-  line-height: 88rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .submit-btn::after {

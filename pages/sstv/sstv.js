@@ -2,12 +2,14 @@ const VIBRATE_TYPE = 'medium'
 
 class SSTVEncoder {
   constructor() {
+    // 基于Web-SSTV标准的参数
     this.sampleRate = 44100
-    this.freqMin = 300
-    this.freqMax = 2300
-    this.hSyncFreq = 1200
-    this.vSyncFreq = 900
-    this.scanLineTime = 30
+    this.freqMin = 1500      // 颜色频率最小值（匹配解码器）
+    this.freqMax = 2300      // 颜色频率最大值
+    this.hSyncFreq = 1200    // 水平同步频率
+    this.vSyncFreq = 1900    // 垂直同步频率（修正为正确值）
+    this.blankFreq = 1500    // 消隐频率
+    this.scanLineTime = 30  // 扫描线时间
   }
 
   rgbToFrequency(r, g, b) {
@@ -95,13 +97,25 @@ class SSTVEncoder {
 
 class SSTVDecoder {
   constructor() {
-    this.sampleRate = 44100
-    this.freqMin = 300
-    this.freqMax = 2300
-    this.hSyncFreq = 1200
-    this.vSyncFreq = 900
+    // Robot36 格式参数 (标准 SSTV 规范)
+    this.sampleRate = 8000
+    this.SYNC_FREQ = 1200      // 同步脉冲频率
+    this.BLANK_FREQ = 1500     // 消隐脉冲频率
+    this.COLOR_MIN = 1500      // 颜色频率最小值
+    this.COLOR_MAX = 2300      // 颜色频率最大值
+    
+    // Robot36 每行时序 (单位: 毫秒)
+    this.H_SYNC_TIME = 4.35    // 水平同步脉冲时长
+    this.H_BLANK_TIME = 0.45   // 水平消隐时长
+    this.GREEN_TIME = 87.2     // 绿色通道时长 (320 像素)
+    this.RB_TIME = 43.6        // 红/蓝通道时长 (各 160 像素)
+    this.LINE_TIME = 135.6     // 一行总时长
+    
+    // Robot36 图像参数
     this.imageWidth = 320
     this.imageHeight = 240
+    this.currentFormat = 'Robot36'
+    
     this.reset()
   }
 
@@ -113,213 +127,297 @@ class SSTVDecoder {
     this.isDecoding = false
     this.onProgress = null
     this.onComplete = null
+    
+    // 解码状态机
+    this.state = 'SEARCHING'  // SEARCHING, SYNC, IMAGE
+    this.lineStartSample = 0   // 当前行开始的样本位置
+    this.sampleCount = 0        // 总样本计数
+    this.totalSamples = 0       // 总样本数
+    
+    // 行内像素采样
+    this.currentChannel = 'GREEN'  // GREEN, RED, BLUE
+    this.channelPixelIndex = 0     // 当前通道内的像素索引
+    this.greenPixels = []          // 绿色通道像素
+    this.redPixels = []            // 红色通道像素
+    this.bluePixels = []           // 蓝色通道像素
+    
+    // 同步检测
+    this.consecutiveSync = 0
+    this.lastFreq = 0
+    
+    // 音频结束检测
+    this.lastAudioTime = 0
+    this.silenceCount = 0
   }
 
+  // 处理音频帧
   processAudioFrame(frameBuffer) {
     if (!this.isDecoding) return
+    if (!frameBuffer || frameBuffer.length === 0) return
     
+    this.lastAudioTime = Date.now()
     this.audioBuffer.push(...frameBuffer)
+    this.totalSamples += frameBuffer.length
     
-    // 每累积足够的数据处理一次
-    if (this.audioBuffer.length >= 4410) { // 100ms 的数据
+    // 持续处理音频数据
+    while (this.audioBuffer.length >= 32) {
       this.processAudioData()
     }
   }
 
+  // 处理音频数据 - 基于时间的像素采样
   processAudioData() {
-    if (!this.isDecoding || this.audioBuffer.length < 512) return
+    if (!this.isDecoding) return
+    if (this.audioBuffer.length < 32) return
     
-    const samples = this.audioBuffer.splice(0, 4410)
-    const segment = samples.slice(0, 512)
-    const freq = this.fftFrequency(segment)
+    // 使用较小的窗口进行频率检测
+    const windowSize = 32  // 4ms at 8kHz
+    const samples = this.audioBuffer.splice(0, windowSize)
+    this.sampleCount += windowSize
     
-    // 检测同步信号
-    if (freq >= 850 && freq <= 950) {
-      // 垂直同步信号，新图像开始
-      this.currentLine = 0
-      this.currentPixel = 0
-      return
+    // 检测当前频率
+    const freq = this.detectFrequency(samples)
+    const isSync = Math.abs(freq - this.SYNC_FREQ) < 100
+    
+    // 状态机处理
+    switch (this.state) {
+      case 'SEARCHING':
+        if (isSync) {
+          this.consecutiveSync++
+          if (this.consecutiveSync >= 5) {
+            console.log('检测到垂直同步信号，开始解码')
+            this.state = 'SYNC'
+            this.lineStartSample = this.sampleCount
+            this.currentLine = 0
+            this.consecutiveSync = 0
+          }
+        } else {
+          this.consecutiveSync = Math.max(0, this.consecutiveSync - 1)
+        }
+        break
+        
+      case 'SYNC':
+        // 等待水平同步结束，开始新行
+        if (!isSync) {
+          // 计算距离上次同步的时间
+          const samplesSinceSync = this.sampleCount - this.lineStartSample
+          const timeSinceSync = (samplesSinceSync / this.sampleRate) * 1000
+          
+          if (timeSinceSync > 5) {  // 同步脉冲结束
+            console.log('开始解码第', this.currentLine + 1, '行')
+            this.state = 'IMAGE'
+            this.currentChannel = 'GREEN'
+            this.channelPixelIndex = 0
+            this.greenPixels = []
+            this.redPixels = []
+            this.bluePixels = []
+            this.lineStartSample = this.sampleCount
+          }
+        }
+        break
+        
+      case 'IMAGE':
+        // 基于时间的像素采样
+        const samplesInLine = this.sampleCount - this.lineStartSample
+        const timeInLine = (samplesInLine / this.sampleRate) * 1000
+        
+        // 检测同步脉冲 (新行开始)
+        if (isSync) {
+          if (this.consecutiveSync === 0) {
+            // 保存当前行的像素数据
+            this.saveCurrentLine()
+            
+            this.currentLine++
+            this.consecutiveSync = 1
+            
+            if (this.currentLine >= this.imageHeight) {
+              console.log('图像解码完成，共', this.currentLine, '行')
+              this.isDecoding = false
+              if (this.onComplete) {
+                this.onComplete(this.imageData, this.imageWidth, this.imageHeight)
+              }
+              this.state = 'SEARCHING'
+              return
+            }
+            
+            // 通知进度
+            if (this.onProgress) {
+              const progress = Math.floor((this.currentLine / this.imageHeight) * 100)
+              this.onProgress(progress, this.currentLine)
+            }
+            
+            // 重置通道
+            this.currentChannel = 'GREEN'
+            this.channelPixelIndex = 0
+            this.greenPixels = []
+            this.redPixels = []
+            this.bluePixels = []
+            this.lineStartSample = this.sampleCount
+          }
+          return
+        }
+        
+        this.consecutiveSync = Math.max(0, this.consecutiveSync - 1)
+        
+        // 采样像素数据
+        this.samplePixel(freq, timeInLine)
+        break
     }
     
-    if (freq >= 1100 && freq <= 1300) {
-      // 水平同步信号，新行开始
-      this.currentLine++
-      this.currentPixel = 0
-      return
-    }
+    this.lastFreq = freq
     
-    // 处理像素数据
-    if (this.currentLine > 0 && this.currentLine <= this.imageHeight && this.currentPixel < this.imageWidth) {
-      const luminance = this.frequencyToLuminance(freq)
-      const val = Math.floor(luminance * 255)
-      const idx = (this.currentLine * this.imageWidth + this.currentPixel) * 4
-      
-      this.imageData[idx] = val     // R
-      this.imageData[idx + 1] = val // G
-      this.imageData[idx + 2] = val // B
-      this.imageData[idx + 3] = 255 // A
-      
-      this.currentPixel++
-      
-      // 更新进度
-      if (this.onProgress) {
-        const progress = Math.floor((this.currentLine / this.imageHeight) * 100)
-        this.onProgress(progress, this.currentLine)
-      }
-      
-      // 检查是否完成
-      if (this.currentLine === this.imageHeight && this.currentPixel === this.imageWidth) {
+    // 检测音频结束
+    if (this.audioBuffer.length === 0) {
+      this.silenceCount++
+      if (this.silenceCount > 100 && this.currentLine > 10) {
+        console.log('音频结束，停止解码')
         this.isDecoding = false
         if (this.onComplete) {
           this.onComplete(this.imageData, this.imageWidth, this.imageHeight)
         }
+        this.state = 'SEARCHING'
       }
+    } else {
+      this.silenceCount = 0
     }
   }
 
-  frequencyToLuminance(freq) {
-    return Math.min(1, Math.max(0, (freq - this.freqMin) / (this.freqMax - this.freqMin)))
+  // 基于时间采样像素
+  samplePixel(freq, timeInLine) {
+    // 计算当前在哪个通道
+    let channelStart, channelEnd
+    
+    if (this.currentChannel === 'GREEN') {
+      channelStart = this.H_SYNC_TIME + this.H_BLANK_TIME
+      channelEnd = channelStart + this.GREEN_TIME
+      if (timeInLine >= channelEnd) {
+        this.currentChannel = 'RED'
+        this.channelPixelIndex = 0
+        return
+      }
+    } else if (this.currentChannel === 'RED') {
+      channelStart = this.H_SYNC_TIME + this.H_BLANK_TIME + this.GREEN_TIME
+      channelEnd = channelStart + this.RB_TIME
+      if (timeInLine >= channelEnd) {
+        this.currentChannel = 'BLUE'
+        this.channelPixelIndex = 0
+        return
+      }
+    } else {
+      channelStart = this.H_SYNC_TIME + this.H_BLANK_TIME + this.GREEN_TIME + this.RB_TIME
+      channelEnd = channelStart + this.RB_TIME
+    }
+    
+    if (timeInLine < channelStart) return
+    
+    // 计算当前像素索引
+    const channelTime = timeInLine - channelStart
+    let pixelsPerChannel
+    if (this.currentChannel === 'GREEN') {
+      pixelsPerChannel = this.imageWidth  // 320
+    } else {
+      pixelsPerChannel = this.imageWidth / 2  // 160
+    }
+    
+    const pixelTime = this.channelPixelIndex > 0 
+      ? (channelTime / pixelsPerChannel) 
+      : 0
+    const pixelIndex = Math.floor(pixelTime)
+    
+    if (pixelIndex > this.channelPixelIndex) {
+      // 采样新像素
+      const gray = this.frequencyToGray(freq)
+      
+      if (this.currentChannel === 'GREEN') {
+        this.greenPixels.push(gray)
+      } else if (this.currentChannel === 'RED') {
+        this.redPixels.push(gray)
+      } else {
+        this.bluePixels.push(gray)
+      }
+      
+      this.channelPixelIndex = pixelIndex
+    }
   }
 
-  // 改进的频率检测算法 - 使用 Goertzel 算法
-  fftFrequency(buffer) {
-    const N = buffer.length
+  // 保存当前行到图像数据
+  saveCurrentLine() {
+    if (this.currentLine >= this.imageHeight) return
+    if (this.greenPixels.length === 0) return
     
-    // 计算 RMS 能量
-    let rmsEnergy = 0
-    for (let i = 0; i < N; i++) {
-      rmsEnergy += buffer[i] * buffer[i]
-    }
-    rmsEnergy = Math.sqrt(rmsEnergy / N)
+    const lineIndex = this.currentLine
+    const width = this.imageWidth
     
-    // 信号太弱，返回中间频率
-    if (rmsEnergy < 0.01) {
-      return (this.freqMin + this.freqMax) / 2
-    }
-    
-    // 使用 Goertzel 算法检测关键频率
-    const targetFreqs = [
-      { freq: this.vSyncFreq, name: 'VSYNC' },
-      { freq: this.hSyncFreq, name: 'HSYNC' },
-      { freq: 1500, name: 'BLACK' },
-      { freq: 1900, name: 'GRAY' },
-      { freq: 2300, name: 'WHITE' }
-    ]
-    
-    let bestFreq = (this.freqMin + this.freqMax) / 2
-    let bestScore = 0
-    
-    for (const target of targetFreqs) {
-      const score = this.goertzel(buffer, target.freq, this.sampleRate)
-      if (score > bestScore) {
-        bestScore = score
-        bestFreq = target.freq
+    for (let x = 0; x < width; x++) {
+      const idx = (lineIndex * width + x) * 4
+      
+      // 获取绿色值
+      const greenIdx = Math.floor(x * this.greenPixels.length / width)
+      const g = this.greenPixels[Math.min(greenIdx, this.greenPixels.length - 1)] || 0
+      
+      // 获取红色值 (红色通道映射到左半边)
+      let r = g
+      if (this.redPixels.length > 0 && x < width / 2) {
+        const redIdx = Math.floor((x * 2) * this.redPixels.length / width)
+        r = this.redPixels[Math.min(redIdx, this.redPixels.length - 1)]
       }
+      
+      // 获取蓝色值 (蓝色通道映射到右半边)
+      let b = g
+      if (this.bluePixels.length > 0 && x >= width / 2) {
+        const blueIdx = Math.floor(((x - width / 2) * 2) * this.bluePixels.length / width)
+        b = this.bluePixels[Math.min(blueIdx, this.bluePixels.length - 1)]
+      }
+      
+      this.imageData[idx] = r
+      this.imageData[idx + 1] = g
+      this.imageData[idx + 2] = b
+      this.imageData[idx + 3] = 255
     }
+  }
+
+  // 使用 Goertzel 算法检测频率
+  detectFrequency(samples) {
+    const N = samples.length
+    let maxEnergy = 0
+    let bestFreq = 1900
     
-    // 如果最佳分数不够，进行 FFT 分析
-    if (bestScore < 0.1) {
-      return this.fftAnalyze(buffer)
+    // 扫描 1200-2300Hz 范围内的频率
+    for (let freq = 1200; freq <= 2300; freq += 25) {
+      const energy = this.goertzel(samples, freq, N)
+      if (energy > maxEnergy) {
+        maxEnergy = energy
+        bestFreq = freq
+      }
     }
     
     return bestFreq
   }
 
-  // Goertzel 算法 - 快速检测单一频率
-  goertzel(buffer, targetFreq, sampleRate) {
-    const N = buffer.length
-    const k = Math.round(0.5 + (N * targetFreq) / sampleRate)
+  goertzel(samples, targetFreq, N) {
+    const k = Math.round(0.5 + (N * targetFreq) / this.sampleRate)
     const w = (2 * Math.PI * k) / N
     const coeff = 2 * Math.cos(w)
     
     let s0 = 0, s1 = 0
     
     for (let i = 0; i < N; i++) {
-      const s = buffer[i] + coeff * s1 - s0
+      const s2 = samples[i] + coeff * s1 - s0
       s0 = s1
-      s1 = s
+      s1 = s2
     }
     
     const power = s1 * s1 + s0 * s0 - coeff * s1 * s0
-    return Math.sqrt(power) / N
+    return power / N
   }
 
-  // 简化的 FFT 频率分析
-  fftAnalyze(buffer) {
-    const N = buffer.length
-    const minBin = Math.floor((this.freqMin * N) / this.sampleRate)
-    const maxBin = Math.ceil((this.freqMax * N) / this.sampleRate)
+  frequencyToGray(freq) {
+    // 将频率映射到灰度值 0-255
+    if (freq < this.COLOR_MIN) return 0
+    if (freq > this.COLOR_MAX) return 255
     
-    let maxMag = 0
-    let maxIdx = minBin
-    
-    // 使用加窗的 FFT
-    for (let k = minBin; k < maxBin && k < Math.floor(N / 2); k++) {
-      let real = 0
-      let imag = 0
-      
-      // 汉宁窗
-      for (let n = 0; n < Math.min(256, N); n++) {
-        const idx = (k - 128 + n + N) % N
-        const window = 0.5 * (1 - Math.cos((2 * Math.PI * n) / 255))
-        const angle = -2 * Math.PI * k * n / 256
-        real += buffer[idx] * window * Math.cos(angle)
-        imag += buffer[idx] * window * Math.sin(angle)
-      }
-      
-      const mag = Math.sqrt(real * real + imag * imag)
-      if (mag > maxMag) {
-        maxMag = mag
-        maxIdx = k
-      }
-    }
-    
-    return maxIdx * this.sampleRate / N
-  }
-
-  async audioToImage(audioBuffer) {
-    const samples = audioBuffer.getChannelData(0)
-    const pixels = []
-    const samplesPerPixel = Math.floor(this.sampleRate * 0.0001)
-    const samplesPerLine = this.imageWidth * samplesPerPixel
-    
-    let lineCount = 0
-    let inLine = false
-    let pixelCount = 0
-    
-    for (let i = 0; i < samples.length - 1024; i += samplesPerPixel) {
-      const segment = samples.slice(i, i + 512)
-      const freq = this.fftFrequency(segment)
-      
-      if (freq < this.vSyncFreq + 150 && freq > this.vSyncFreq - 150) {
-        inLine = false
-        lineCount = 0
-        pixelCount = 0
-        continue
-      }
-      
-      if (freq < this.hSyncFreq + 150 && freq > this.hSyncFreq - 150) {
-        if (!inLine) {
-          inLine = true
-          lineCount++
-          pixelCount = 0
-        }
-        continue
-      }
-      
-      if (inLine && lineCount <= this.imageHeight && pixelCount < this.imageWidth) {
-        const luminance = this.frequencyToLuminance(freq)
-        const val = Math.floor(luminance * 255)
-        pixels.push(val, val, val, 255)
-        pixelCount++
-      }
-    }
-    
-    while (pixels.length < this.imageWidth * this.imageHeight * 4) {
-      pixels.push(0, 0, 0, 255)
-    }
-    
-    return new Uint8ClampedArray(pixels)
+    const ratio = (freq - this.COLOR_MIN) / (this.COLOR_MAX - this.COLOR_MIN)
+    return Math.floor(ratio * 255)
   }
 }
 
@@ -337,7 +435,6 @@ Page({
     decodedImage: '',
     decodeProgress: 0,
     scanLine: 0,
-    waveformData: [],
     sstvEncoder: null,
     sstvDecoder: null,
     recorderManager: null,
@@ -356,10 +453,32 @@ Page({
     this.loadTheme()
   },
 
+  onHide() {
+    // 页面隐藏时停止录音，防止页面卡死
+    if (this.data.isDecoding) {
+      this.forceStopRecording()
+      this.setData({ isDecoding: false })
+    }
+    console.log('页面隐藏，录音已停止')
+  },
+
   onUnload() {
+    // 页面卸载时清理资源
+    if (this.data.isDecoding) {
+      this.forceStopRecording()
+    }
+    
+    // 清理定时器
+    if (this.updateTimer) {
+      clearTimeout(this.updateTimer)
+    }
+    
+    // 关闭音频上下文
     if (this.data.audioContext) {
       this.data.audioContext.close()
     }
+    
+    console.log('页面卸载，资源已清理')
   },
 
   loadTheme() {
@@ -389,50 +508,47 @@ Page({
 
   initRecorder() {
     const recorderManager = wx.getRecorderManager()
-    this.waveformFrameCount = 0
-    this.waveformBuffer = []
+    
+    // 录音开始事件
+    recorderManager.onStart(() => {
+      console.log('录音已开始')
+      wx.showToast({ title: '录音已开始', icon: 'success' })
+    })
+    
+    // 录音帧数据回调 - 关键！需要设置frameSize才会触发
     recorderManager.onFrameRecorded((res) => {
       const { frameBuffer } = res
+      if (!frameBuffer || frameBuffer.byteLength === 0) {
+        console.log('空帧数据')
+        return
+      }
+      
       if (this.data.isDecoding && this.decoder) {
-        this.decoder.processAudioFrame(frameBuffer)
-        // 收集音频帧用于波形显示
-        this.waveformBuffer.push(...frameBuffer)
-        this.waveformFrameCount++
-        // 每 5 帧更新一次波形（约每 100ms）
-        if (this.waveformFrameCount >= 5) {
-          this.waveformFrameCount = 0
-          this.updateWaveform()
+        try {
+          // 将 ArrayBuffer 转换为 Float32Array
+          const floatArray = new Float32Array(frameBuffer)
+          
+          // 处理音频帧用于解码
+          this.decoder.processAudioFrame(floatArray)
+        } catch (err) {
+          console.error('处理音频帧失败:', err)
         }
       }
     })
+    
+    // 录音结束事件
+    recorderManager.onStop((res) => {
+      console.log('录音已停止', res)
+    })
+    
+    // 录音错误处理
+    recorderManager.onError((err) => {
+      console.error('录音错误:', err)
+      console.log('错误详情:', JSON.stringify(err))
+      this.setData({ isDecoding: false })
+    })
+    
     this.recorderManager = recorderManager
-  },
-
-  updateWaveform() {
-    if (this.waveformBuffer.length < 32) return
-    const waveform = []
-    const step = Math.floor(this.waveformBuffer.length / 32)
-    for (let i = 0; i < 32; i++) {
-      const startIdx = i * step
-      const endIdx = Math.min(startIdx + step, this.waveformBuffer.length)
-      // 计算 RMS 能量
-      let sum = 0
-      let count = 0
-      for (let j = startIdx; j < endIdx; j++) {
-        sum += Math.abs(this.waveformBuffer[j])
-        count++
-      }
-      const avg = sum / count
-      // 归一化到 20-80 范围
-      const value = Math.min(80, Math.max(20, avg * 100))
-      waveform.push(value)
-    }
-    this.setData({ waveformData: waveform })
-    // 保留最新部分数据，避免内存增长
-    const keepLength = 4410 // 保留约 100ms 数据
-    if (this.waveformBuffer.length > keepLength) {
-      this.waveformBuffer = this.waveformBuffer.slice(-keepLength)
-    }
   },
 
   switchTab(e) {
@@ -560,69 +676,243 @@ Page({
   },
 
   startDecode() {
-    wx.authorize({ scope: 'scope.record' })
-    this.waveformBuffer = [] // 重置波形缓冲区
-    this.waveformFrameCount = 0
-    this.setData({ isDecoding: true, decodedImage: '', decodeProgress: 0, scanLine: 0, waveformData: [] })
+    // 检查权限
+    wx.getSetting({
+      success: (res) => {
+        if (!res.authSetting['scope.record']) {
+          wx.authorize({
+            scope: 'scope.record',
+            success: () => {
+              this._startDecoding()
+            },
+            fail: () => {
+              wx.showModal({
+                title: '需要麦克风权限',
+                content: '请在设置中开启麦克风权限',
+                success: (res) => {
+                  if (res.confirm) {
+                    wx.openSetting()
+                  }
+                }
+              })
+            }
+          })
+        } else {
+          this._startDecoding()
+        }
+      }
+    })
+  },
+
+  _startDecoding() {
+    this.decodedImageData = null // 保存解码后的图片数据
+    this.hasCompletedDecoding = false // 标记是否完成解码
+    
+    // 保持屏幕常量 - 防止息屏
+    wx.setKeepScreenOn({
+      keepScreenOn: true,
+      success: () => {
+        console.log('屏幕保持常亮成功')
+      },
+      fail: () => {
+        console.error('屏幕保持常亮失败')
+      }
+    })
+    
+    // 初始化
+    this.setData({ 
+      isDecoding: true, 
+      decodedImage: '', 
+      decodeProgress: 0, 
+      scanLine: 0
+    })
+    
     const decoder = this.decoder
     if (decoder) {
       decoder.reset()
+      decoder.isDecoding = true // 确保解码器处于活动状态
       decoder.onProgress = (progress, scanLine) => {
-        this.setData({ decodeProgress: progress, scanLine })
+        // 使用防抖更新UI，避免过于频繁的setData
+        if (this.updateTimer) {
+          clearTimeout(this.updateTimer)
+        }
+        this.updateTimer = setTimeout(() => {
+          this.setData({ decodeProgress: progress, scanLine })
+          
+          // 实时更新预览图片 - 降低频率，每20行更新一次
+          if (decoder.imageData && scanLine > 0 && scanLine % 20 === 0) {
+            this.decodedImageData = decoder.imageData
+            this.renderDecodedImage(
+              decoder.imageData, 
+              decoder.imageWidth, 
+              decoder.imageHeight
+            ).then((filePath) => {
+              this.setData({ decodedImage: filePath })
+            }).catch((err) => {
+              console.error('实时预览失败:', err)
+              // 失败时不重复尝试
+            })
+          }
+        }, 200) // 200ms 防抖
       }
       decoder.onComplete = (imageData, width, height) => {
+        this.hasCompletedDecoding = true
+        this.decodedImageData = imageData
+        
+        // 立即停止录音
+        this.forceStopRecording()
+        
         this.renderDecodedImage(imageData, width, height).then((filePath) => {
-          this.setData({ decodedImage: filePath })
+          this.setData({ 
+            isDecoding: false,
+            decodedImage: filePath,
+            decodeProgress: 100
+          })
+          wx.showToast({ title: '解码完成', icon: 'success' })
+        }).catch((err) => {
+          console.error('渲染解码图片失败:', err)
+          this.setData({ isDecoding: false })
+          wx.showToast({ title: '解码失败', icon: 'none' })
         })
       }
+    } else {
+      console.error('解码器未初始化')
+      wx.showToast({ title: '解码器初始化失败', icon: 'none' })
+      wx.setKeepScreenOn({ keepScreenOn: false }) // 关闭屏幕常量
+      return
     }
-    this.recorderManager.start({
-      duration: 60000,
-      sampleRate: 44100,
+    
+    // 尝试使用不同的音频格式和参数
+    const recordOptions = {
+      duration: 300000, // 5分钟，足以覆盖完整的音频
+      sampleRate: 8000,  // 降低采样率以提高兼容性
       numberOfChannels: 1,
-      encodeBitRate: 64000,
-      format: 'raw'
-    })
-    wx.showToast({ title: '开始监听', icon: 'success' })
+      encodeBitRate: 16000,
+      format: 'pcm',  // 使用PCM格式，避免AAC编码问题
+      frameSize: 1  // 关键：设置frameSize才能触发onFrameRecorded
+    }
+    
+    try {
+      this.recorderManager.start(recordOptions)
+      wx.showToast({ title: '开始监听', icon: 'success' })
+    } catch (err) {
+      console.error('启动录音失败:', err)
+      this.setData({ isDecoding: false })
+      wx.setKeepScreenOn({ keepScreenOn: false }) // 关闭屏幕常量
+      wx.showToast({ title: '启动录音失败', icon: 'none' })
+    }
+  },
+  
+  // 强制停止录音（用于解码完成或停止按钮）
+  forceStopRecording() {
+    try {
+      if (this.recorderManager) {
+        this.recorderManager.stop()
+        console.log('录音已停止')
+      }
+    } catch (err) {
+      console.error('停止录音失败:', err)
+    }
+    
+    // 关闭屏幕常量
+    wx.setKeepScreenOn({ keepScreenOn: false })
+    
+    // 停止解码器
+    if (this.decoder) {
+      this.decoder.isDecoding = false
+    }
   },
 
   stopDecode() {
-    this.recorderManager.stop()
-    this.setData({ isDecoding: false, waveformData: [] })
-    wx.showToast({ title: '已停止', icon: 'success' })
+    console.log('停止监听被调用')
+    
+    // 强制停止录音
+    this.forceStopRecording()
+    
+    // 立即更新页面状态 - 关键！否则UI不会更新
+    this.setData({ isDecoding: false })
+    
+    // 检查是否解码成功（或者已经有实时预览）
+    const hasDecodedImage = this.data.decodedImage && this.data.decodedImage.length > 0
+    const wasCompleted = this.hasCompletedDecoding
+    
+    if (hasDecodedImage || wasCompleted) {
+      wx.showToast({ title: '已停止，可以保存图片', icon: 'success' })
+    } else {
+      wx.showToast({ title: '已停止，未检测到有效信号', icon: 'none' })
+      // 如果没有解码成功，清空结果
+      this.setData({ decodedImage: '', decodeProgress: 0, scanLine: 0 })
+    }
   },
 
   async renderDecodedImage(imageData, width, height) {
     return new Promise((resolve, reject) => {
-      const query = wx.createSelectorQuery()
-      query.select('#decodeCanvas')
-        .node((res) => {
-          const canvas = res.node
-          canvas.width = width
-          canvas.height = height
-          const ctx = canvas.getContext('2d')
-          const imageDataArray = new Uint8ClampedArray(imageData)
-          
-          // 使用 ImageData 对象直接绘制
-          const imgData = ctx.createImageData(width, height)
-          imgData.data.set(imageDataArray)
-          ctx.putImageData(imgData, 0, 0)
-          
-          // 导出为图片
-          wx.canvasToTempFilePath({
-            canvas: canvas,
-            x: 0,
-            y: 0,
-            width: width,
-            height: height,
-            destWidth: width,
-            destHeight: height,
-            fileType: 'png',
-            success: (res) => resolve(res.tempFilePath),
-            fail: reject
+      try {
+        const query = wx.createSelectorQuery()
+        query.select('#decodeCanvas')
+          .fields({
+            node: true,
+            context: true
           })
-        })
-      query.exec()
+          .exec((res) => {
+            // 获取canvas节点
+            const canvasRes = res[0]
+            let canvas
+            
+            // 尝试多种方式获取canvas
+            if (canvasRes && canvasRes.node) {
+              canvas = canvasRes.node
+            } else if (canvasRes && canvasRes.context) {
+              // 如果node方式失败，尝试使用context方式
+              canvas = canvasRes.context
+            } else {
+              reject(new Error('Canvas节点和上下文都获取失败'))
+              return
+            }
+            
+            // 如果是node方式，需要设置canvas尺寸
+            if (canvas.width !== width || canvas.height !== height) {
+              canvas.width = width
+              canvas.height = height
+            }
+            
+            // 获取绘图上下文
+            const ctx = canvas.getContext ? canvas.getContext('2d') : canvas
+            
+            // 清除画布
+            ctx.clearRect(0, 0, width, height)
+            
+            // 创建ImageData并绘制
+            const imgData = ctx.createImageData(width, height)
+            const imageDataArray = new Uint8ClampedArray(imageData)
+            imgData.data.set(imageDataArray)
+            ctx.putImageData(imgData, 0, 0)
+            
+            // 导出为图片
+            wx.canvasToTempFilePath({
+              canvas: canvas,
+              x: 0,
+              y: 0,
+              width: width,
+              height: height,
+              destWidth: width,
+              destHeight: height,
+              fileType: 'png',
+              quality: 1.0,
+              success: (res) => {
+                console.log('图像渲染成功:', res.tempFilePath)
+                resolve(res.tempFilePath)
+              },
+              fail: (err) => {
+                console.error('导出图片失败:', err)
+                reject(err)
+              }
+            })
+          })
+      } catch (err) {
+        console.error('渲染图像异常:', err)
+        reject(err)
+      }
     })
   },
 

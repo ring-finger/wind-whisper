@@ -136,7 +136,7 @@
     </view>
 
     <view class="submit-actions">
-      <button class="submit-btn" hover-class="button-hover" bindtap="submitLog">保存通联</button>
+      <button class="submit-btn" hover-class="button-hover" bindtap="submitLog">保存</button>
     </view>
   </view>
 

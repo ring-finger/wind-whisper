@@ -58,21 +58,6 @@
         <text class="status-hint" wx:if="{{isDecoding}}">请将音频源靠近麦克风</text>
       </view>
 
-      <!-- 音频波形显示 -->
-      <view class="waveform-container" wx:if="{{isDecoding}}">
-        <view class="waveform-header">
-          <text class="waveform-title">🎵 音频波形</text>
-        </view>
-        <view class="waveform">
-          <view 
-            wx:for="{{waveformData}}" 
-            wx:key="index" 
-            class="waveform-bar"
-            style="height: {{item}}%;"
-          ></view>
-        </view>
-      </view>
-
       <view class="decode-controls">
         <button class="action-btn {{isDecoding ? 'danger' : 'primary'}}" bindtap="toggleDecode">
           {{isDecoding ? '停止监听' : '开始监听'}}
@@ -80,7 +65,7 @@
       </view>
 
       <!-- 实时解码图片预览 -->
-      <view class="decode-preview" wx:if="{{isDecoding}}">
+      <view class="decode-preview" wx:if="{{isDecoding || decodedImage}}">
         <view class="preview-header">
           <text class="preview-title">📺 实时解码</text>
         </view>
@@ -91,7 +76,8 @@
           style="width: 320rpx; height: 240rpx;"
         ></canvas>
         <view class="preview-info">
-          <text>扫描线: {{scanLine}} / 240</text>
+          <text wx:if="{{isDecoding}}">扫描线: {{scanLine}} / 240</text>
+          <text wx:if="{{!isDecoding && decodedImage}}">解码完成</text>
         </view>
       </view>
 
