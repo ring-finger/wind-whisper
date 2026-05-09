@@ -1,3 +1,4 @@
+const app = getApp()
 const SHARE_TITLE_PREFIX = '风语纪: '
 const VIBRATE_TYPE = 'medium'
 
@@ -41,6 +42,27 @@ Page({
   },
 
   onLoad(options) {
+    // 检查是否有传递完整的日志数据（从分享列表进入）
+    if (options.logData) {
+      try {
+        const log = JSON.parse(decodeURIComponent(options.logData))
+        this.setData({ log: log })
+        this.processLogData(log)
+        this.loadTheme()
+        return
+      } catch (e) {
+        console.error('解析日志数据失败', e)
+      }
+    }
+    
+    // 检查是否是分享的日志
+    if (options.shareId && options.logId) {
+      this.loadSharedLogDetail(options.shareId, options.logId)
+      this.loadTheme()
+      return
+    }
+    
+    // 普通本地日志
     const logId = parseInt(options.id)
     this.loadLogDetail(logId)
     this.loadTheme()
@@ -48,6 +70,11 @@ Page({
 
   onShow() {
     if (this.data.log) {
+      // 如果是分享的日志，不重新加载
+      if (this.data.isSharedLog) {
+        this.loadTheme()
+        return
+      }
       this.loadLogDetail(this.data.log.id)
     }
     this.loadTheme()
@@ -68,6 +95,101 @@ Page({
     } catch (e) {
       console.error('加载主题失败', e)
     }
+  },
+
+  // 处理日志数据（通用方法）
+  processLogData(log) {
+    let myRst = ''
+    let theirRst = ''
+    
+    if (log.rst) {
+      if (log.rst.myRst) {
+        myRst = `${log.rst.myRst.r || '-'}${log.rst.myRst.s || '-'}`
+        if (log.rst.myRst.t) {
+          myRst += log.rst.myRst.t
+        }
+      } else if (log.rst.r || log.rst.s || log.rst.t) {
+        myRst = `${log.rst.r || '-'}${log.rst.s || '-'}`
+        if (log.rst.t) {
+          myRst += log.rst.t
+        }
+      }
+      
+      if (log.rst.theirRst) {
+        theirRst = `${log.rst.theirRst.r || '-'}${log.rst.theirRst.s || '-'}`
+        if (log.rst.theirRst.t) {
+          theirRst += log.rst.theirRst.t
+        }
+      }
+    }
+    
+    let recordTime = ''
+    if (log.createdAt) {
+      recordTime = this.formatDate(log.createdAt)
+    } else if (log.date && log.btcTime) {
+      recordTime = `${log.date} ${log.btcTime}`
+    } else {
+      recordTime = this.formatDate(new Date().toISOString())
+    }
+    
+    const weatherIcon = this.getWeatherIcon(log.weather)
+    const weatherText = this.getWeatherText(log.weather)
+    const bjtDateTimeFull = buildBjtDateTimeFull(log)
+    const utcDateTimeFull = buildUtcDateTimeFull(log)
+
+    this.setData({
+      log: log,
+      myRst: myRst,
+      theirRst: theirRst,
+      recordTime: recordTime,
+      weatherIcon: weatherIcon,
+      weatherText: weatherText,
+      bjtDateTimeFull: bjtDateTimeFull,
+      utcDateTimeFull: utcDateTimeFull,
+      isSharedLog: true  // 标记为分享的日志
+    })
+  },
+
+  // 从分享数据加载单条日志详情
+  loadSharedLogDetail(shareId, logId) {
+    wx.showLoading({ title: '加载中...' })
+    
+    const db = wx.cloud.database()
+    db.collection('shareLogs').doc(shareId).get().then(res => {
+      wx.hideLoading()
+      
+      if (res.data && res.data.logs) {
+        // 从分享的日志列表中找到对应的日志
+        const log = res.data.logs.find(item => item.id == logId)
+        
+        if (log) {
+          this.processLogData(log)
+        } else {
+          wx.showToast({
+            title: '日志不存在',
+            icon: 'none'
+          })
+          setTimeout(() => {
+            wx.navigateBack()
+          }, 1500)
+        }
+      } else {
+        wx.showToast({
+          title: '日志不存在',
+          icon: 'none'
+        })
+        setTimeout(() => {
+          wx.navigateBack()
+        }, 1500)
+      }
+    }).catch(err => {
+      wx.hideLoading()
+      console.error('加载分享日志详情失败', err)
+      wx.showToast({
+        title: '加载失败',
+        icon: 'none'
+      })
+    })
   },
 
   loadLogDetail(logId) {
@@ -122,7 +244,8 @@ Page({
           weatherIcon: weatherIcon,
           weatherText: weatherText,
           bjtDateTimeFull: bjtDateTimeFull,
-          utcDateTimeFull: utcDateTimeFull
+          utcDateTimeFull: utcDateTimeFull,
+          isSharedLog: false
         })
       } else {
         wx.showToast({
@@ -194,25 +317,62 @@ Page({
       confirmColor: '#ff4d4f',
       success: (res) => {
         if (res.confirm) {
-          try {
-            let logs = wx.getStorageSync('contactLogs') || []
-            logs = logs.filter(item => item.id !== this.data.log.id)
-            wx.setStorageSync('contactLogs', logs)
+          const logId = this.data.log.id
+          const cloudSyncEnabled = app.isCloudSyncEnabled()
+          
+          wx.showLoading({ title: '删除中...' })
+          
+          // 定义删除本地日志的函数
+          const deleteLocalLog = () => {
+            try {
+              let logs = wx.getStorageSync('contactLogs') || []
+              logs = logs.filter(item => item.id !== logId)
+              wx.setStorageSync('contactLogs', logs)
+              
+              wx.hideLoading()
+              wx.showToast({
+                title: '删除成功',
+                icon: 'success'
+              })
+              
+              setTimeout(() => {
+                wx.navigateBack()
+              }, 1500)
+            } catch (e) {
+              console.error('删除本地日志失败', e)
+              wx.hideLoading()
+              wx.showToast({
+                title: '删除失败',
+                icon: 'none'
+              })
+            }
+          }
+          
+          // 如果云同步开启，先从云端删除
+          if (cloudSyncEnabled) {
+            const db = wx.cloud.database()
+            const collection = db.collection(app.CLOUD_LOGS_CONFIG.collectionName)
             
-            wx.showToast({
-              title: '删除成功',
-              icon: 'success'
+            // 查询云端是否有匹配的日志
+            collection.where({ id: logId }).get().then(res => {
+              if (res.data && res.data.length > 0) {
+                // 删除云端记录
+                const deleteTasks = res.data.map(log => 
+                  collection.doc(log._id).remove()
+                )
+                return Promise.all(deleteTasks)
+              }
+            }).then(() => {
+              // 删除本地日志
+              deleteLocalLog()
+            }).catch(err => {
+              console.error('删除云端日志失败', err)
+              // 即使云端删除失败，也删除本地
+              deleteLocalLog()
             })
-            
-            setTimeout(() => {
-              wx.navigateBack()
-            }, 1500)
-          } catch (e) {
-            console.error('删除日志失败', e)
-            wx.showToast({
-              title: '删除失败',
-              icon: 'none'
-            })
+          } else {
+            // 云同步未开启，直接删除本地
+            deleteLocalLog()
           }
         }
       }

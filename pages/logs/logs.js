@@ -2,6 +2,8 @@ const app = getApp()
 const VIBRATE_TYPE = 'medium'
 
 const BJT_OFFSET_MS = 8 * 60 * 60 * 1000
+const SHARE_EXPIRE_DAYS = 7  // 分享过期天数
+const SHARE_EXPIRE_MS = SHARE_EXPIRE_DAYS * 24 * 60 * 60 * 1000  // 30天的毫秒数
 
 function pad2(n) {
   return String(n).padStart(2, '0')
@@ -125,7 +127,17 @@ Page({
       myRst: false,
       theirRst: false
     },
-    currentTheme: 'radio'
+    currentTheme: 'radio',
+    // 分享功能
+    shareMode: false,
+    selectedLogs: {},  // 对象存储选中的ID {id: true}
+    selectedLogsArray: [],  // 数组存储选中的ID列表
+    shareDataReady: false,  // 分享数据是否已准备好
+    preparingShare: false,  // 是否正在准备分享数据
+    // 我的分享
+    showMySharesModal: false,
+    myShareList: [],
+    myShareCount: 0
   },
 
   onLoad(options) {
@@ -133,6 +145,10 @@ Page({
     this.initDateTime()
     if (options && options.tab === 'add') {
       this.setData({ currentTab: 'add' })
+    }
+    // 处理分享链接
+    if (options && options.shareId) {
+      this.loadSharedLogs(options.shareId)
     }
   },
 
@@ -142,6 +158,7 @@ Page({
       this.loadLogs()
     }
     this.loadCallSuggestions()
+    this.loadMyShares()  // 加载我的分享数量
   },
 
   loadTheme() {
@@ -159,6 +176,86 @@ Page({
       })
     } catch (e) {
       console.error('加载主题失败', e)
+    }
+  },
+
+  loadSharedLogs(shareId) {
+    // 显示加载提示
+    wx.showLoading({ title: '加载分享...' })
+    
+    // 保存当前分享ID，供_displaySharedLogs使用
+    this._currentShareId = shareId
+
+    const db = wx.cloud.database()
+    db.collection('shareLogs').doc(shareId).get().then(res => {
+      wx.hideLoading()
+      if (res.data) {
+        this._displaySharedLogs(res.data)
+      } else {
+        wx.showToast({ title: '分享记录不存在', icon: 'none' })
+      }
+    }).catch(err => {
+      wx.hideLoading()
+      console.error('加载分享记录失败', err)
+      wx.showToast({ title: '加载分享失败', icon: 'none' })
+    })
+  },
+
+  _displaySharedLogs(shareData) {
+    // 检查是否过期
+    if (shareData.expireTime) {
+      const expireTime = new Date(shareData.expireTime).getTime()
+      const now = Date.now()
+      
+      if (now > expireTime) {
+        wx.showToast({
+          title: '分享链接已过期',
+          icon: 'none',
+          duration: 3000
+        })
+        return
+      }
+      
+      // 计算剩余天数
+      const remainDays = Math.ceil((expireTime - now) / (24 * 60 * 60 * 1000))
+      shareData.remainDays = remainDays
+    }
+    
+    // 格式化分享的记录
+    const sharedLogs = shareData.logs.map(log => {
+      const { my, their } = formatRstBlock(log.rst)
+      return {
+        ...log,
+        rstMy: my,
+        rstTheir: their,
+        rstSummary: [my, their].filter(Boolean).join(' / ')
+      }
+    })
+    
+    this.setData({
+      filteredLogs: sharedLogs,
+      currentTab: 'list',
+      shareMode: false,
+      selectedLogs: {},
+      selectedLogsArray: [],
+      currentShareId: this._currentShareId  // 保存当前查看的分享ID
+    })
+    
+    // 显示过期提示
+    if (shareData.remainDays) {
+      wx.showModal({
+        title: '分享的通联记录',
+        content: `来自 ${shareData.myCallSign || 'BA4IWA'} 的 ${sharedLogs.length} 条通联记录\n\n⚠️ 剩余有效期：${shareData.remainDays}天`,
+        showCancel: false,
+        confirmText: '查看'
+      })
+    } else {
+      wx.showModal({
+        title: '分享的通联记录',
+        content: `来自 ${shareData.myCallSign || 'BA4IWA'} 的 ${sharedLogs.length} 条通联记录`,
+        showCancel: false,
+        confirmText: '查看'
+      })
     }
   },
 
@@ -236,13 +333,422 @@ Page({
   loadLogs() {
     try {
       const logs = wx.getStorageSync('contactLogs') || []
-      this.setData({ _allLogs: logs })
+      this.setData({ 
+        _allLogs: logs,
+        currentShareId: null  // 清除分享ID，切回本地日志
+      })
       this.applyFilter(logs)
     } catch (e) {
       console.error(e)
-      this.setData({ filteredLogs: [] })
+      this.setData({ filteredLogs: [], currentShareId: null })
     }
   },
+
+  // ========== 分享功能 ==========
+  enterShareMode() {
+    wx.vibrateShort({ type: VIBRATE_TYPE })
+    this.setData({
+      shareMode: true
+      // selectedLogs 保持不变，保留之前的勾选状态
+    })
+  },
+
+  cancelShare() {
+    wx.vibrateShort({ type: VIBRATE_TYPE })
+    this.setData({
+      shareMode: false,
+      shareDataReady: false,
+      preparingShare: false
+      // selectedLogs 保留，下次进入时恢复
+    })
+  },
+
+  toggleLogSelect(e) {
+    wx.vibrateShort({ type: VIBRATE_TYPE })
+    const logId = e.currentTarget.dataset.id
+    const selectedLogs = this.data.selectedLogs
+    
+    if (selectedLogs[logId]) {
+      delete selectedLogs[logId]
+    } else {
+      const count = Object.keys(selectedLogs).length
+      if (count >= 10) {
+        wx.showToast({
+          title: '最多选择10条记录',
+          icon: 'none'
+        })
+        return
+      }
+      selectedLogs[logId] = true
+    }
+    
+    // 同步更新 Array
+    const selectedLogsArray = Object.keys(selectedLogs)
+    
+    this.setData({ 
+      selectedLogs,
+      selectedLogsArray
+    })
+  },
+
+  // 准备分享数据 - 保存分享数据到全局，供 onShareAppMessage 使用
+  prepareShareData() {
+    if (this.data.selectedLogsArray.length === 0) {
+      wx.showToast({
+        title: '请选择要分享的记录',
+        icon: 'none'
+      })
+      return
+    }
+
+    wx.vibrateShort({ type: VIBRATE_TYPE })
+    
+    // 如果数据已准备好，直接触发分享
+    if (this.data.shareDataReady) {
+      return
+    }
+
+    this.setData({ preparingShare: true })
+    
+    // 获取选中的记录
+    const allLogs = this.data._allLogs || []
+    const selectedIds = this.data.selectedLogs
+    const selectedLogsData = allLogs.filter(log => 
+      selectedIds[log.id]
+    )
+
+    // 显示加载提示
+    wx.showLoading({ title: '准备分享...' })
+
+    // 生成分享卡片图片
+    this.generateShareCard(selectedLogsData).then(imagePath => {
+      // 使用云开发保存分享数据
+      const db = wx.cloud.database()
+      const shareCollection = db.collection('shareLogs')
+      
+      const myCallSign = wx.getStorageSync('myCallSign') || 'BA4IWA'
+      const shareData = {
+        logs: selectedLogsData,
+        myCallSign: myCallSign,
+        createTime: db.serverDate(),
+        expireTime: db.serverDate({ offset: SHARE_EXPIRE_MS })
+      }
+
+      return shareCollection.add({
+        data: shareData
+      }).then(res => {
+        wx.hideLoading()
+        
+        // 保存到全局，供 onShareAppMessage 使用
+        const app = getApp()
+        app.globalData.currentShareId = res._id
+        app.globalData.currentShareData = { myCallSign, logs: selectedLogsData }
+        app.globalData.currentShareImage = imagePath
+        
+        // 保存到我的分享列表
+        this.saveToMyShares(res._id, selectedLogsData.length)
+
+        // 显示分享菜单（必要的配置）
+        wx.showShareMenu({
+          withShareTicket: true,
+          menus: ['shareAppMessage', 'shareTimeline']
+        })
+
+        // 设置数据准备好标志
+        this.setData({
+          shareDataReady: true,
+          preparingShare: false
+        })
+      })
+    }).catch(err => {
+      wx.hideLoading()
+      this.setData({ preparingShare: false })
+      console.error('分享失败', err)
+      wx.showToast({ title: '分享失败，请重试', icon: 'none' })
+    })
+  },
+
+  // 保存到我的分享列表
+  saveToMyShares(shareId, logCount) {
+    try {
+      let myShares = wx.getStorageSync('myShares') || []
+      const newShare = {
+        id: shareId,
+        logCount: logCount,
+        myCallSign: wx.getStorageSync('myCallSign') || 'BA4IWA',
+        createTime: new Date().toISOString(),
+        expireDaysLeft: SHARE_EXPIRE_DAYS
+      }
+      myShares.unshift(newShare)
+      // 只保留最近10条
+      if (myShares.length > 10) {
+        myShares = myShares.slice(0, 10)
+      }
+      wx.setStorageSync('myShares', myShares)
+      this.loadMyShares()
+    } catch (e) {
+      console.error('保存分享记录失败', e)
+    }
+  },
+
+  // 加载我的分享列表
+  loadMyShares() {
+    try {
+      let myShares = wx.getStorageSync('myShares') || []
+      const now = Date.now()
+      
+      // 过滤并计算剩余天数
+      myShares = myShares.filter(share => {
+        const expireTime = new Date(share.createTime).getTime() + SHARE_EXPIRE_MS
+        share.expireDaysLeft = Math.max(0, Math.ceil((expireTime - now) / (24 * 60 * 60 * 1000)))
+        return share.expireDaysLeft > 0
+      })
+      
+      wx.setStorageSync('myShares', myShares)
+      this.setData({
+        myShareList: myShares,
+        myShareCount: myShares.length
+      })
+    } catch (e) {
+      console.error('加载分享记录失败', e)
+    }
+  },
+
+  // 显示我的分享弹窗
+  showMyShares() {
+    this.loadMyShares()
+    this.setData({ showMySharesModal: true })
+  },
+
+  // 隐藏我的分享弹窗
+  hideMyShares() {
+    this.setData({ showMySharesModal: false })
+  },
+
+  // 再次分享
+  reShareRecord(e) {
+    const shareId = e.currentTarget.dataset.id
+    wx.vibrateShort({ type: VIBRATE_TYPE })
+    
+    this.hideMyShares()
+    wx.showLoading({ title: '准备分享...' })
+    
+    // 从云端加载分享数据
+    const db = wx.cloud.database()
+    db.collection('shareLogs').doc(shareId).get().then(res => {
+      if (!res.data) {
+        wx.hideLoading()
+        wx.showToast({ title: '分享记录不存在', icon: 'none' })
+        return
+      }
+      
+      const shareData = res.data
+      const logs = shareData.logs || []
+      
+      // 生成分享卡片图片
+      this.generateShareCard(logs).then(imagePath => {
+        wx.hideLoading()
+        
+        // 保存到全局，供 onShareAppMessage 使用
+        const app = getApp()
+        app.globalData.currentShareId = shareId
+        app.globalData.currentShareData = { myCallSign: shareData.myCallSign, logs: logs }
+        app.globalData.currentShareImage = imagePath
+        
+        // 显示分享菜单
+        wx.showShareMenu({
+          withShareTicket: true,
+          menus: ['shareAppMessage', 'shareTimeline']
+        })
+      }).catch(err => {
+        wx.hideLoading()
+        console.error('生成分享卡片失败', err)
+        wx.showToast({ title: '分享失败，请重试', icon: 'none' })
+      })
+    }).catch(err => {
+      wx.hideLoading()
+      console.error('加载分享记录失败', err)
+      wx.showToast({ title: '加载失败', icon: 'none' })
+    })
+  },
+
+  // 删除分享记录
+  deleteShareRecord(e) {
+    const shareId = e.currentTarget.dataset.id
+    wx.vibrateShort({ type: VIBRATE_TYPE })
+    
+    wx.showModal({
+      title: '删除分享',
+      content: '确定要删除这条分享记录吗？云端数据也会同步删除。',
+      success: (res) => {
+        if (res.confirm) {
+          wx.showLoading({ title: '删除中...' })
+          
+          // 删除云端数据
+          const db = wx.cloud.database()
+          db.collection('shareLogs').doc(shareId).remove().then(() => {
+            // 云端删除成功后，删除本地记录
+            try {
+              let myShares = wx.getStorageSync('myShares') || []
+              myShares = myShares.filter(share => share.id !== shareId)
+              wx.setStorageSync('myShares', myShares)
+              this.loadMyShares()
+              wx.hideLoading()
+              wx.showToast({ title: '已删除', icon: 'success' })
+            } catch (e) {
+              console.error('删除本地分享记录失败', e)
+              wx.hideLoading()
+            }
+          }).catch(err => {
+            wx.hideLoading()
+            console.error('删除云端分享记录失败', err)
+            // 即使云端删除失败，也删除本地记录
+            try {
+              let myShares = wx.getStorageSync('myShares') || []
+              myShares = myShares.filter(share => share.id !== shareId)
+              wx.setStorageSync('myShares', myShares)
+              this.loadMyShares()
+              wx.showToast({ title: '已删除', icon: 'success' })
+            } catch (e) {
+              console.error('删除本地分享记录失败', e)
+            }
+          })
+        }
+      }
+    })
+  },
+
+  // 生成分享卡片图片
+  generateShareCard(logs) {
+    return new Promise((resolve, reject) => {
+      // 超时处理，避免一直卡住
+      const timeout = setTimeout(() => {
+        reject(new Error('生成卡片超时'))
+      }, 10000) // 10秒超时
+
+      try {
+        const ctx = wx.createCanvasContext('shareCardCanvas')
+        const width = 520
+        const height = 416
+        const padding = 24
+        const lineHeight = 48
+        const maxLines = 6
+
+        // 背景渐变
+        ctx.setFillStyle('#1a1a2e')
+        ctx.fillRect(0, 0, width, height)
+
+        // 顶部装饰条
+        ctx.setFillStyle('#e74c3c')
+        ctx.fillRect(0, 0, width, 8)
+
+        // 标题
+        ctx.setFillStyle('#ffffff')
+        ctx.setFontSize(28)
+        ctx.fillText('📻 业余无线电通联日志', padding, 60)
+
+        // 呼号
+        const myCallSign = wx.getStorageSync('myCallSign') || 'BA4IWA'
+        ctx.setFontSize(36)
+        ctx.setFillStyle('#e74c3c')
+        ctx.fillText(myCallSign, padding, 110)
+
+        // 记录数量
+        ctx.setFontSize(22)
+        ctx.setFillStyle('#888888')
+        ctx.fillText(`分享 ${logs.length} 条通联记录`, padding, 145)
+
+        // 分割线
+        ctx.setStrokeStyle('#333333')
+        ctx.beginPath()
+        ctx.moveTo(padding, 165)
+        ctx.lineTo(width - padding, 165)
+        ctx.stroke()
+
+        // 通联列表头部
+        ctx.setFontSize(20)
+        ctx.setFillStyle('#666666')
+        ctx.fillText('呼号          频率          模式          RST', padding, 195)
+
+        // 绘制通联记录
+        const displayLogs = logs.slice(0, maxLines)
+        displayLogs.forEach((log, index) => {
+          const y = 230 + index * lineHeight
+          
+          // 序号
+          ctx.setFillStyle('#e74c3c')
+          ctx.setFontSize(18)
+          ctx.fillText(`${index + 1}.`, padding, y)
+          
+          // 呼号
+          ctx.setFillStyle('#ffffff')
+          ctx.setFontSize(22)
+          const callSign = (log.callSign || '').padEnd(10, ' ')
+          ctx.fillText(callSign, padding + 30, y)
+          
+          // 频率
+          ctx.setFillStyle('#888888')
+          ctx.setFontSize(20)
+          const freq = (log.frequency || '0') + ' MHz'
+          ctx.fillText(freq, padding + 170, y)
+          
+          // 模式
+          ctx.setFillStyle('#f39c12')
+          ctx.setFontSize(20)
+          ctx.fillText(log.mode || 'SSB', padding + 295, y)
+          
+          // RST
+          ctx.setFillStyle('#2ecc71')
+          ctx.setFontSize(20)
+          const rst = log.rstSummary || ''
+          ctx.fillText(rst, padding + 380, y)
+        })
+
+        // 如果还有更多记录
+        if (logs.length > maxLines) {
+          ctx.setFillStyle('#666666')
+          ctx.setFontSize(18)
+          ctx.fillText(`... 还有 ${logs.length - maxLines} 条记录`, padding, 230 + maxLines * lineHeight)
+        }
+
+        // 底部信息
+        ctx.setFillStyle('#444444')
+        ctx.setFontSize(16)
+        ctx.fillText(`有效期 ${SHARE_EXPIRE_DAYS} 天 · ${new Date().toLocaleDateString()}`, padding, height - 30)
+
+        // 绘制
+        ctx.draw(true, () => {
+          // 导出图片
+          wx.canvasToTempFilePath({
+            canvasId: 'shareCardCanvas',
+            x: 0,
+            y: 0,
+            width: width,
+            height: height,
+            destWidth: width * 2,
+            destHeight: height * 2,
+            fileType: 'png',
+            quality: 0.9,
+            success: (res) => {
+              clearTimeout(timeout)
+              resolve(res.tempFilePath)
+            },
+            fail: (err) => {
+              clearTimeout(timeout)
+              console.error('生成分享卡片失败', err)
+              reject(err)
+            }
+          })
+        })
+      } catch (err) {
+        clearTimeout(timeout)
+        console.error('生成卡片异常', err)
+        reject(err)
+      }
+    })
+  },
+
+  // ========== 分享功能结束 ==========
 
   applyFilter(sourceLogs) {
     const logs = sourceLogs || this.data._allLogs || []
@@ -312,10 +818,23 @@ Page({
 
   openDetail(e) {
     const id = e.currentTarget.dataset.id
+    const shareId = e.currentTarget.dataset.shareid
     wx.vibrateShort({ type: VIBRATE_TYPE })
-    wx.navigateTo({
-      url: '/pages/log-detail/log-detail?id=' + id
-    })
+    
+    if (shareId) {
+      // 从分享列表进入，需要传递分享ID和日志ID，以及日志数据
+      const log = this.data.filteredLogs.find(item => item.id == id)
+      if (log) {
+        const logData = encodeURIComponent(JSON.stringify(log))
+        wx.navigateTo({
+          url: `/pages/log-detail/log-detail?shareId=${shareId}&logId=${id}&logData=${logData}`
+        })
+      }
+    } else {
+      wx.navigateTo({
+        url: '/pages/log-detail/log-detail?id=' + id
+      })
+    }
   },
 
   onCallSignInput(e) {
@@ -533,11 +1052,221 @@ Page({
         logs = logs.slice(0, 1000)
       }
       wx.setStorageSync('contactLogs', logs)
+      
+      // 同步到云数据库
+      this.syncLogToCloud(log)
     } catch (e) {
       console.error('保存日志失败', e)
       wx.showToast({ title: '保存失败', icon: 'none' })
     }
   },
+
+  // 同步单条日志到云数据库
+  syncLogToCloud(log) {
+    if (!app.isCloudSyncEnabled()) return
+    
+    try {
+      const db = wx.cloud.database()
+      const collection = db.collection(app.CLOUD_LOGS_CONFIG.collectionName)
+      
+      // 添加到云端
+      collection.add({
+        data: {
+          ...log,
+          _syncTime: db.serverDate()
+        }
+      }).then(res => {
+        console.log('日志已同步到云端', res)
+        // 同步成功后检查云端条数限制
+        this.checkCloudLogLimit()
+      }).catch(err => {
+        console.error('同步日志到云端失败', err)
+      })
+    } catch (e) {
+      console.error('云同步异常', e)
+    }
+  },
+
+  // 检查并清理云端日志数量
+  checkCloudLogLimit() {
+    if (!app.isCloudSyncEnabled()) return
+    
+    try {
+      const db = wx.cloud.database()
+      const collection = db.collection(app.CLOUD_LOGS_CONFIG.collectionName)
+      const maxCount = 100
+      
+      // 获取云端总数
+      collection.count().then(res => {
+        if (res.total > maxCount) {
+          // 需要删除超出的部分
+          const removeCount = res.total - maxCount
+          this.removeOldestCloudLogs(removeCount)
+        }
+      }).catch(err => {
+        console.error('检查云端日志数量失败', err)
+      })
+    } catch (e) {
+      console.error('检查云端限制异常', e)
+    }
+  },
+
+  // 删除最旧的云端日志
+  removeOldestCloudLogs(count) {
+    try {
+      const db = wx.cloud.database()
+      const collection = db.collection(app.CLOUD_LOGS_CONFIG.collectionName)
+      
+      // 按创建时间升序排列，获取最旧的记录
+      collection.orderBy('createdAt', 'asc').limit(count).get().then(res => {
+        const oldLogs = res.data || []
+        if (oldLogs.length === 0) return
+        
+        // 删除这些记录
+        const tasks = oldLogs.map(log => {
+          return collection.doc(log._id).remove()
+        })
+        
+        Promise.all(tasks).then(results => {
+          console.log(`已删除 ${results.length} 条云端旧日志`)
+        }).catch(err => {
+          console.error('删除云端旧日志失败', err)
+        })
+      }).catch(err => {
+        console.error('获取云端旧日志失败', err)
+      })
+    } catch (e) {
+      console.error('删除云端日志异常', e)
+    }
+  },
+
+  // 从云端同步日志
+  syncLogsFromCloud() {
+    return new Promise((resolve, reject) => {
+      if (!app.isCloudSyncEnabled()) {
+        resolve([])
+        return
+      }
+      
+      wx.showLoading({ title: '同步中...' })
+      
+      try {
+        const db = wx.cloud.database()
+        const collection = db.collection(app.CLOUD_LOGS_CONFIG.collectionName)
+        
+        collection.orderBy('createdAt', 'desc').get().then(res => {
+          wx.hideLoading()
+          const cloudLogs = res.data || []
+          console.log(`从云端同步了 ${cloudLogs.length} 条日志`)
+          resolve(cloudLogs)
+        }).catch(err => {
+          wx.hideLoading()
+          console.error('从云端同步日志失败', err)
+          reject(err)
+        })
+      } catch (e) {
+        wx.hideLoading()
+        console.error('云同步异常', e)
+        reject(e)
+      }
+    })
+  },
+
+  // 手动触发云端同步
+  triggerCloudSync() {
+    wx.vibrateShort({ type: VIBRATE_TYPE })
+    
+    if (!app.isCloudSyncEnabled()) {
+      wx.showToast({
+        title: '请先开启云同步',
+        icon: 'none'
+      })
+      return
+    }
+    
+    // 同步本地日志到云端
+    this.syncLocalLogsToCloud()
+  },
+
+  // 将本地所有日志同步到云端
+  syncLocalLogsToCloud() {
+    wx.showLoading({ title: '同步中...' })
+    
+    try {
+      const localLogs = wx.getStorageSync('contactLogs') || []
+      
+      if (localLogs.length === 0) {
+        wx.hideLoading()
+        wx.showToast({
+          title: '本地暂无日志',
+          icon: 'none'
+        })
+        return
+      }
+      
+      const db = wx.cloud.database()
+      const collection = db.collection(app.CLOUD_LOGS_CONFIG.collectionName)
+      
+      // 先清空云端（可选策略，也可以选择追加）
+      collection.get().then(res => {
+        const existingLogs = res.data || []
+        const deleteTasks = existingLogs.map(log => 
+          collection.doc(log._id).remove()
+        )
+        
+        return Promise.all(deleteTasks).then(() => {
+          // 删除完成后，添加本地日志到云端
+          return this.addLogsToCloud(localLogs)
+        })
+      }).catch(() => {
+        // 如果获取失败，直接尝试添加
+        return this.addLogsToCloud(localLogs)
+      })
+    } catch (e) {
+      wx.hideLoading()
+      console.error('同步本地日志到云端失败', e)
+      wx.showToast({
+        title: '同步失败',
+        icon: 'none'
+      })
+    }
+  },
+
+  // 将日志批量添加到云端
+  addLogsToCloud(logs) {
+    const db = wx.cloud.database()
+    const collection = db.collection(app.CLOUD_LOGS_CONFIG.collectionName)
+    const maxCount = 100
+    
+    // 只同步最新的N条
+    const logsToSync = logs.slice(0, maxCount)
+    
+    const tasks = logsToSync.map(log => {
+      return collection.add({
+        data: {
+          ...log,
+          _syncTime: db.serverDate()
+        }
+      })
+    })
+    
+    Promise.all(tasks).then(results => {
+      wx.hideLoading()
+      wx.showToast({
+        title: `已同步 ${results.length} 条`,
+        icon: 'success'
+      })
+      console.log(`已同步 ${results.length} 条日志到云端`)
+    }).catch(err => {
+      wx.hideLoading()
+      console.error('批量同步日志失败', err)
+      wx.showToast({
+        title: '同步失败',
+        icon: 'none'
+      })
+    })
+  },
+
 
   resetForm() {
     this.initDateTime()
@@ -565,5 +1294,76 @@ Page({
         theirRst: false
       }
     })
+  },
+
+  onShareAppMessage(res) {
+    const app = getApp()
+    const currentShareId = app.globalData.currentShareId
+    const currentShareData = app.globalData.currentShareData
+    const currentShareImage = app.globalData.currentShareImage
+    
+    if (currentShareId) {
+      const myCallSign = currentShareData?.myCallSign || 'BA4IWA'
+      const logCount = currentShareData?.logs?.length || 0
+      
+      // 清理当前分享数据
+      app.globalData.currentShareId = null
+      app.globalData.currentShareData = null
+      app.globalData.currentShareImage = null
+      
+      // 重置分享状态
+      this.setData({
+        shareMode: false,
+        selectedLogs: {},
+        selectedLogsArray: [],
+        shareDataReady: false,
+        preparingShare: false
+      })
+      
+      return {
+        title: `${myCallSign}分享了${logCount}条通联记录（${SHARE_EXPIRE_DAYS}天有效）`,
+        path: `/pages/logs/logs?shareId=${currentShareId}`,
+        imageUrl: currentShareImage || '/images/cover.jpg'
+      }
+    }
+    
+    return {
+      title: '业余无线电通联日志',
+      path: '/pages/logs/logs',
+      imageUrl: '/images/cover.jpg'
+    }
+  },
+
+  onShareTimeline() {
+    const app = getApp()
+    const currentShareId = app.globalData.currentShareId
+    const currentShareData = app.globalData.currentShareData
+    const currentShareImage = app.globalData.currentShareImage
+    
+    if (currentShareId) {
+      const myCallSign = currentShareData?.myCallSign || 'BA4IWA'
+      const logCount = currentShareData?.logs?.length || 0
+      
+      // 重置分享状态
+      this.setData({
+        shareMode: false,
+        selectedLogs: {},
+        selectedLogsArray: [],
+        shareDataReady: false,
+        preparingShare: false
+      })
+      
+      return {
+        title: `${myCallSign}分享了${logCount}条通联记录（${SHARE_EXPIRE_DAYS}天有效）`,
+        query: `shareId=${currentShareId}`,
+        imageUrl: currentShareImage || '/images/cover.jpg'
+      }
+    }
+    
+    return {
+      title: '业余无线电通联日志',
+      query: '',
+      imageUrl: '/images/cover.jpg'
+    }
   }
 })

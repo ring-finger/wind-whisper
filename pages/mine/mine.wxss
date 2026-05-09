@@ -296,3 +296,67 @@
 .theme-wrapper {
   transition: background-color 0.3s ease, color 0.3s ease;
 }
+
+/* 云同步配置 */
+.section-header {
+  padding: 20rpx 28rpx 0;
+}
+
+.section-title {
+  font-size: 24rpx;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.cell-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24rpx 28rpx;
+  border-bottom: 1rpx solid var(--border-color);
+}
+
+.cell-tip {
+  padding: 16rpx 28rpx 20rpx;
+  border-bottom: 1rpx solid var(--border-color);
+}
+
+.cell-tip-text {
+  font-size: 24rpx;
+  color: var(--text-secondary);
+}
+
+.cloud-sync-actions {
+  padding: 12rpx 20rpx 16rpx;
+}
+
+.cloud-action-btn {
+  display: flex;
+  align-items: center;
+  padding: 20rpx 8rpx;
+  border-radius: 8rpx;
+}
+
+.cloud-action-icon {
+  font-size: 32rpx;
+  margin-right: 16rpx;
+}
+
+.cloud-action-text {
+  flex: 1;
+  font-size: 28rpx;
+  color: var(--text-primary);
+}
+
+.cloud-action-value {
+  font-size: 26rpx;
+  color: var(--accent-primary);
+  font-weight: 600;
+  margin-right: 8rpx;
+}
+
+.cloud-action-btn::after {
+  content: '›';
+  font-size: 32rpx;
+  color: var(--text-secondary);
+}

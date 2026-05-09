@@ -1,5 +1,5 @@
 <view class="theme-wrapper">
-  <view class="container">
+  <scroll-view scroll-y class="container">
     <view class="log-detail-card">
     <view class="card-header">
       <view class="callsign font-mono">{{log.callSign}}</view>
@@ -85,9 +85,9 @@
       <text class="footer-text">记录时间: {{recordTime}}</text>
     </view>
     </view>
-  </view>
+  </scroll-view>
 
-  <view class="action-bar">
+  <view class="action-bar" wx:if="{{!isSharedLog}}">
     <button class="action-btn delete-btn" hover-class="button-hover" bindtap="deleteLog">删除日志</button>
   </view>
 </view>

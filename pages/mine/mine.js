@@ -36,7 +36,10 @@ Page({
     showThanksInfo: false,
     currentTheme: 'radio',
     currentThemeName: '无线电',
-    showThemePicker: false
+    showThemePicker: false,
+    // 云同步配置
+    cloudSyncEnabled: false,
+    cloudSyncTips: ''
   },
 
   onLoad() {
@@ -44,12 +47,228 @@ Page({
     this.loadMyCallSign()
     this.loadContactCount()
     this.loadTheme()
+    this.loadCloudSyncConfig()
   },
 
   onShow() {
     this.loadUserProfile()
     this.loadContactCount()
+    this.loadCloudSyncConfig()
   },
+
+  // 加载云同步配置
+  loadCloudSyncConfig() {
+    try {
+      const cloudSyncEnabled = app.isCloudSyncEnabled()
+      
+      let tips = ''
+      if (cloudSyncEnabled) {
+        tips = '已开启 · 云端最多保存 100 条'
+      } else {
+        tips = '未开启 · 日志仅保存在本地'
+      }
+      
+      this.setData({
+        cloudSyncEnabled,
+        cloudSyncTips: tips
+      })
+    } catch (e) {
+      console.error('加载云同步配置失败', e)
+    }
+  },
+
+  // 切换云同步开关
+  toggleCloudSync() {
+    wx.vibrateShort({ type: VIBRATE_TYPE })
+    const newEnabled = !this.data.cloudSyncEnabled
+    
+    if (newEnabled) {
+      // 开启时，询问用户是否同步现有日志
+      wx.showModal({
+        title: '开启云同步',
+        content: '开启后新增的日志会自动同步到云端。是否立即同步现有的本地日志？',
+        confirmText: '同步',
+        cancelText: '暂不',
+        success: (res) => {
+          app.setCloudSyncEnabled(true)
+          this.setData({
+            cloudSyncEnabled: true,
+            cloudSyncTips: '已开启 · 云端最多保存 100 条'
+          })
+          wx.showToast({
+            title: '已开启云同步',
+            icon: 'success'
+          })
+          
+          if (res.confirm) {
+            // 立即同步现有日志
+            this.syncAllLogsToCloud()
+          }
+        }
+      })
+    } else {
+      // 关闭时
+      wx.showModal({
+        title: '关闭云同步',
+        content: '关闭后新增的日志将不再同步到云端。云端已保存的日志不会被删除。',
+        success: (res) => {
+          if (res.confirm) {
+            app.setCloudSyncEnabled(false)
+            this.setData({
+              cloudSyncEnabled: false,
+              cloudSyncTips: '未开启 · 日志仅保存在本地'
+            })
+            wx.showToast({
+              title: '已关闭云同步',
+              icon: 'success'
+            })
+          }
+        }
+      })
+    }
+  },
+
+  // 同步所有日志到云端
+  syncAllLogsToCloud() {
+    const logs = wx.getStorageSync('contactLogs') || []
+    
+    if (logs.length === 0) {
+      wx.showToast({
+        title: '本地暂无日志',
+        icon: 'none'
+      })
+      return
+    }
+    
+    // 检查每天同步限制
+    const today = new Date().toISOString().split('T')[0]  // 格式: '2024-01-15'
+    const lastSyncDate = wx.getStorageSync('lastCloudSyncDate')
+    
+    if (lastSyncDate === today) {
+      wx.showModal({
+        title: '今日已同步',
+        content: '云端同步每天只能执行一次，请明天再试。',
+        showCancel: false,
+        confirmText: '知道了'
+      })
+      return
+    }
+    
+    wx.showLoading({ title: '同步中...' })
+    
+    const db = wx.cloud.database()
+    const collection = db.collection(app.CLOUD_LOGS_CONFIG.collectionName)
+    const maxCount = 100
+    
+    // 限制同步条数
+    const logsToSync = logs.slice(0, maxCount)
+    
+    // 先清空云端
+    collection.get().then(res => {
+      const existingLogs = res.data || []
+      const deleteTasks = existingLogs.map(log => 
+        collection.doc(log._id).remove()
+      )
+      
+      return Promise.all(deleteTasks).then(() => logsToSync)
+    }).catch(() => logsToSync).then(logsToSync => {
+      // 添加日志到云端（过滤掉系统字段）
+      const tasks = logsToSync.map(log => {
+        // 移除系统保留字段，避免写入错误
+        const { _id, _openid, ...logData } = log
+        return collection.add({
+          data: {
+            ...logData,
+            _syncTime: db.serverDate()
+          }
+        })
+      })
+      
+      return Promise.all(tasks)
+    }).then(results => {
+      // 同步成功后记录今天的日期
+      wx.setStorageSync('lastCloudSyncDate', today)
+      
+      wx.hideLoading()
+      wx.showToast({
+        title: `已同步 ${results.length} 条`,
+        icon: 'success'
+      })
+    }).catch(err => {
+      wx.hideLoading()
+      console.error('同步日志失败', err)
+      wx.showToast({
+        title: '同步失败',
+        icon: 'none'
+      })
+    })
+  },
+
+  // 从云端恢复日志
+  restoreFromCloud() {
+    wx.vibrateShort({ type: VIBRATE_TYPE })
+    
+    wx.showModal({
+      title: '从云端恢复',
+      content: '此操作会用云端日志覆盖本地日志。确定继续吗？',
+      confirmText: '确定',
+      confirmColor: '#e74c3c',
+      success: (res) => {
+        if (res.confirm) {
+          this.doRestoreFromCloud()
+        }
+      }
+    })
+  },
+
+  // 执行从云端恢复
+  doRestoreFromCloud() {
+    wx.showLoading({ title: '恢复中...' })
+    
+    const db = wx.cloud.database()
+    const collection = db.collection(app.CLOUD_LOGS_CONFIG.collectionName)
+    
+    collection.orderBy('createdAt', 'desc').get().then(res => {
+      const cloudLogs = res.data || []
+      
+      if (cloudLogs.length === 0) {
+        wx.hideLoading()
+        wx.showToast({
+          title: '云端暂无日志',
+          icon: 'none'
+        })
+        return
+      }
+      
+      // 清理系统字段，保持与本地日志格式一致
+      const cleanLogs = cloudLogs.map(log => {
+        const { _id, _openid, _syncTime, ...logData } = log
+        return logData
+      })
+      
+      // 保存到本地
+      wx.setStorageSync('contactLogs', cleanLogs)
+      
+      // 更新显示
+      this.setData({
+        contactCount: cloudLogs.length
+      })
+      
+      wx.hideLoading()
+      wx.showToast({
+        title: `已恢复 ${cloudLogs.length} 条`,
+        icon: 'success'
+      })
+    }).catch(err => {
+      wx.hideLoading()
+      console.error('从云端恢复失败', err)
+      wx.showToast({
+        title: '恢复失败',
+        icon: 'none'
+      })
+    })
+  },
+
 
   loadTheme() {
     try {

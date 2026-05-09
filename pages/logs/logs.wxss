@@ -96,6 +96,45 @@
   box-shadow: 0 4rpx 16rpx var(--shadow-color);
 }
 
+.share-toggle-btn {
+  width: 72rpx;
+  height: 72rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-primary);
+  border-radius: 12rpx;
+  box-shadow: 0 4rpx 16rpx var(--shadow-color);
+  flex-shrink: 0;
+}
+
+.share-toggle-icon {
+  font-size: 32rpx;
+}
+
+.share-btn-cancel {
+  padding: 12rpx 32rpx;
+  border-radius: 24rpx;
+  font-size: 26rpx;
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.share-btn-confirm {
+  padding: 12rpx 32rpx;
+  border-radius: 24rpx;
+  font-size: 26rpx;
+  background: var(--accent-primary);
+  color: #fff;
+  text-align: center;
+}
+
+.share-btn-confirm.disabled {
+  background: #ccc;
+  color: #fff;
+}
+
 .filter-panel {
   display: none;
   background: var(--card-bg);
@@ -523,4 +562,264 @@
 
 .submit-btn::after {
   border: none;
+}
+
+/* 分享功能样式 */
+.share-action-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20rpx 24rpx;
+  background: var(--card-bg);
+  border-radius: 12rpx;
+  margin-bottom: 16rpx;
+  box-shadow: 0 2rpx 8rpx var(--shadow-color);
+}
+
+.share-info {
+  flex: 1;
+}
+
+.share-tip {
+  font-size: 26rpx;
+  color: var(--text-secondary);
+}
+
+.share-actions {
+  display: flex;
+  gap: 16rpx;
+}
+
+/* 可选择的日志项 */
+.log-row-shareable {
+  position: relative;
+  padding-left: 80rpx;
+}
+
+.log-row-shareable.log-row-selected {
+  background: var(--primary-soft);
+  border-color: var(--accent-primary);
+}
+
+.log-select-indicator {
+  position: absolute;
+  left: 20rpx;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44rpx;
+  height: 44rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.log-select-circle {
+  width: 40rpx;
+  height: 40rpx;
+  border-radius: 50%;
+  border: 3rpx solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.log-select-circle-active {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+
+.log-select-check {
+  color: #fff;
+  font-size: 24rpx;
+  font-weight: 700;
+}
+
+/* 分享按钮样式 */
+.share-btn-confirm {
+  background: var(--accent-primary);
+  color: #fff;
+  border: none;
+  padding: 0 40rpx;
+  border-radius: 40rpx;
+  font-size: 28rpx;
+  line-height: 2.4;
+}
+
+.share-btn-confirm.disabled {
+  background: #ccc;
+}
+
+/* 弹窗样式 */
+.modal-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+  z-index: 100;
+}
+
+.modal-mask.modal-show {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.my-shares-modal {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #fff;
+  border-radius: 32rpx 32rpx 0 0;
+  max-height: 70vh;
+  transform: translateY(100%);
+  transition: transform 0.3s ease;
+  z-index: 101;
+}
+
+.my-shares-modal-show {
+  transform: translateY(0);
+}
+
+.my-shares-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 30rpx;
+  border-bottom: 1rpx solid var(--border-color);
+}
+
+.my-shares-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #333;
+}
+
+.my-shares-close {
+  width: 56rpx;
+  height: 56rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36rpx;
+  color: #999;
+  background: #f5f5f5;
+  border-radius: 50%;
+}
+
+.my-shares-content {
+  padding: 20rpx 30rpx;
+  max-height: calc(70vh - 120rpx);
+  overflow-y: auto;
+}
+
+.my-shares-empty {
+  text-align: center;
+  padding: 60rpx 0;
+  color: #999;
+  font-size: 28rpx;
+}
+
+.share-record-item {
+  display: flex;
+  align-items: center;
+  padding: 24rpx 0;
+  border-bottom: 1rpx solid var(--border-color);
+}
+
+.share-record-item:last-child {
+  border-bottom: none;
+}
+
+.share-record-info {
+  flex: 1;
+}
+
+.share-record-title {
+  font-size: 28rpx;
+  color: #333;
+  display: block;
+  margin-bottom: 8rpx;
+}
+
+.share-record-meta {
+  font-size: 24rpx;
+  color: #999;
+}
+
+.share-record-actions {
+  display: flex;
+  gap: 16rpx;
+}
+
+.share-record-share {
+  padding: 8rpx 20rpx;
+  background: var(--accent-primary);
+  color: #fff;
+  font-size: 24rpx;
+  border-radius: 24rpx;
+}
+
+.share-record-delete {
+  padding: 8rpx 20rpx;
+  background: #f5f5f5;
+  color: #666;
+  font-size: 24rpx;
+  border-radius: 24rpx;
+}
+
+/* 右下角悬浮分享按钮 */
+.float-share-btn {
+  position: fixed;
+  right: 30rpx;
+  bottom: 120rpx;
+  width: 96rpx;
+  height: 96rpx;
+  background: linear-gradient(135deg, var(--accent-primary) 0%, #e8856c 100%);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8rpx 24rpx rgba(231, 76, 60, 0.4);
+  z-index: 50;
+}
+
+.float-share-btn-hover {
+  transform: scale(0.92);
+  box-shadow: 0 4rpx 12rpx rgba(231, 76, 60, 0.3);
+}
+
+.float-share-icon {
+  font-size: 44rpx;
+  color: #fff;
+}
+
+.float-share-badge {
+  position: absolute;
+  top: -8rpx;
+  right: -8rpx;
+  min-width: 36rpx;
+  height: 36rpx;
+  background: #ff4757;
+  color: #fff;
+  font-size: 22rpx;
+  font-weight: 600;
+  border-radius: 18rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8rpx;
+  box-sizing: border-box;
+}
+
+/* 隐藏的分享卡片画布 */
+.share-canvas {
+  position: fixed;
+  left: -10000px;
+  top: -10000px;
 }

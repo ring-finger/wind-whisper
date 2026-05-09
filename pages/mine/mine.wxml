@@ -51,6 +51,36 @@
       </view>
     </view>
 
+    <!-- 云同步配置 -->
+    <view class="mine-card mine-group">
+      <view class="section-header">
+        <text class="section-title">云端同步</text>
+      </view>
+      <view class="cell cell-switch" hover-class="cell-hover">
+        <view class="cell-primary-block">
+          <text class="cell-label cell-label-strong">开启云同步</text>
+        </view>
+        <switch 
+          checked="{{cloudSyncEnabled}}" 
+          bindchange="toggleCloudSync"
+          color="#e74c3c"
+        />
+      </view>
+      <view class="cell cell-tip">
+        <text class="cell-tip-text">{{cloudSyncTips}}</text>
+      </view>
+      <view class="cloud-sync-actions" wx:if="{{cloudSyncEnabled}}">
+        <view class="cloud-action-btn" hover-class="button-hover" bindtap="syncAllLogsToCloud">
+          <text class="cloud-action-icon">⬆️</text>
+          <text class="cloud-action-text">同步本地到云端</text>
+        </view>
+        <view class="cloud-action-btn" hover-class="button-hover" bindtap="restoreFromCloud">
+          <text class="cloud-action-icon">⬇️</text>
+          <text class="cloud-action-text">从云端恢复</text>
+        </view>
+      </view>
+    </view>
+
     <view class="mine-card mine-group">
       <view class="cell cell-tap" hover-class="cell-hover" bindtap="toggleTheme">
         <view class="cell-primary-block">

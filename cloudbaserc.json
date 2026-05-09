@@ -1,0 +1,23 @@
+{
+  "shareLogs": {
+    "description": "通联记录分享数据",
+    "indexes": [
+      {
+        "indexName": "_id",
+        "fieldPos": 0,
+        "seqIndex": false
+      },
+      {
+        "indexName": "_openid",
+        "fieldPos": 0,
+        "seqIndex": false
+      }
+    ],
+    "permission": {
+      "read": true,
+      "create": true,
+      "update": false,
+      "delete": false
+    }
+  }
+}

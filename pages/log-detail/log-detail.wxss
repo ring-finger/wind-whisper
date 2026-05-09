@@ -1,6 +1,14 @@
 .container {
   padding: 24rpx;
   box-sizing: border-box;
+  background: var(--bg-primary);
+  flex: 1;
+  height: calc(100vh - 140rpx);
+}
+
+.theme-wrapper {
+  display: flex;
+  flex-direction: column;
   min-height: 100vh;
   background: var(--bg-primary);
 }
@@ -122,10 +130,16 @@
 }
 
 .action-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
   display: flex;
   gap: 20rpx;
-  margin-top: 30rpx;
-  padding: 0 10rpx;
+  padding: 20rpx 24rpx;
+  padding-bottom: calc(20rpx + env(safe-area-inset-bottom));
+  background: var(--bg-primary);
+  box-shadow: 0 -4rpx 24rpx var(--shadow-color);
 }
 
 .action-btn {

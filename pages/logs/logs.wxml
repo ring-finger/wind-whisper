@@ -1,5 +1,8 @@
 <view class="theme-wrapper {{currentTheme === 'morandi' ? 'theme-morandi' : ''}}">
   <view class="logs-page">
+  <!-- 隐藏的画布用于生成分享卡片 -->
+  <canvas canvas-id="shareCardCanvas" class="share-canvas" style="width:520px;height:416px;"></canvas>
+
   <!-- 顶部Tab切换 -->
   <view class="page-tabs">
     <view 
@@ -142,60 +145,99 @@
 
   <!-- 通联列表 -->
   <view class="tab-panel {{currentTab === 'list' ? 'tab-panel-show' : ''}}" wx:if="{{currentTab === 'list'}}">
-    <view class="search-immersive">
-      <view class="search-inner">
-        <text class="search-icon">⌕</text>
-        <input
-          class="search-input font-mono"
-          type="text"
-          placeholder="呼号 / 频率 / 模式"
-          value="{{searchQuery}}"
-          bindinput="onSearchInput"
-          confirm-type="search"
-          bindconfirm="onSearchConfirm"
-        />
+    <!-- 分享操作栏 -->
+    <view class="share-action-bar" wx:if="{{shareMode}}">
+      <view class="share-info">
+        <text class="share-tip">已选择 {{selectedLogsArray.length}} 条记录（最多10条）</text>
       </view>
-      <view
-        class="filter-toggle font-mono"
-        hover-class="button-hover"
-        bindtap="toggleSearchExpanded"
-      >
-        {{searchExpanded ? '收起' : '日期筛选'}}
-      </view>
-    </view>
-
-    <view class="filter-panel {{searchExpanded ? 'filter-panel-open' : ''}}">
-      <view class="filter-panel-inner">
-        <text class="filter-bjt-hint">按 BJT 记录日期筛选，选好后点击「搜索」</text>
-        <view class="filter-row">
-          <text class="filter-label">从</text>
-          <picker mode="date" value="{{dateFrom}}" bindchange="onDateFromChange">
-            <view class="filter-picker font-mono">{{dateFrom || '不限'}}</view>
-          </picker>
-        </view>
-        <view class="filter-row">
-          <text class="filter-label">至</text>
-          <picker mode="date" value="{{dateTo}}" bindchange="onDateToChange">
-            <view class="filter-picker font-mono">{{dateTo || '不限'}}</view>
-          </picker>
-        </view>
-        <view class="filter-actions">
-          <button class="filter-btn filter-btn-primary" hover-class="button-hover" bindtap="onDateSearch">搜索</button>
-          <button class="filter-btn filter-btn-ghost" hover-class="button-hover" bindtap="onDateReset">重置</button>
-        </view>
+      <view class="share-actions">
+        <view class="share-btn-cancel" hover-class="button-hover" bindtap="cancelShare">取消</view>
+        <button 
+          wx:if="{{!shareDataReady}}"
+          class="share-btn-confirm {{selectedLogsArray.length === 0 ? 'disabled' : ''}}" 
+          hover-class="button-hover"
+          bindtap="prepareShareData"
+        >{{preparingShare ? '准备中...' : '确认分享'}}</button>
+        <button 
+          wx:if="{{shareDataReady}}"
+          class="share-btn-confirm" 
+          hover-class="button-hover"
+          open-type="share"
+        >去分享</button>
       </view>
     </view>
 
-    <view wx:if="{{filteredLogs.length === 0}}" class="empty-tip">暂无记录</view>
+    <!-- 正常模式搜索区域 -->
+    <view wx:if="{{!shareMode}}">
+      <view class="search-immersive">
+        <view class="search-inner">
+          <text class="search-icon">⌕</text>
+          <input
+            class="search-input font-mono"
+            type="text"
+            placeholder="呼号 / 频率 / 模式"
+            value="{{searchQuery}}"
+            bindinput="onSearchInput"
+            confirm-type="search"
+            bindconfirm="onSearchConfirm"
+          />
+        </view>
+        <view
+          class="filter-toggle font-mono"
+          hover-class="button-hover"
+          bindtap="toggleSearchExpanded"
+        >
+          {{searchExpanded ? '收起' : '日期'}}
+        </view>
+        <view
+          class="share-toggle-btn"
+          hover-class="button-hover"
+          bindtap="enterShareMode"
+          wx:if="{{filteredLogs.length > 0}}"
+        >
+          <text class="share-toggle-icon">📤</text>
+        </view>
+      </view>
 
+      <!-- 筛选面板 -->
+      <view class="filter-panel {{searchExpanded ? 'filter-panel-open' : ''}}">
+        <view class="filter-panel-inner">
+          <view class="filter-row">
+            <text class="filter-label">从</text>
+            <picker mode="date" value="{{dateFrom}}" bindchange="onDateFromChange">
+              <view class="filter-picker font-mono">{{dateFrom || '不限'}}</view>
+            </picker>
+            <text class="filter-label" style="margin-left: 24rpx;">至</text>
+            <picker mode="date" value="{{dateTo}}" bindchange="onDateToChange">
+              <view class="filter-picker font-mono">{{dateTo || '不限'}}</view>
+            </picker>
+          </view>
+          <view class="filter-actions">
+            <view class="filter-btn filter-btn-primary" hover-class="button-hover" bindtap="onDateSearch">搜索</view>
+            <view class="filter-btn filter-btn-ghost" hover-class="button-hover" bindtap="onDateReset">重置</view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view wx:if="{{filteredLogs.length === 0 && !shareMode}}" class="empty-tip">暂无记录</view>
+
+    <!-- 通联记录列表 -->
     <view
       wx:for="{{filteredLogs}}"
       wx:key="id"
-      class="log-row-card"
-      hover-class="button-hover"
-      bindtap="openDetail"
+      class="log-row-card {{shareMode ? 'log-row-shareable' : ''}} {{selectedLogs[item.id] ? 'log-row-selected' : ''}}"
+      hover-class="{{shareMode ? '' : 'button-hover'}}"
+      bindtap="{{shareMode ? 'toggleLogSelect' : 'openDetail'}}"
       data-id="{{item.id}}"
+      data-shareid="{{currentShareId || ''}}"
     >
+      <!-- 选择指示器 -->
+      <view class="log-select-indicator" wx:if="{{shareMode}}">
+        <view class="log-select-circle {{selectedLogs[item.id] ? 'log-select-circle-active' : ''}}">
+          <text class="log-select-check" wx:if="{{selectedLogs[item.id]}}">✓</text>
+        </view>
+      </view>
       <view class="log-row-left font-mono">{{item.callSign}}</view>
       <view class="log-row-mid">
         <text class="log-row-line1 font-mono">{{item.frequency}} MHz · {{item.mode}}</text>
@@ -204,5 +246,35 @@
       <view class="log-row-rst font-mono">{{item.rstSummary}}</view>
     </view>
   </view>
+  </view>
+
+  <!-- 我的分享弹窗 -->
+  <view class="modal-mask {{showMySharesModal ? 'modal-show' : ''}}" bindtap="hideMyShares"></view>
+  <view class="my-shares-modal {{showMySharesModal ? 'my-shares-modal-show' : ''}}">
+    <view class="my-shares-header">
+      <text class="my-shares-title">我的分享</text>
+      <view class="my-shares-close" bindtap="hideMyShares">✕</view>
+    </view>
+    <view class="my-shares-content">
+      <view wx:if="{{myShareList.length === 0}}" class="my-shares-empty">
+        <text>暂无分享记录</text>
+      </view>
+      <view wx:for="{{myShareList}}" wx:key="id" class="share-record-item">
+        <view class="share-record-info">
+          <text class="share-record-title">{{item.title || '通联记录分享'}}</text>
+          <text class="share-record-meta">{{item.logCount}}条记录 · {{item.expireDaysLeft}}天有效期</text>
+        </view>
+        <view class="share-record-actions">
+          <view class="share-record-share" bindtap="reShareRecord" data-id="{{item.id}}">再次分享</view>
+          <view class="share-record-delete" bindtap="deleteShareRecord" data-id="{{item.id}}">删除</view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 右下角悬浮分享入口 -->
+  <view class="float-share-btn" hover-class="float-share-btn-hover" bindtap="showMyShares" wx:if="{{!shareMode}}">
+    <text class="float-share-icon">📋</text>
+    <view class="float-share-badge" wx:if="{{myShareCount > 0}}">{{myShareCount > 99 ? '99+' : myShareCount}}</view>
   </view>
 </view>

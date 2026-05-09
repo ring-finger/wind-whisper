@@ -52,5 +52,8 @@
   "projectname": "ham-radio-log",
   "condition": {},
   "simulatorPluginLibVersion": {},
-  "editorSetting": {}
+  "editorSetting": {},
+  "cloudfunctionTemplateRoot": "cloudfunctionTemplate/",
+  "cloudfunctionRoot": "cloudfunctions/",
+  "miniprogramRoot": "./"
 }
