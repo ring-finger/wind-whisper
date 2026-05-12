@@ -43,9 +43,9 @@
           <text class="info-label">天线</text>
           <text class="info-value">{{log.antenna}}</text>
         </view>
-        <view class="info-item" wx:if="{{log.power}}">
+        <view class="info-item" wx:if="{{powerDisplay}}">
           <text class="info-label">功率</text>
-          <text class="info-value">{{log.power}}W</text>
+          <text class="info-value">{{powerDisplay}}</text>
         </view>
       </view>
     </view>

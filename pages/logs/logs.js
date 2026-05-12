@@ -96,7 +96,7 @@ Page({
       callSign: '',
       weather: '',
       frequency: '',
-      mode: '',
+      mode: 'SSB',  // 默认SSB模式
       equipment: '',
       antenna: '',
       rst: {
@@ -127,6 +127,11 @@ Page({
       myRst: false,
       theirRst: false
     },
+    // RST焦点状态 - 控制哪个输入框可编辑
+    rstFocus: {
+      theirRst: 'r',  // 默认聚焦对方R
+      myRst: 'r'
+    },
     currentTheme: 'radio',
     // 分享功能
     shareMode: false,
@@ -137,14 +142,30 @@ Page({
     // 我的分享
     showMySharesModal: false,
     myShareList: [],
-    myShareCount: 0
+    myShareCount: 0,
+    // 分享详情弹窗
+    showShareDetailModal: false,
+    shareDetailLoading: false,
+    shareDetailLogs: [],
+    shareDetailData: {},
+    // 分享来源
+    shareOwnerCallSign: ''
   },
 
   onLoad(options) {
     this.loadTheme()
     this.initDateTime()
     if (options && options.tab === 'add') {
-      this.setData({ currentTab: 'add' })
+      this.setData({ 
+        currentTab: 'add',
+        rstFocus: {
+          theirRst: 'r',
+          myRst: 'r'
+        }
+      }, () => {
+        // 页面加载时聚焦到对方R输入框
+        this.focusRstInput('theirRst', 'r')
+      })
     }
     // 处理分享链接
     if (options && options.shareId) {
@@ -238,7 +259,8 @@ Page({
       shareMode: false,
       selectedLogs: {},
       selectedLogsArray: [],
-      currentShareId: this._currentShareId  // 保存当前查看的分享ID
+      currentShareId: this._currentShareId,  // 保存当前查看的分享ID
+      shareOwnerCallSign: shareData.myCallSign || 'TA'
     })
     
     // 显示过期提示
@@ -269,12 +291,21 @@ Page({
   switchTab(e) {
     const tab = e.currentTarget.dataset.tab
     wx.vibrateShort({ type: VIBRATE_TYPE })
-    this.setData({ currentTab: tab })
-    if (tab === 'list') {
-      this.loadLogs()
-    } else {
-      this.initDateTime()
-    }
+    this.setData({ 
+      currentTab: tab,
+      rstFocus: {
+        theirRst: 'r',
+        myRst: 'r'
+      }
+    }, () => {
+      if (tab === 'list') {
+        this.loadLogs()
+      } else {
+        this.initDateTime()
+        // 切换到添加页时聚焦到对方R输入框
+        this.focusRstInput('theirRst', 'r')
+      }
+    })
   },
 
   initDateTime() {
@@ -402,12 +433,6 @@ Page({
     }
 
     wx.vibrateShort({ type: VIBRATE_TYPE })
-    
-    // 如果数据已准备好，直接触发分享
-    if (this.data.shareDataReady) {
-      return
-    }
-
     this.setData({ preparingShare: true })
     
     // 获取选中的记录
@@ -416,9 +441,6 @@ Page({
     const selectedLogsData = allLogs.filter(log => 
       selectedIds[log.id]
     )
-
-    // 显示加载提示
-    wx.showLoading({ title: '准备分享...' })
 
     // 生成分享卡片图片
     this.generateShareCard(selectedLogsData).then(imagePath => {
@@ -437,8 +459,6 @@ Page({
       return shareCollection.add({
         data: shareData
       }).then(res => {
-        wx.hideLoading()
-        
         // 保存到全局，供 onShareAppMessage 使用
         const app = getApp()
         app.globalData.currentShareId = res._id
@@ -448,20 +468,19 @@ Page({
         // 保存到我的分享列表
         this.saveToMyShares(res._id, selectedLogsData.length)
 
-        // 显示分享菜单（必要的配置）
-        wx.showShareMenu({
-          withShareTicket: true,
-          menus: ['shareAppMessage', 'shareTimeline']
-        })
-
-        // 设置数据准备好标志
+        // 设置分享数据准备好
         this.setData({
           shareDataReady: true,
           preparingShare: false
         })
+
+        // 显示分享菜单
+        wx.showShareMenu({
+          withShareTicket: true,
+          menus: ['shareAppMessage', 'shareTimeline']
+        })
       })
     }).catch(err => {
-      wx.hideLoading()
       this.setData({ preparingShare: false })
       console.error('分享失败', err)
       wx.showToast({ title: '分享失败，请重试', icon: 'none' })
@@ -525,51 +544,57 @@ Page({
     this.setData({ showMySharesModal: false })
   },
 
-  // 再次分享
-  reShareRecord(e) {
+  // 查看分享详情
+  viewShareDetail(e) {
     const shareId = e.currentTarget.dataset.id
     wx.vibrateShort({ type: VIBRATE_TYPE })
     
     this.hideMyShares()
-    wx.showLoading({ title: '准备分享...' })
+    this.setData({
+      showShareDetailModal: true,
+      shareDetailLoading: true,
+      shareDetailLogs: [],
+      shareDetailData: {}
+    })
     
     // 从云端加载分享数据
     const db = wx.cloud.database()
     db.collection('shareLogs').doc(shareId).get().then(res => {
       if (!res.data) {
-        wx.hideLoading()
+        this.setData({ shareDetailLoading: false })
         wx.showToast({ title: '分享记录不存在', icon: 'none' })
         return
       }
       
       const shareData = res.data
-      const logs = shareData.logs || []
+      const logs = (shareData.logs || []).map(log => {
+        const { my, their } = formatRstBlock(log.rst)
+        return {
+          ...log,
+          rstMy: my,
+          rstTheir: their,
+          rstSummary: [my, their].filter(Boolean).join(' / ')
+        }
+      })
       
-      // 生成分享卡片图片
-      this.generateShareCard(logs).then(imagePath => {
-        wx.hideLoading()
-        
-        // 保存到全局，供 onShareAppMessage 使用
-        const app = getApp()
-        app.globalData.currentShareId = shareId
-        app.globalData.currentShareData = { myCallSign: shareData.myCallSign, logs: logs }
-        app.globalData.currentShareImage = imagePath
-        
-        // 显示分享菜单
-        wx.showShareMenu({
-          withShareTicket: true,
-          menus: ['shareAppMessage', 'shareTimeline']
-        })
-      }).catch(err => {
-        wx.hideLoading()
-        console.error('生成分享卡片失败', err)
-        wx.showToast({ title: '分享失败，请重试', icon: 'none' })
+      this.setData({
+        shareDetailLoading: false,
+        shareDetailLogs: logs,
+        shareDetailData: {
+          myCallSign: shareData.myCallSign,
+          logCount: logs.length
+        }
       })
     }).catch(err => {
-      wx.hideLoading()
+      this.setData({ shareDetailLoading: false })
       console.error('加载分享记录失败', err)
       wx.showToast({ title: '加载失败', icon: 'none' })
     })
+  },
+
+  // 隐藏分享详情弹窗
+  hideShareDetail() {
+    this.setData({ showShareDetailModal: false })
   },
 
   // 删除分享记录
@@ -821,6 +846,17 @@ Page({
     const shareId = e.currentTarget.dataset.shareid
     wx.vibrateShort({ type: VIBRATE_TYPE })
     
+    // 如果是查看他人分享的记录，拦截并提示
+    if (this.data.currentShareId) {
+      wx.showModal({
+        title: '提示',
+        content: '分享信息不可查看详情',
+        showCancel: false,
+        confirmText: '知道了'
+      })
+      return
+    }
+    
     if (shareId) {
       // 从分享列表进入，需要传递分享ID和日志ID，以及日志数据
       const log = this.data.filteredLogs.find(item => item.id == id)
@@ -897,6 +933,37 @@ Page({
     }
   },
 
+  // 频率输入框聚焦时，加载缓存的频率列表
+  onFrequencyFocus() {
+    this.loadFrequencySuggestions()
+  },
+
+  // 加载所有历史频率列表
+  loadFrequencySuggestions() {
+    try {
+      const logs = wx.getStorageSync('contactLogs') || []
+      const frequencySet = new Set(logs.map(log => log.frequency).filter(f => f))
+      const frequencies = Array.from(frequencySet)
+      // 按使用频率排序（最近使用的在前）
+      const recentFreqs = []
+      const otherFreqs = []
+      logs.forEach(log => {
+        if (log.frequency && !recentFreqs.includes(log.frequency)) {
+          recentFreqs.push(log.frequency)
+        }
+      })
+      frequencies.forEach(f => {
+        if (!recentFreqs.includes(f)) {
+          otherFreqs.push(f)
+        }
+      })
+      const sortedFreqs = [...recentFreqs, ...otherFreqs].slice(0, 8)
+      this.setData({ frequencySuggestions: sortedFreqs })
+    } catch (e) {
+      console.error('加载频率历史失败', e)
+    }
+  },
+
   filterFrequencySuggestions(input) {
     try {
       const logs = wx.getStorageSync('contactLogs') || []
@@ -920,7 +987,11 @@ Page({
     const freq = parseFloat(frequency)
     const isUHF = !isNaN(freq) && freq >= 300 && freq <= 3000
     const isVHF = !isNaN(freq) && freq >= 30 && freq < 300
-    this.setData({ isUHF: isUHF, isVHF: isVHF })
+    
+    this.setData({ 
+      isUHF: isUHF, 
+      isVHF: isVHF
+    })
   },
 
   selectMode(e) {
@@ -931,17 +1002,43 @@ Page({
     wx.vibrateShort({ type: VIBRATE_TYPE })
   },
 
+  // ========== RST验证码式输入组件 ==========
+
+  // 封装聚焦方法 - 使用rstFocus数据控制焦点
+  focusRstInput(type, field) {
+    const { isVHF, isUHF } = this.data
+    
+    // 重置所有焦点
+    const rstFocus = {
+      theirRst: { r: false, s: false, t: false },
+      myRst: { r: false, s: false, t: false }
+    }
+    
+    // VHF/UHF频段时，跳过T字段
+    if (field === 't' && (isVHF || isUHF)) {
+      if (type === 'theirRst') {
+        rstFocus.myRst.r = true
+      }
+    } else {
+      rstFocus[type][field] = true
+    }
+    
+    this.setData({ rstFocus })
+  },
+
+  // RST输入处理 - 核心交互逻辑
   onRstInput(e) {
-    wx.vibrateShort({ type: VIBRATE_TYPE })
-    const { formData } = this.data
+    const { formData, isVHF, isUHF } = this.data
     const type = e.currentTarget.dataset.type
     const field = e.currentTarget.dataset.field
     let value = e.detail.value
 
+    // 只保留最后一个字符
     if (value.length > 1) {
       value = value.slice(-1)
     }
 
+    // 验证输入值
     if (field === 'r') {
       const num = parseInt(value, 10)
       if (isNaN(num) || num < 1 || num > 5) {
@@ -952,16 +1049,167 @@ Page({
       if (isNaN(num) || num < 1 || num > 9) {
         value = ''
       }
+    } else if (field === 't') {
+      // T字段只允许数字
+      if (value && !/^[0-9]$/.test(value)) {
+        value = ''
+      }
     }
 
+    // 更新RST数据
     const rst = {
       myRst: { ...formData.rst.myRst },
       theirRst: { ...formData.rst.theirRst }
     }
     const cur = { ...rst[type] }
+    const prevValue = cur[field]  // 保存之前的值用于判断是输入还是删除
     cur[field] = value
     rst[type] = cur
     this.setData({ 'formData.rst': rst })
+
+    wx.vibrateShort({ type: VIBRATE_TYPE })
+
+    // 判断是输入还是删除
+    if (value && !prevValue) {
+      // 正向输入：自动跳转下一个
+      this.rstForwardFocus(type, field, isVHF, isUHF)
+    } else if (!value && prevValue) {
+      // 反向删除：自动跳转上一个
+      this.rstBackwardFocus(type, field)
+    }
+  },
+
+  // RST正向跳转 - 输入完成后自动聚焦下一个
+  rstForwardFocus(type, field, isVHF, isUHF) {
+    const nextFocus = {}
+    let nextType = type
+    let nextField = ''
+
+    if (field === 'r') {
+      // R → S
+      nextField = 's'
+      nextFocus.rstFocus = { ...this.data.rstFocus, [type]: 's' }
+    } else if (field === 's') {
+      if (isVHF || isUHF) {
+        // VHF/UHF频段：S → 己方R (跳过T)
+        nextType = 'myRst'
+        nextField = 'r'
+        nextFocus.rstFocus = { ...this.data.rstFocus, myRst: 'r' }
+      } else {
+        // HF频段：S → T
+        nextField = 't'
+        nextFocus.rstFocus = { ...this.data.rstFocus, [type]: 't' }
+      }
+    } else if (field === 't') {
+      // T → 己方R
+      nextType = 'myRst'
+      nextField = 'r'
+      nextFocus.rstFocus = { ...this.data.rstFocus, myRst: 'r' }
+    }
+
+    if (Object.keys(nextFocus).length > 0) {
+      this.setData(nextFocus, () => {
+        // 真正聚焦到下一个输入框
+        this.focusRstInput(nextType, nextField)
+      })
+    }
+  },
+
+  // RST反向跳转 - 删除时自动聚焦上一个
+  rstBackwardFocus(type, field) {
+    const nextFocus = {}
+    let nextType = type
+    let nextField = ''
+
+    if (field === 't') {
+      // T → S
+      nextField = 's'
+      nextFocus.rstFocus = { ...this.data.rstFocus, [type]: 's' }
+    } else if (field === 's') {
+      // S → R
+      nextField = 'r'
+      nextFocus.rstFocus = { ...this.data.rstFocus, [type]: 'r' }
+    } else if (field === 'r') {
+      // R → 对方S (如果当前是己方)
+      if (type === 'myRst') {
+        nextType = 'theirRst'
+        nextField = 's'
+        nextFocus.rstFocus = { ...this.data.rstFocus, theirRst: 's' }
+      }
+    }
+
+    if (Object.keys(nextFocus).length > 0) {
+      this.setData(nextFocus, () => {
+        // 真正聚焦到上一个输入框
+        this.focusRstInput(nextType, nextField)
+      })
+    }
+  },
+
+  // RST获取焦点 - 点击输入框时聚焦
+  onRstFocus(e) {
+    const type = e.currentTarget.dataset.type
+    const field = e.currentTarget.dataset.field
+    this.setData({
+      rstFocus: { ...this.data.rstFocus, [type]: field }
+    }, () => {
+      // 真正聚焦到输入框
+      this.focusRstInput(type, field)
+    })
+  },
+
+  // RST点击切换 - 点击占位符切换焦点
+  rstTapToFocus(e) {
+    const type = e.currentTarget.dataset.type
+    const field = e.currentTarget.dataset.field
+    wx.vibrateShort({ type: VIBRATE_TYPE })
+    this.setData({
+      rstFocus: { ...this.data.rstFocus, [type]: field }
+    }, () => {
+      // 真正聚焦到输入框
+      this.focusRstInput(type, field)
+    })
+  },
+
+  // 设置RST的T为+号（VHF/UHF频段）
+  setRstPlus(e) {
+    const type = e.currentTarget.dataset.type
+    const { formData } = this.data
+    const rst = {
+      myRst: { ...formData.rst.myRst },
+      theirRst: { ...formData.rst.theirRst }
+    }
+    const cur = { ...rst[type] }
+    cur.t = '+'
+    rst[type] = cur
+    this.setData({ 'formData.rst': rst })
+    wx.vibrateShort({ type: VIBRATE_TYPE })
+
+    // 设置+后跳到己方R
+    if (type === 'theirRst') {
+      this.setData({
+        rstFocus: { ...this.data.rstFocus, myRst: 'r' }
+      }, () => {
+        // 真正聚焦到己方R输入框
+        this.focusRstInput('myRst', 'r')
+      })
+    }
+  },
+
+  // 获取完整的RST字符串 - 提供给外部调用
+  getFullRst(type = 'theirRst') {
+    const { formData } = this.data
+    const rst = formData.rst[type]
+    return `${rst.r || ''}${rst.s || ''}${rst.t || ''}`
+  },
+
+  // ========== RST组件结束 ==========
+
+  // 选择功率快捷值
+  selectPower(e) {
+    const power = e.currentTarget.dataset.power
+    this.setData({ 'formData.power': power })
+    wx.vibrateShort({ type: VIBRATE_TYPE })
   },
 
   onQthInput(e) {
@@ -1292,7 +1540,14 @@ Page({
       rstPlusSelected: {
         myRst: false,
         theirRst: false
+      },
+      rstFocus: {
+        theirRst: 'r',
+        myRst: 'r'
       }
+    }, () => {
+      // 重置后聚焦到对方R输入框
+      this.focusRstInput('theirRst', 'r')
     })
   },
 

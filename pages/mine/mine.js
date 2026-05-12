@@ -7,6 +7,24 @@ const STORAGE_AVATAR = 'wxMineAvatarUrl'
 const STORAGE_NICK = 'wxMineNickName'
 const STORAGE_THEME = 'appTheme'
 
+// 当前版本号 - 每次发布新版本时更新
+const CURRENT_VERSION = '1.2.1'
+
+// 更新日志内容
+const UPDATE_LOGS = [
+  {
+    version: CURRENT_VERSION,
+    date: '2026-05-12',
+    title: '功能优化',
+    content: [
+      'VHF/UHF 频段选择时不再自动选中 + 号',
+      '优化 RST 信号报告输入体验',
+      '频率输入支持聚焦时显示历史列表',
+      "优化云同步开启逻辑"
+    ]
+  }
+]
+
 const THEMES = {
   radio: {
     name: '无线电'
@@ -39,10 +57,56 @@ Page({
     showThemePicker: false,
     // 云同步配置
     cloudSyncEnabled: false,
-    cloudSyncTips: ''
+    cloudSyncTips: '',
+    // 免责声明
+    showCloudDisclaimer: false,
+    cloudDisclaimerAgreed: false,
+    cloudDisclaimerText: '云端同步免责声明：\n\n1. 云端数据存储存在不确定性，不保证100%数据完整性\n2. 云端同步的数据仅为备份用途，不能作为唯一存储方式\n3. 请定期通过"导出日志"功能备份您的数据到本地\n4. 作者不对因云端数据丢失造成的任何损失负责\n5. 开启云同步即表示您同意以上条款',
+    // 更新日志
+    showUpdateLog: false,
+    updateLogList: UPDATE_LOGS,
+    currentVersion: CURRENT_VERSION
   },
 
   onLoad() {
+    // 检查是否需要显示更新日志
+    this.checkAndShowUpdateLog()
+  },
+
+  // 检查并显示更新日志
+  checkAndShowUpdateLog() {
+    try {
+      const lastSeenVersion = wx.getStorageSync('lastSeenVersion') || ''
+      
+      // 如果是新版本或首次打开，显示更新日志
+      if (lastSeenVersion !== CURRENT_VERSION) {
+        // 延迟显示，确保页面已加载
+        setTimeout(() => {
+          this.setData({ showUpdateLog: true })
+        }, 500)
+        
+        // 更新已查看的版本号
+        wx.setStorageSync('lastSeenVersion', CURRENT_VERSION)
+      }
+    } catch (e) {
+      console.error('检查更新日志失败', e)
+    }
+  },
+
+  // 关闭更新日志弹窗
+  hideUpdateLog() {
+    this.setData({ showUpdateLog: false })
+  },
+
+  // 打开更新日志弹窗
+  showUpdateLogModal() {
+    wx.vibrateShort({ type: VIBRATE_TYPE })
+    this.setData({ showUpdateLog: true })
+  },
+
+  onLoad() {
+    // 检查是否需要显示更新日志
+    this.checkAndShowUpdateLog()
     this.loadUserProfile()
     this.loadMyCallSign()
     this.loadContactCount()
@@ -78,33 +142,16 @@ Page({
   },
 
   // 切换云同步开关
-  toggleCloudSync() {
+  toggleCloudSync(e) {
     wx.vibrateShort({ type: VIBRATE_TYPE })
-    const newEnabled = !this.data.cloudSyncEnabled
+    const newEnabled = e.detail.value
     
     if (newEnabled) {
-      // 开启时，询问用户是否同步现有日志
-      wx.showModal({
-        title: '开启云同步',
-        content: '开启后新增的日志会自动同步到云端。是否立即同步现有的本地日志？',
-        confirmText: '同步',
-        cancelText: '暂不',
-        success: (res) => {
-          app.setCloudSyncEnabled(true)
-          this.setData({
-            cloudSyncEnabled: true,
-            cloudSyncTips: '已开启 · 云端最多保存 100 条'
-          })
-          wx.showToast({
-            title: '已开启云同步',
-            icon: 'success'
-          })
-          
-          if (res.confirm) {
-            // 立即同步现有日志
-            this.syncAllLogsToCloud()
-          }
-        }
+      // 开启时先显示免责声明
+      // 注意：此时开关组件的 checked 已经变为 true，但我们需要等待用户同意
+      this.setData({ 
+        showCloudDisclaimer: true,
+        cloudSyncEnabled: false  // 先保持关闭状态，等同意后再开启
       })
     } else {
       // 关闭时
@@ -126,6 +173,43 @@ Page({
         }
       })
     }
+  },
+
+  // 关闭免责声明弹窗
+  hideCloudDisclaimer() {
+    this.setData({ showCloudDisclaimer: false })
+  },
+
+  // 同意免责声明
+  agreeCloudDisclaimer() {
+    this.setData({ 
+      showCloudDisclaimer: false,
+      cloudDisclaimerAgreed: true
+    })
+    
+    // 同意后开启云同步
+    wx.showModal({
+      title: '开启云同步',
+      content: '开启后新增的日志会自动同步到云端。是否立即同步现有的本地日志？',
+      confirmText: '同步',
+      cancelText: '暂不',
+      success: (res) => {
+        app.setCloudSyncEnabled(true)
+        this.setData({
+          cloudSyncEnabled: true,
+          cloudSyncTips: '已开启 · 云端最多保存 100 条'
+        })
+        wx.showToast({
+          title: '已开启云同步',
+          icon: 'success'
+        })
+        
+        if (res.confirm) {
+          // 立即同步现有日志
+          this.syncAllLogsToCloud()
+        }
+      }
+    })
   },
 
   // 同步所有日志到云端

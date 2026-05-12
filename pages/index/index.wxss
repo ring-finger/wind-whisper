@@ -70,6 +70,7 @@
   font-size: 24rpx;
   color: var(--text-inverse);
   font-weight: 600;
+  line-height: 1;
 }
 
 /* 统计网格 */

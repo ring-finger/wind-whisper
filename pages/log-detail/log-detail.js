@@ -13,6 +13,23 @@ function instantFromBjtWall(dateStr, timeStr) {
   return isNaN(ms) ? null : ms
 }
 
+// 判断是否为数字
+function isNumeric(value) {
+  if (!value) return false
+  return /^\d+(\.\d+)?$/.test(String(value).trim())
+}
+
+// 获取功率显示文本
+function getPowerDisplay(power) {
+  if (!power) return ''
+  const trimmed = String(power).trim()
+  if (isNumeric(trimmed)) {
+    return trimmed + ' W'
+  } else {
+    return trimmed + ' 功率'
+  }
+}
+
 function formatUtcDateTime(ms) {
   const d = new Date(ms)
   return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())} ${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}`
@@ -136,6 +153,7 @@ Page({
     const weatherText = this.getWeatherText(log.weather)
     const bjtDateTimeFull = buildBjtDateTimeFull(log)
     const utcDateTimeFull = buildUtcDateTimeFull(log)
+    const powerDisplay = getPowerDisplay(log.power)
 
     this.setData({
       log: log,
@@ -146,6 +164,7 @@ Page({
       weatherText: weatherText,
       bjtDateTimeFull: bjtDateTimeFull,
       utcDateTimeFull: utcDateTimeFull,
+      powerDisplay: powerDisplay,
       isSharedLog: true  // 标记为分享的日志
     })
   },
@@ -235,6 +254,7 @@ Page({
         const weatherText = this.getWeatherText(log.weather)
         const bjtDateTimeFull = buildBjtDateTimeFull(log)
         const utcDateTimeFull = buildUtcDateTimeFull(log)
+        const powerDisplay = getPowerDisplay(log.power)
 
         this.setData({
           log: log,
@@ -245,6 +265,7 @@ Page({
           weatherText: weatherText,
           bjtDateTimeFull: bjtDateTimeFull,
           utcDateTimeFull: utcDateTimeFull,
+          powerDisplay: powerDisplay,
           isSharedLog: false
         })
       } else {

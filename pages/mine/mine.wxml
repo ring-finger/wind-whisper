@@ -81,6 +81,25 @@
       </view>
     </view>
 
+    <!-- 免责声明弹窗 -->
+    <view class="modal-mask {{showCloudDisclaimer ? 'modal-show' : ''}}" bindtap="hideCloudDisclaimer"></view>
+    <view class="cloud-disclaimer-modal {{showCloudDisclaimer ? 'cloud-disclaimer-modal-show' : ''}}">
+      <view class="cloud-disclaimer-header">
+        <text class="cloud-disclaimer-title">云端同步免责声明</text>
+      </view>
+      <view class="cloud-disclaimer-content">
+        <text class="cloud-disclaimer-text">{{cloudDisclaimerText}}</text>
+      </view>
+      <view class="cloud-disclaimer-footer">
+        <view class="cloud-disclaimer-btn cloud-disclaimer-cancel" hover-class="button-hover" bindtap="hideCloudDisclaimer">
+          <text>不同意</text>
+        </view>
+        <view class="cloud-disclaimer-btn cloud-disclaimer-agree" hover-class="button-hover" bindtap="agreeCloudDisclaimer">
+          <text>同意并开启</text>
+        </view>
+      </view>
+    </view>
+
     <view class="mine-card mine-group">
       <view class="cell cell-tap" hover-class="cell-hover" bindtap="toggleTheme">
         <view class="cell-primary-block">
@@ -96,6 +115,11 @@
     </view>
 
     <view class="mine-card mine-group">
+      <view class="cell cell-tap" hover-class="cell-hover" bindtap="showUpdateLogModal">
+        <text class="cell-label cell-label-full">更新日志</text>
+        <text class="cell-version">v{{currentVersion}}</text>
+        <text class="cell-chevron">›</text>
+      </view>
       <view class="cell cell-tap" hover-class="cell-hover" bindtap="toggleAuthorInfo">
         <text class="cell-label cell-label-full">联系作者</text>
         <text class="cell-chevron">›</text>
@@ -112,6 +136,32 @@
         <text class="author-action-chevron">›</text>
       </view>
       <text class="author-hint">关注公众号【饮月听风】</text>
+    </view>
+
+    <!-- 更新日志弹窗 -->
+    <view class="modal-mask {{showUpdateLog ? 'modal-show' : ''}}" bindtap="hideUpdateLog"></view>
+    <view class="update-log-modal {{showUpdateLog ? 'update-log-modal-show' : ''}}">
+      <view class="update-log-header">
+        <text class="update-log-title">📋 更新日志</text>
+        <view class="update-log-close" bindtap="hideUpdateLog">✕</view>
+      </view>
+      <scroll-view class="update-log-content" scroll-y>
+        <view wx:for="{{updateLogList}}" wx:key="version" class="update-log-item">
+          <view class="update-log-version">
+            <text class="version-tag">v{{item.version}}</text>
+            <text class="version-date">{{item.date}}</text>
+          </view>
+          <view class="update-log-title-text">{{item.title}}</view>
+          <view class="update-log-list">
+            <text wx:for="{{item.content}}" wx:for-item="line" wx:key="*this" class="update-log-line">• {{line}}</text>
+          </view>
+        </view>
+      </scroll-view>
+      <view class="update-log-footer">
+        <view class="update-log-btn" hover-class="button-hover" bindtap="hideUpdateLog">
+          <text>知道了</text>
+        </view>
+      </view>
     </view>
   </view>
 </view>

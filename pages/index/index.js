@@ -7,6 +7,7 @@ Page({
   data: {
     userCallsign: '',
     userAvatarUrl: '',
+    userNickName: '',
     stats: {
       totalLogs: 0,
       todayLogs: 0,
@@ -54,9 +55,11 @@ Page({
     try {
       const myCallSign = wx.getStorageSync('myCallSign') || ''
       const userAvatarUrl = wx.getStorageSync('wxMineAvatarUrl') || ''
+      const userNickName = wx.getStorageSync('wxMineNickName') || ''
       this.setData({
         userCallsign: myCallSign || '设置呼号',
-        userAvatarUrl: userAvatarUrl
+        userAvatarUrl: userAvatarUrl,
+        userNickName: userNickName
       })
     } catch (e) {
       console.error('加载用户信息失败', e)

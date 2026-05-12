@@ -7,7 +7,7 @@
       <text wx:else class="avatar-icon">📡</text>
     </view>
     <view class="profile-info">
-      <text class="profile-title">业余无线电</text>
+      <text class="profile-title">{{userNickName || '业余无线电'}}</text>
       <text class="profile-subtitle">{{userCallsign || '设置呼号'}}</text>
     </view>
     <view class="profile-badge">

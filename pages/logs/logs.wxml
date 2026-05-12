@@ -58,7 +58,7 @@
     <view class="float-card">
       <view class="form-label">频率 FREQUENCY</view>
       <view class="lcd-wrap">
-        <input class="lcd-input font-mono" type="digit" value="{{formData.frequency}}" bindinput="onFrequencyInput" placeholder="0.000" />
+        <input class="lcd-input font-mono" type="digit" value="{{formData.frequency}}" bindinput="onFrequencyInput" bindfocus="onFrequencyFocus" placeholder="0.000" />
         <text class="lcd-suffix font-mono">MHz</text>
       </view>
       <view wx:if="{{frequencySuggestions.length > 0}}" class="frequency-suggestions">
@@ -91,26 +91,95 @@
       </view>
     </view>
 
+
+
     <view class="float-card">
       <view class="form-label">信号报告 RST</view>
       <view class="rst-inputs-row">
+        <!-- 对方RST -->
         <view class="rst-group">
           <text class="rst-group-label">对方</text>
           <view class="rst-inputs">
-            <input class="rst-input font-mono" type="number" maxlength="1" value="{{formData.rst.theirRst.r}}" bindinput="onRstInput" data-type="theirRst" data-field="r" placeholder="R" />
-            <input class="rst-input font-mono" type="number" maxlength="1" value="{{formData.rst.theirRst.s}}" bindinput="onRstInput" data-type="theirRst" data-field="s" placeholder="S" />
-            <input class="rst-input font-mono" type="text" maxlength="1" value="{{formData.rst.theirRst.t}}" bindinput="onRstInput" data-type="theirRst" data-field="t" placeholder="T" />
+            <!-- R输入框 -->
+            <view class="rst-input-wrapper">
+              <input 
+                type="text" 
+                class="rst-input font-mono" 
+                maxlength="1" 
+                value="{{formData.rst.theirRst.r}}" 
+                placeholder="R"
+                bindinput="onRstInput"
+                focus="{{rstFocus.theirRst.r}}"
+                data-type="theirRst" 
+                data-field="r"
+                id="theirRst-r"
+              />
+            </view>
+            <!-- S输入框 -->
+            <view class="rst-input-wrapper">
+              <input 
+                type="text" 
+                class="rst-input font-mono" 
+                maxlength="1" 
+                value="{{formData.rst.theirRst.s}}" 
+                placeholder="S"
+                bindinput="onRstInput"
+                focus="{{rstFocus.theirRst.s}}"
+                data-type="theirRst" 
+                data-field="s"
+                id="theirRst-s"
+              />
+            </view>
+            <!-- T输入框 - VHF/UHF显示+号按钮 -->
+            <view class="rst-input-wrapper">
+              <view wx:if="{{isVHF || isUHF}}" class="rst-input rst-plus-btn {{formData.rst.theirRst.t ? 'rst-plus-selected' : ''}}" bindtap="setRstPlus" data-type="theirRst">+</view>
+              <input wx:else type="text" class="rst-input font-mono" maxlength="1" value="{{formData.rst.theirRst.t}}" placeholder="T" bindinput="onRstInput" focus="{{rstFocus.theirRst.t}}" data-type="theirRst" data-field="t" id="theirRst-t" />
+            </view>
           </view>
         </view>
+        <!-- 己方RST -->
         <view class="rst-group">
           <text class="rst-group-label">己方</text>
           <view class="rst-inputs">
-            <input class="rst-input font-mono" type="number" maxlength="1" value="{{formData.rst.myRst.r}}" bindinput="onRstInput" data-type="myRst" data-field="r" placeholder="R" />
-            <input class="rst-input font-mono" type="number" maxlength="1" value="{{formData.rst.myRst.s}}" bindinput="onRstInput" data-type="myRst" data-field="s" placeholder="S" />
-            <input class="rst-input font-mono" type="text" maxlength="1" value="{{formData.rst.myRst.t}}" bindinput="onRstInput" data-type="myRst" data-field="t" placeholder="T" />
+            <!-- R输入框 -->
+            <view class="rst-input-wrapper">
+              <input 
+                type="text" 
+                class="rst-input font-mono" 
+                maxlength="1" 
+                value="{{formData.rst.myRst.r}}" 
+                placeholder="R"
+                bindinput="onRstInput"
+                focus="{{rstFocus.myRst.r}}"
+                data-type="myRst" 
+                data-field="r"
+                id="myRst-r"
+              />
+            </view>
+            <!-- S输入框 -->
+            <view class="rst-input-wrapper">
+              <input 
+                type="text" 
+                class="rst-input font-mono" 
+                maxlength="1" 
+                value="{{formData.rst.myRst.s}}" 
+                placeholder="S"
+                bindinput="onRstInput"
+                focus="{{rstFocus.myRst.s}}"
+                data-type="myRst" 
+                data-field="s"
+                id="myRst-s"
+              />
+            </view>
+            <!-- T输入框 - VHF/UHF显示+号按钮 -->
+            <view class="rst-input-wrapper">
+              <view wx:if="{{isVHF || isUHF}}" class="rst-input rst-plus-btn {{formData.rst.myRst.t ? 'rst-plus-selected' : ''}}" bindtap="setRstPlus" data-type="myRst">+</view>
+              <input wx:else type="text" class="rst-input font-mono" maxlength="1" value="{{formData.rst.myRst.t}}" placeholder="T" bindinput="onRstInput" focus="{{rstFocus.myRst.t}}" data-type="myRst" data-field="t" id="myRst-t" />
+            </view>
           </view>
         </view>
       </view>
+      <view class="rst-tips">VHF/UHF频段自动显示+号 · 点击可切换输入框</view>
     </view>
 
     <view class="float-card">
@@ -120,7 +189,16 @@
 
     <view class="float-card">
       <view class="form-label">功率 PWR (W)</view>
-      <input class="form-input input-minimal font-mono" type="number" value="{{formData.power}}" bindinput="onPowerInput" placeholder="W" />
+      <view class="power-input-row">
+        <input class="form-input input-minimal font-mono power-input" type="text" value="{{formData.power}}" bindinput="onPowerInput" placeholder="W" />
+        <view class="power-quick-btns">
+          <view class="power-quick-btn" hover-class="button-hover" bindtap="selectPower" data-power="低">低</view>
+          <view class="power-quick-btn" hover-class="button-hover" bindtap="selectPower" data-power="中">中</view>
+          <view class="power-quick-btn" hover-class="button-hover" bindtap="selectPower" data-power="高">高</view>
+          <view class="power-quick-btn" hover-class="button-hover" bindtap="selectPower" data-power="5">5</view>
+          <view class="power-quick-btn" hover-class="button-hover" bindtap="selectPower" data-power="10">10</view>
+        </view>
+      </view>
     </view>
 
     <view class="float-card">
@@ -153,15 +231,19 @@
       <view class="share-actions">
         <view class="share-btn-cancel" hover-class="button-hover" bindtap="cancelShare">取消</view>
         <button 
-          wx:if="{{!shareDataReady}}"
+          wx:if="{{!preparingShare && !shareDataReady}}"
           class="share-btn-confirm {{selectedLogsArray.length === 0 ? 'disabled' : ''}}" 
           hover-class="button-hover"
           bindtap="prepareShareData"
-        >{{preparingShare ? '准备中...' : '确认分享'}}</button>
+        >确认分享</button>
+        <button 
+          wx:if="{{preparingShare}}"
+          class="share-btn-confirm disabled" 
+          loading="{{true}}"
+        >准备中...</button>
         <button 
           wx:if="{{shareDataReady}}"
           class="share-btn-confirm" 
-          hover-class="button-hover"
           open-type="share"
         >去分享</button>
       </view>
@@ -238,6 +320,10 @@
           <text class="log-select-check" wx:if="{{selectedLogs[item.id]}}">✓</text>
         </view>
       </view>
+      <!-- 分享来源标签 -->
+      <view class="share-source-tag" wx:if="{{currentShareId && !shareMode}}">
+        来自{{shareOwnerCallSign || 'TA'}}的分享
+      </view>
       <view class="log-row-left font-mono">{{item.callSign}}</view>
       <view class="log-row-mid">
         <text class="log-row-line1 font-mono">{{item.frequency}} MHz · {{item.mode}}</text>
@@ -265,7 +351,7 @@
           <text class="share-record-meta">{{item.logCount}}条记录 · {{item.expireDaysLeft}}天有效期</text>
         </view>
         <view class="share-record-actions">
-          <view class="share-record-share" bindtap="reShareRecord" data-id="{{item.id}}">再次分享</view>
+          <view class="share-record-share" bindtap="viewShareDetail" data-id="{{item.id}}">查看详情</view>
           <view class="share-record-delete" bindtap="deleteShareRecord" data-id="{{item.id}}">删除</view>
         </view>
       </view>
@@ -276,5 +362,35 @@
   <view class="float-share-btn" hover-class="float-share-btn-hover" bindtap="showMyShares" wx:if="{{!shareMode}}">
     <text class="float-share-icon">📋</text>
     <view class="float-share-badge" wx:if="{{myShareCount > 0}}">{{myShareCount > 99 ? '99+' : myShareCount}}</view>
+  </view>
+
+  <!-- 分享详情弹窗 -->
+  <view class="modal-mask {{showShareDetailModal ? 'modal-show' : ''}}" bindtap="hideShareDetail"></view>
+  <view class="share-detail-modal {{showShareDetailModal ? 'share-detail-modal-show' : ''}}">
+    <view class="share-detail-header">
+      <text class="share-detail-title">{{shareDetailData.myCallSign || 'BA4IWA'}} 的分享</text>
+      <view class="share-detail-close" bindtap="hideShareDetail">✕</view>
+    </view>
+    <view class="share-detail-content">
+      <view wx:if="{{shareDetailLoading}}" class="share-detail-loading">
+        <text>加载中...</text>
+      </view>
+      <view wx:elif="{{shareDetailLogs.length === 0}}" class="share-detail-empty">
+        <text>暂无记录</text>
+      </view>
+      <view wx:else class="share-detail-list">
+        <view wx:for="{{shareDetailLogs}}" wx:key="index" class="share-detail-item">
+          <view class="share-detail-item-header">
+            <text class="share-detail-callsign font-mono">{{item.callSign}}</text>
+            <text class="share-detail-freq font-mono">{{item.frequency}} MHz</text>
+            <text class="share-detail-mode font-mono">{{item.mode}}</text>
+          </view>
+          <view class="share-detail-item-info font-mono">
+            BJT {{item.date}} {{item.btcTime || item.bjcTime}}
+            <text wx:if="{{item.rstSummary}}"> · {{item.rstSummary}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
   </view>
 </view>
