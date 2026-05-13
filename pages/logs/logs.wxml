@@ -1,7 +1,7 @@
 <view class="theme-wrapper {{currentTheme === 'morandi' ? 'theme-morandi' : ''}}">
   <view class="logs-page">
   <!-- 隐藏的画布用于生成分享卡片 -->
-  <canvas canvas-id="shareCardCanvas" class="share-canvas" style="width:520px;height:416px;"></canvas>
+  <canvas type="2d" id="shareCardCanvas" class="share-canvas" style="width:520px;height:416px;"></canvas>
 
   <!-- 顶部Tab切换 -->
   <view class="page-tabs">
@@ -271,11 +271,12 @@
           {{searchExpanded ? '收起' : '日期'}}
         </view>
         <view
-          class="share-toggle-btn"
+          class="share-toggle-btn {{showShareGuide ? 'share-guide-pulse' : ''}}"
           hover-class="button-hover"
           bindtap="enterShareMode"
           wx:if="{{filteredLogs.length > 0}}"
         >
+          <view class="share-guide-ring" wx:if="{{showShareGuide}}"></view>
           <text class="share-toggle-icon">📤</text>
         </view>
       </view>
@@ -346,8 +347,8 @@
       </view>
       <view wx:for="{{myShareList}}" wx:key="id" class="share-record-item">
         <view class="share-record-info">
-          <text class="share-record-title">{{item.title || '通联记录分享'}}</text>
-          <text class="share-record-meta">{{item.logCount}}条记录 · {{item.expireDaysLeft}}天有效期</text>
+          <text class="share-record-title">{{item.shareTitle || '通联记录分享'}}</text>
+          <text class="share-record-meta">剩余 {{item.expireDaysLeft}} 天有效期</text>
         </view>
         <view class="share-record-actions">
           <view class="share-record-share" bindtap="viewShareDetail" data-id="{{item.id}}">查看详情</view>
@@ -358,7 +359,13 @@
   </view>
 
   <!-- 右下角悬浮分享入口 -->
-  <view class="float-share-btn" hover-class="float-share-btn-hover" bindtap="showMyShares" wx:if="{{!shareMode}}">
+  <view 
+    class="float-share-btn {{showShareGuide && filteredLogs.length > 0 ? 'share-guide-pulse' : ''}}" 
+    hover-class="float-share-btn-hover" 
+    bindtap="showMyShares" 
+    wx:if="{{!shareMode}}"
+  >
+    <view class="share-guide-ring" wx:if="{{showShareGuide && filteredLogs.length > 0}}"></view>
     <text class="float-share-icon">📋</text>
     <view class="float-share-badge" wx:if="{{myShareCount > 0}}">{{myShareCount > 99 ? '99+' : myShareCount}}</view>
   </view>

@@ -149,7 +149,10 @@ Page({
     shareDetailLogs: [],
     shareDetailData: {},
     // 分享来源
-    shareOwnerCallSign: ''
+    shareOwnerCallSign: '',
+    // 分享引导闪烁效果
+    showShareGuide: false,  // 是否显示分享按钮闪烁引导
+    _shareGuideShown: false  // 内部标记：本次会话是否已展示过闪烁
   },
 
   onLoad(options) {
@@ -166,8 +169,29 @@ Page({
       this.loadSharedLogs(options.shareId)
     }
     
+    // 检查是否需要显示分享引导闪烁效果（首次进入）
+    this.initShareGuide()
+    
     // 默认滚动到顶部
     wx.pageScrollTo({ scrollTop: 0, duration: 0 })
+  },
+  
+  // 初始化分享引导闪烁效果
+  initShareGuide() {
+    try {
+      // 从本地存储读取是否已展示过闪烁
+      const hasShownGuide = wx.getStorageSync('hasShownShareGuide')
+      
+      // 如果还没有展示过，并且有通联记录，则显示闪烁效果
+      if (!hasShownGuide) {
+        // 延迟显示，确保列表已加载
+        setTimeout(() => {
+          this.setData({ showShareGuide: true })
+        }, 500)
+      }
+    } catch (e) {
+      console.error('检查分享引导状态失败', e)
+    }
   },
 
   onShow() {
@@ -197,6 +221,23 @@ Page({
     }
     this.loadCallSuggestions()
     this.loadMyShares()  // 加载我的分享数量
+    
+    // 检查是否需要显示分享引导闪烁效果
+    this.checkShareGuide()
+  },
+  
+  // 检查并显示分享引导闪烁效果
+  checkShareGuide() {
+    try {
+      const hasShownGuide = wx.getStorageSync('hasShownShareGuide')
+      
+      // 如果还没有展示过闪烁，且通联记录已加载，则显示闪烁效果
+      if (!hasShownGuide && this.data.filteredLogs && this.data.filteredLogs.length > 0) {
+        this.setData({ showShareGuide: true })
+      }
+    } catch (e) {
+      console.error('检查分享引导状态失败', e)
+    }
   },
 
   loadTheme() {
@@ -388,6 +429,9 @@ Page({
         currentShareId: null  // 清除分享ID，切回本地日志
       })
       this.applyFilter(logs)
+      
+      // 日志加载完成后检查是否需要显示分享引导
+      this.checkShareGuide()
     } catch (e) {
       console.error(e)
       this.setData({ filteredLogs: [], currentShareId: null })
@@ -397,9 +441,52 @@ Page({
   // ========== 分享功能 ==========
   enterShareMode() {
     wx.vibrateShort({ type: VIBRATE_TYPE })
+    
+    // 先刷新分享数量
+    this.loadMyShares()
+    
+    // 检查分享次数限制（最多5条）
+    if (this.data.myShareCount >= 5) {
+      wx.showModal({
+        title: '分享次数已达上限',
+        content: `您已有 ${this.data.myShareCount} 条分享记录（含未过期），请先删除部分分享记录后再分享。`,
+        showCancel: true,
+        cancelText: '我知道了',
+        confirmText: '查看我的分享',
+        success: (res) => {
+          if (res.confirm) {
+            // 用户选择查看我的分享
+            this.showMyShares()
+          }
+        }
+      })
+      return
+    }
+    
+    // 停止闪烁引导效果
+    this.stopShareGuide()
+    
     this.setData({
       shareMode: true
       // selectedLogs 保持不变，保留之前的勾选状态
+    })
+  },
+  
+  // 停止分享引导闪烁效果
+  stopShareGuide() {
+    // 如果正在显示闪烁效果
+    if (this.data.showShareGuide) {
+      try {
+        // 标记为已展示过
+        wx.setStorageSync('hasShownShareGuide', true)
+      } catch (e) {
+        console.error('保存分享引导状态失败', e)
+      }
+    }
+    
+    this.setData({
+      showShareGuide: false,
+      _shareGuideShown: true
     })
   },
 
@@ -510,12 +597,16 @@ Page({
   saveToMyShares(shareId, logCount) {
     try {
       let myShares = wx.getStorageSync('myShares') || []
+      const now = new Date()
+      const pad = n => String(n).padStart(2, '0')
+      const shareDateTime = `${now.getMonth() + 1}月${now.getDate()}日 ${pad(now.getHours())}:${pad(now.getMinutes())}`
       const newShare = {
         id: shareId,
         logCount: logCount,
         myCallSign: wx.getStorageSync('myCallSign') || 'BA4IWA',
-        createTime: new Date().toISOString(),
-        expireDaysLeft: SHARE_EXPIRE_DAYS
+        createTime: now.toISOString(),
+        expireDaysLeft: SHARE_EXPIRE_DAYS,
+        shareTitle: `${shareDateTime} · ${logCount}条通联`
       }
       myShares.unshift(newShare)
       // 只保留最近10条
@@ -554,12 +645,14 @@ Page({
 
   // 显示我的分享弹窗
   showMyShares() {
+    console.log('showMyShares called')
     this.loadMyShares()
     this.setData({ showMySharesModal: true })
   },
 
   // 隐藏我的分享弹窗
   hideMyShares() {
+    console.log('hideMyShares called')
     this.setData({ showMySharesModal: false })
   },
 
@@ -581,7 +674,7 @@ Page({
     db.collection('shareLogs').doc(shareId).get().then(res => {
       if (!res.data) {
         this.setData({ shareDetailLoading: false })
-        wx.showToast({ title: '分享记录不存在', icon: 'none' })
+        wx.showToast({ title: '该分享已删除或超时', icon: 'none' })
         return
       }
       
@@ -607,7 +700,7 @@ Page({
     }).catch(err => {
       this.setData({ shareDetailLoading: false })
       console.error('加载分享记录失败', err)
-      wx.showToast({ title: '加载失败', icon: 'none' })
+      wx.showToast({ title: '该分享已删除或超时', icon: 'none' })
     })
   },
 
@@ -671,119 +764,128 @@ Page({
       }, 10000) // 10秒超时
 
       try {
-        const ctx = wx.createCanvasContext('shareCardCanvas')
         const width = 520
         const height = 416
         const padding = 24
         const lineHeight = 48
         const maxLines = 6
 
-        // 背景渐变
-        ctx.setFillStyle('#1a1a2e')
-        ctx.fillRect(0, 0, width, height)
+        // 使用 canvas 2D 接口
+        const query = wx.createSelectorQuery()
+        query.select('#shareCardCanvas')
+          .node((res) => {
+            const canvas = res.node
+            const ctx = canvas.getContext('2d')
+            
+            // 设置 canvas 尺寸
+            canvas.width = width
+            canvas.height = height
 
-        // 顶部装饰条
-        ctx.setFillStyle('#e74c3c')
-        ctx.fillRect(0, 0, width, 8)
+            // 背景
+            ctx.fillStyle = '#1a1a2e'
+            ctx.fillRect(0, 0, width, height)
 
-        // 标题
-        ctx.setFillStyle('#ffffff')
-        ctx.setFontSize(28)
-        ctx.fillText('📻 业余无线电通联日志', padding, 60)
+            // 顶部装饰条
+            ctx.fillStyle = '#e74c3c'
+            ctx.fillRect(0, 0, width, 8)
 
-        // 呼号
-        const myCallSign = wx.getStorageSync('myCallSign') || 'BA4IWA'
-        ctx.setFontSize(36)
-        ctx.setFillStyle('#e74c3c')
-        ctx.fillText(myCallSign, padding, 110)
+            // 标题
+            ctx.fillStyle = '#ffffff'
+            ctx.font = '28px sans-serif'
+            ctx.fillText('📻 业余无线电通联日志', padding, 60)
 
-        // 记录数量
-        ctx.setFontSize(22)
-        ctx.setFillStyle('#888888')
-        ctx.fillText(`分享 ${logs.length} 条通联记录`, padding, 145)
+            // 呼号
+            const myCallSign = wx.getStorageSync('myCallSign') || 'BA4IWA'
+            ctx.font = '36px sans-serif'
+            ctx.fillStyle = '#e74c3c'
+            ctx.fillText(myCallSign, padding, 110)
 
-        // 分割线
-        ctx.setStrokeStyle('#333333')
-        ctx.beginPath()
-        ctx.moveTo(padding, 165)
-        ctx.lineTo(width - padding, 165)
-        ctx.stroke()
+            // 记录数量
+            ctx.font = '22px sans-serif'
+            ctx.fillStyle = '#888888'
+            ctx.fillText(`分享 ${logs.length} 条通联记录`, padding, 145)
 
-        // 通联列表头部
-        ctx.setFontSize(20)
-        ctx.setFillStyle('#666666')
-        ctx.fillText('呼号          频率          模式          RST', padding, 195)
+            // 分割线
+            ctx.strokeStyle = '#333333'
+            ctx.beginPath()
+            ctx.moveTo(padding, 165)
+            ctx.lineTo(width - padding, 165)
+            ctx.stroke()
 
-        // 绘制通联记录
-        const displayLogs = logs.slice(0, maxLines)
-        displayLogs.forEach((log, index) => {
-          const y = 230 + index * lineHeight
-          
-          // 序号
-          ctx.setFillStyle('#e74c3c')
-          ctx.setFontSize(18)
-          ctx.fillText(`${index + 1}.`, padding, y)
-          
-          // 呼号
-          ctx.setFillStyle('#ffffff')
-          ctx.setFontSize(22)
-          const callSign = (log.callSign || '').padEnd(10, ' ')
-          ctx.fillText(callSign, padding + 30, y)
-          
-          // 频率
-          ctx.setFillStyle('#888888')
-          ctx.setFontSize(20)
-          const freq = (log.frequency || '0') + ' MHz'
-          ctx.fillText(freq, padding + 170, y)
-          
-          // 模式
-          ctx.setFillStyle('#f39c12')
-          ctx.setFontSize(20)
-          ctx.fillText(log.mode || 'SSB', padding + 295, y)
-          
-          // RST
-          ctx.setFillStyle('#2ecc71')
-          ctx.setFontSize(20)
-          const rst = log.rstSummary || ''
-          ctx.fillText(rst, padding + 380, y)
-        })
+            // 通联列表头部
+            ctx.font = '20px sans-serif'
+            ctx.fillStyle = '#666666'
+            ctx.fillText('呼号          频率          模式          RST', padding, 195)
 
-        // 如果还有更多记录
-        if (logs.length > maxLines) {
-          ctx.setFillStyle('#666666')
-          ctx.setFontSize(18)
-          ctx.fillText(`... 还有 ${logs.length - maxLines} 条记录`, padding, 230 + maxLines * lineHeight)
-        }
+            // 绘制通联记录
+            const displayLogs = logs.slice(0, maxLines)
+            displayLogs.forEach((log, index) => {
+              const y = 230 + index * lineHeight
+              
+              // 序号
+              ctx.fillStyle = '#e74c3c'
+              ctx.font = '18px sans-serif'
+              ctx.fillText(`${index + 1}.`, padding, y)
+              
+              // 呼号
+              ctx.fillStyle = '#ffffff'
+              ctx.font = '22px sans-serif'
+              const callSign = (log.callSign || '').padEnd(10, ' ')
+              ctx.fillText(callSign, padding + 30, y)
+              
+              // 频率
+              ctx.fillStyle = '#888888'
+              ctx.font = '20px sans-serif'
+              const freq = (log.frequency || '0') + ' MHz'
+              ctx.fillText(freq, padding + 170, y)
+              
+              // 模式
+              ctx.fillStyle = '#f39c12'
+              ctx.font = '20px sans-serif'
+              ctx.fillText(log.mode || 'SSB', padding + 295, y)
+              
+              // RST
+              ctx.fillStyle = '#2ecc71'
+              ctx.font = '20px sans-serif'
+              const rst = log.rstSummary || ''
+              ctx.fillText(rst, padding + 380, y)
+            })
 
-        // 底部信息
-        ctx.setFillStyle('#444444')
-        ctx.setFontSize(16)
-        ctx.fillText(`有效期 ${SHARE_EXPIRE_DAYS} 天 · ${new Date().toLocaleDateString()}`, padding, height - 30)
-
-        // 绘制
-        ctx.draw(true, () => {
-          // 导出图片
-          wx.canvasToTempFilePath({
-            canvasId: 'shareCardCanvas',
-            x: 0,
-            y: 0,
-            width: width,
-            height: height,
-            destWidth: width * 2,
-            destHeight: height * 2,
-            fileType: 'png',
-            quality: 0.9,
-            success: (res) => {
-              clearTimeout(timeout)
-              resolve(res.tempFilePath)
-            },
-            fail: (err) => {
-              clearTimeout(timeout)
-              console.error('生成分享卡片失败', err)
-              reject(err)
+            // 如果还有更多记录
+            if (logs.length > maxLines) {
+              ctx.fillStyle = '#666666'
+              ctx.font = '18px sans-serif'
+              ctx.fillText(`... 还有 ${logs.length - maxLines} 条记录`, padding, 230 + maxLines * lineHeight)
             }
+
+            // 底部信息
+            ctx.fillStyle = '#444444'
+            ctx.font = '16px sans-serif'
+            ctx.fillText(`有效期 ${SHARE_EXPIRE_DAYS} 天 · ${new Date().toLocaleDateString()}`, padding, height - 30)
+
+            // 使用 canvas 2D 的导出方式
+            wx.canvasToTempFilePath({
+              canvas: canvas,  // 使用 canvas 对象而非 canvasId
+              x: 0,
+              y: 0,
+              width: width,
+              height: height,
+              destWidth: width * 2,
+              destHeight: height * 2,
+              fileType: 'png',
+              quality: 0.9,
+              success: (res) => {
+                clearTimeout(timeout)
+                resolve(res.tempFilePath)
+              },
+              fail: (err) => {
+                clearTimeout(timeout)
+                console.error('生成分享卡片失败', err)
+                reject(err)
+              }
+            })
           })
-        })
+          .exec()
       } catch (err) {
         clearTimeout(timeout)
         console.error('生成卡片异常', err)
@@ -1315,6 +1417,13 @@ Page({
   saveLog(log) {
     try {
       let logs = wx.getStorageSync('contactLogs') || []
+      
+      // 补充当前用户的呼号（兼容历史数据）
+      const myCallSign = wx.getStorageSync('myCallSign') || ''
+      if (!log.myCallSign) {
+        log.myCallSign = myCallSign
+      }
+      
       logs.unshift(log)
       if (logs.length > 1000) {
         logs = logs.slice(0, 1000)

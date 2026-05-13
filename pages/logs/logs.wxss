@@ -106,6 +106,7 @@
   border-radius: 12rpx;
   box-shadow: 0 4rpx 16rpx var(--shadow-color);
   flex-shrink: 0;
+  position: relative;
 }
 
 .share-toggle-icon {
@@ -800,11 +801,52 @@
   overflow-y: auto;
 }
 
+
 .my-shares-empty {
   text-align: center;
-  padding: 60rpx 0;
+  padding: 60rpx 32rpx;
   color: #999;
   font-size: 28rpx;
+}
+
+/* 分享引导闪烁动画 - 持续到用户点击 */
+.share-guide-pulse {
+  animation: shareGuideGlow 2s ease-in-out infinite;
+}
+
+.share-guide-ring {
+  position: absolute;
+  width: 140%;
+  height: 140%;
+  top: -20%;
+  left: -20%;
+  border-radius: 50%;
+  border: 6rpx solid #f39c12;
+  animation: shareGuideRing 2s ease-out infinite;
+  pointer-events: none;
+  z-index: 1;
+}
+
+@keyframes shareGuideGlow {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 8rpx 24rpx rgba(243, 156, 18, 0.4);
+  }
+  50% {
+    transform: scale(1.1);
+    box-shadow: 0 8rpx 32rpx 12rpx rgba(243, 156, 18, 0.7);
+  }
+}
+
+@keyframes shareGuideRing {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
 }
 
 .share-record-item {

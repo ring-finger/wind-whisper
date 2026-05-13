@@ -212,6 +212,7 @@ Page({
   // 同步所有日志到云端
   syncAllLogsToCloud() {
     const logs = wx.getStorageSync('contactLogs') || []
+    const myCallSign = wx.getStorageSync('myCallSign') || ''
     
     if (logs.length === 0) {
       wx.showToast({
@@ -220,6 +221,30 @@ Page({
       })
       return
     }
+    
+    // 检查是否有呼号
+    if (!myCallSign) {
+      wx.showModal({
+        title: '请先设置呼号',
+        content: '云同步需要设置您的呼号，请在"我的"页面先设置呼号后再进行同步。',
+        confirmText: '去设置',
+        success: (res) => {
+          if (res.confirm) {
+            // 跳转到设置呼号
+            this.editCallSign()
+          }
+        }
+      })
+      return
+    }
+    
+    // 为历史日志补充呼号
+    logs.forEach(log => {
+      if (!log.myCallSign) {
+        log.myCallSign = myCallSign
+      }
+    })
+    wx.setStorageSync('contactLogs', logs)
     
     // 检查每天同步限制
     const today = new Date().toISOString().split('T')[0]  // 格式: '2024-01-15'
