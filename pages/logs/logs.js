@@ -155,7 +155,28 @@ Page({
   onLoad(options) {
     this.loadTheme()
     this.initDateTime()
+    
     if (options && options.tab === 'add') {
+      // 保存需要切换到添加页的标志
+      this._switchToAddOnShow = true
+    }
+    
+    // 处理分享链接
+    if (options && options.shareId) {
+      this.loadSharedLogs(options.shareId)
+    }
+    
+    // 默认滚动到顶部
+    wx.pageScrollTo({ scrollTop: 0, duration: 0 })
+  },
+
+  onShow() {
+    this.loadTheme()
+    
+    // 检查是否需要切换到添加页
+    if (this._switchToAddOnShow) {
+      this._switchToAddOnShow = false
+      
       this.setData({ 
         currentTab: 'add',
         rstFocus: {
@@ -163,18 +184,14 @@ Page({
           myRst: 'r'
         }
       }, () => {
-        // 页面加载时聚焦到对方R输入框
-        this.focusRstInput('theirRst', 'r')
+        // 页面渲染完成后滚动到顶部
+        setTimeout(() => {
+          wx.pageScrollTo({ scrollTop: 0, duration: 0 })
+        }, 100)
       })
+      return
     }
-    // 处理分享链接
-    if (options && options.shareId) {
-      this.loadSharedLogs(options.shareId)
-    }
-  },
-
-  onShow() {
-    this.loadTheme()
+    
     if (this.data.currentTab === 'list') {
       this.loadLogs()
     }
@@ -291,6 +308,7 @@ Page({
   switchTab(e) {
     const tab = e.currentTarget.dataset.tab
     wx.vibrateShort({ type: VIBRATE_TYPE })
+    
     this.setData({ 
       currentTab: tab,
       rstFocus: {
@@ -298,12 +316,13 @@ Page({
         myRst: 'r'
       }
     }, () => {
+      // 滚动到顶部
+      wx.pageScrollTo({ scrollTop: 0, duration: 0 })
+      
       if (tab === 'list') {
         this.loadLogs()
       } else {
         this.initDateTime()
-        // 切换到添加页时聚焦到对方R输入框
-        this.focusRstInput('theirRst', 'r')
       }
     })
   },
@@ -1171,7 +1190,7 @@ Page({
     })
   },
 
-  // 设置RST的T为+号（VHF/UHF频段）
+  // 设置RST的T为+号（VHF/UHF频段）- 可切换选中/非选中
   setRstPlus(e) {
     const type = e.currentTarget.dataset.type
     const { formData } = this.data
@@ -1180,13 +1199,14 @@ Page({
       theirRst: { ...formData.rst.theirRst }
     }
     const cur = { ...rst[type] }
-    cur.t = '+'
+    // 切换+号状态：如果已有+则清除，否则设置为+
+    cur.t = cur.t === '+' ? '' : '+'
     rst[type] = cur
     this.setData({ 'formData.rst': rst })
     wx.vibrateShort({ type: VIBRATE_TYPE })
 
     // 设置+后跳到己方R
-    if (type === 'theirRst') {
+    if (type === 'theirRst' && cur.t === '+') {
       this.setData({
         rstFocus: { ...this.data.rstFocus, myRst: 'r' }
       }, () => {

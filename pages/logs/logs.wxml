@@ -103,7 +103,7 @@
             <!-- R输入框 -->
             <view class="rst-input-wrapper">
               <input 
-                type="text" 
+                type="number" 
                 class="rst-input font-mono" 
                 maxlength="1" 
                 value="{{formData.rst.theirRst.r}}" 
@@ -118,7 +118,7 @@
             <!-- S输入框 -->
             <view class="rst-input-wrapper">
               <input 
-                type="text" 
+                type="number" 
                 class="rst-input font-mono" 
                 maxlength="1" 
                 value="{{formData.rst.theirRst.s}}" 
@@ -130,10 +130,10 @@
                 id="theirRst-s"
               />
             </view>
-            <!-- T输入框 - VHF/UHF显示+号按钮 -->
+            <!-- T输入框 - VHF/UHF显示+号按钮，可切换选中状态 -->
             <view class="rst-input-wrapper">
               <view wx:if="{{isVHF || isUHF}}" class="rst-input rst-plus-btn {{formData.rst.theirRst.t ? 'rst-plus-selected' : ''}}" bindtap="setRstPlus" data-type="theirRst">+</view>
-              <input wx:else type="text" class="rst-input font-mono" maxlength="1" value="{{formData.rst.theirRst.t}}" placeholder="T" bindinput="onRstInput" focus="{{rstFocus.theirRst.t}}" data-type="theirRst" data-field="t" id="theirRst-t" />
+              <input wx:else type="number" class="rst-input font-mono" maxlength="1" value="{{formData.rst.theirRst.t}}" placeholder="T" bindinput="onRstInput" focus="{{rstFocus.theirRst.t}}" data-type="theirRst" data-field="t" id="theirRst-t" />
             </view>
           </view>
         </view>
@@ -144,7 +144,7 @@
             <!-- R输入框 -->
             <view class="rst-input-wrapper">
               <input 
-                type="text" 
+                type="number" 
                 class="rst-input font-mono" 
                 maxlength="1" 
                 value="{{formData.rst.myRst.r}}" 
@@ -159,7 +159,7 @@
             <!-- S输入框 -->
             <view class="rst-input-wrapper">
               <input 
-                type="text" 
+                type="number" 
                 class="rst-input font-mono" 
                 maxlength="1" 
                 value="{{formData.rst.myRst.s}}" 
@@ -171,15 +171,14 @@
                 id="myRst-s"
               />
             </view>
-            <!-- T输入框 - VHF/UHF显示+号按钮 -->
+            <!-- T输入框 - VHF/UHF显示+号按钮，可切换选中状态 -->
             <view class="rst-input-wrapper">
               <view wx:if="{{isVHF || isUHF}}" class="rst-input rst-plus-btn {{formData.rst.myRst.t ? 'rst-plus-selected' : ''}}" bindtap="setRstPlus" data-type="myRst">+</view>
-              <input wx:else type="text" class="rst-input font-mono" maxlength="1" value="{{formData.rst.myRst.t}}" placeholder="T" bindinput="onRstInput" focus="{{rstFocus.myRst.t}}" data-type="myRst" data-field="t" id="myRst-t" />
+              <input wx:else type="number" class="rst-input font-mono" maxlength="1" value="{{formData.rst.myRst.t}}" placeholder="T" bindinput="onRstInput" focus="{{rstFocus.myRst.t}}" data-type="myRst" data-field="t" id="myRst-t" />
             </view>
           </view>
         </view>
       </view>
-      <view class="rst-tips">VHF/UHF频段自动显示+号 · 点击可切换输入框</view>
     </view>
 
     <view class="float-card">
