@@ -8,7 +8,7 @@ const STORAGE_NICK = 'wxMineNickName'
 const STORAGE_THEME = 'appTheme'
 
 // 当前版本号 - 每次发布新版本时更新
-const CURRENT_VERSION = '1.2.1'
+const CURRENT_VERSION = '1.2.2'
 
 // 更新日志内容
 const UPDATE_LOGS = [
@@ -17,10 +17,7 @@ const UPDATE_LOGS = [
     date: '2026-05-12',
     title: '功能优化',
     content: [
-      'VHF/UHF 频段选择时不再自动选中 + 号',
-      '优化 RST 信号报告输入体验',
-      '频率输入支持聚焦时显示历史列表',
-      "优化云同步开启逻辑"
+      '优化日志添加流程，更便捷的使用方式'
     ]
   }
 ]
