@@ -2,13 +2,16 @@ const app = getApp()
 const AUTHOR_CALL_SIGN = 'BA4IWA'
 const VIBRATE_TYPE = 'medium'
 
+// 公众号文章链接
+const WECHAT_ARTICLE_URL = 'https://mp.weixin.qq.com/s/v9SCaoojlJ6hPdoODTyTYg'
+
 const SHARE_TITLE = '风语纪<电波有痕，风语为纪> - 我的设置'
 const STORAGE_AVATAR = 'wxMineAvatarUrl'
 const STORAGE_NICK = 'wxMineNickName'
 const STORAGE_THEME = 'appTheme'
 
 // 当前版本号 - 每次发布新版本时更新
-const CURRENT_VERSION = '1.2.2'
+const CURRENT_VERSION = '1.2.4'
 
 // 更新日志内容
 const UPDATE_LOGS = [
@@ -18,7 +21,6 @@ const UPDATE_LOGS = [
     title: '功能优化',
     content: [
       '优化日志添加流程，更便捷的使用方式',
-      '优化分享流程',
       '我的分享更友好的展示方式'
     ]
   }
@@ -764,9 +766,8 @@ Page({
 
   contactAuthor() {
     wx.vibrateShort({ type: VIBRATE_TYPE })
-    const url = 'https://mp.weixin.qq.com/s/-ADGZLEDFymzWFU3euFraw'
     wx.navigateTo({
-      url: '/pages/web-view/web-view?url=' + encodeURIComponent(url),
+      url: '/pages/web-view/web-view?url=' + encodeURIComponent(WECHAT_ARTICLE_URL),
       fail: (err) => {
         console.error('导航失败', err)
         wx.showToast({
