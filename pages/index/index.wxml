@@ -49,8 +49,8 @@
         </view>
       </view>
 
-      <!-- SSTV卡片 - 暂时隐藏 -->
-      <!-- <view class="feature-card feature-sstv" hover-class="button-hover" bindtap="goToSSTV">
+          <!-- SSTV卡片 -->
+      <view class="feature-card feature-sstv" hover-class="button-hover" bindtap="goToSSTV">
         <view class="feature-icon-wrap">
           <text class="feature-icon">🖼️</text>
         </view>
@@ -58,7 +58,7 @@
           <text class="feature-title">SSTV图像传输</text>
           <text class="feature-desc">慢扫描电视编码解码</text>
         </view>
-      </view> -->
+      </view>
     </view>
   </view>
 

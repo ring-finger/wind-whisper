@@ -16,16 +16,44 @@
 
     <!-- 编码界面 -->
     <view class="encode-panel" wx:if="{{currentTab === 'encode'}}">
-      <view class="upload-area" bindtap="chooseImage">
+      <!-- 未选择图片时显示上传区域 -->
+      <view class="upload-area" wx:if="{{!uploadImage}}" bindtap="chooseImage">
         <view class="upload-icon">📷</view>
-        <text class="upload-text">{{uploadImage ? '点击更换图片' : '点击上传图片'}}</text>
+        <text class="upload-text">点击上传图片</text>
         <text class="upload-hint">支持拍照或从相册选择</text>
       </view>
       
-      <image wx:if="{{uploadImage}}" class="preview-image" src="{{uploadImage}}" mode="aspectFit" />
-      
-      <view class="image-info" wx:if="{{uploadImage}}">
-        <text>图片尺寸: {{imageWidth}} x {{imageHeight}}</text>
+      <!-- 选择图片后显示图片和操作按钮 -->
+      <view class="upload-area has-image" wx:else>
+        <view class="image-container">
+          <image class="upload-preview" src="{{uploadImage}}" mode="aspectFit" />
+          <!-- 可拖动的呼号文字 -->
+          <view 
+            class="callsign-overlay {{showCallsign ? 'show' : ''}}"
+            style="left: {{callsignX}}px; bottom: {{240 - callsignY}}px;"
+            catchtouchstart="onCallsignTouchStart"
+            catchtouchmove="onCallsignTouchMove"
+          >
+            <text class="callsign-text">{{callsign}}</text>
+          </view>
+        </view>
+        <view class="upload-actions">
+          <view class="action-btn-small reselect" catchtap="chooseImage" data-action="reselect">
+            <text class="action-icon">📷</text>
+            <text class="action-label">更换</text>
+          </view>
+          <view class="action-btn-small remove" catchtap="removeImage">
+            <text class="action-icon">🗑️</text>
+            <text class="action-label">删除</text>
+          </view>
+          <view class="action-btn-small callsign-btn" catchtap="toggleCallsignInput">
+            <text class="action-icon">📻</text>
+            <text class="action-label">{{showCallsign ? '隐藏' : '呼号'}}</text>
+          </view>
+        </view>
+        <view class="image-size-label">
+          <text>{{imageWidth}} x {{imageHeight}}</text>
+        </view>
       </view>
 
       <view class="control-group">
@@ -34,9 +62,36 @@
         </button>
       </view>
 
-      <view class="audio-player" wx:if="{{audioFilePath}}">
-        <text class="audio-label">生成的音频</text>
-        <audio src="{{audioFilePath}}" controls />
+      <view class="audio-panel" wx:if="{{audioFilePath}}">
+        <view class="audio-header">
+          <text class="audio-title">🎵 生成的音频</text>
+          <view class="audio-header-right">
+            <text class="audio-format">{{audioFormat}} · {{audioFileSize}}</text>
+            <view class="audio-download-btn" catchtap="downloadAudio">
+              <text class="download-icon">💾</text>
+              <text class="download-text">保存</text>
+            </view>
+          </view>
+        </view>
+        
+        <view class="audio-progress-container">
+          <text class="audio-time">{{audioCurrentTimeStr}}</text>
+          <view class="audio-progress-bar">
+            <view class="audio-progress-fill" style="{{'width:' + audioProgress + '%;'}}"></view>
+          </view>
+          <text class="audio-time">{{audioDurationStr}}</text>
+        </view>
+        
+        <view class="audio-controls">
+          <button class="audio-play-btn {{isPlaying ? 'playing' : ''}}" bindtap="togglePlayAudio">
+            <text class="play-icon">{{isPlaying ? '⏸' : '▶️'}}</text>
+          </button>
+          <view class="audio-info-tags">
+            <text class="info-tag">Robot36</text>
+            <text class="info-tag">8kHz</text>
+            <text class="info-tag">单声道</text>
+          </view>
+        </view>
       </view>
 
       <view class="encode-settings">
@@ -83,7 +138,7 @@
 
       <view class="decode-progress" wx:if="{{isDecoding}}">
         <view class="progress-bar">
-          <view class="progress-fill" style="width: {{decodeProgress}}%"></view>
+          <view class="progress-fill" style="{{'width:' + decodeProgress + '%;'}}"></view>
         </view>
         <text class="progress-text">解码进度: {{decodeProgress}}%</text>
       </view>
