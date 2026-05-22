@@ -1,4 +1,4 @@
-<view class="theme-wrapper {{currentTheme === 'morandi' ? 'theme-morandi' : ''}}">
+<view class="theme-wrapper theme-{{currentTheme}}">
   <view class="container">
     <canvas type="2d" id="resizeCanvas" class="hidden-canvas" style="width: 320px; height: 240px;"></canvas>
     <canvas type="2d" id="encodeCanvas" class="hidden-canvas" style="width: 320px; height: 240px;"></canvas>
@@ -57,9 +57,9 @@
       </view>
 
       <view class="control-group">
-        <button class="action-btn primary" bindtap="startEncode" disabled="{{!uploadImage || isEncoding}}">
+        <view class="action-btn primary {{uploadImage && !isEncoding ? '' : 'btn-disabled'}}" bindtap="onEncodeTap">
           {{isEncoding ? '正在生成音频...' : '生成SSTV音频'}}
-        </button>
+        </view>
       </view>
 
       <view class="audio-panel" wx:if="{{audioFilePath}}">
@@ -167,8 +167,9 @@
       <view class="tips-content" wx:if="{{currentTab === 'encode'}}">
         <text>1. 点击上传区域选择图片</text>
         <text>2. 图片会被自动调整为SSTV格式</text>
-        <text>3. 点击生成按钮创建音频</text>
-        <text>4. 通过无线电发射音频信号</text>
+        <text>3. 调整呼号位置</text>
+        <text>4. 点击生成按钮创建音频</text>
+        <text>5. 通过无线电发射音频信号</text>
       </view>
       <view class="tips-content" wx:if="{{currentTab === 'decode'}}">
         <text>1. 确保环境安静，减少背景噪音</text>

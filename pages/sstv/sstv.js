@@ -1,616 +1,7 @@
 const VIBRATE_TYPE = 'medium'
-
-class SSTVEncoder {
-  constructor(sampleRate = 48000) {  // Robot36 标准采样率 48000Hz
-    this.sampleRate = sampleRate
-    this.audioBuffer = null
-    this.bufferIndex = 0
-    this.currentPhase = 0  // 跟踪当前相位，避免相位不连续
-  }
-
-  // 计算所需的总采样数 (Robot36: 每行 150ms)
-  calculateTotalSamples(width, height) {
-    // Robot36 标准时序 (单位: ms)
-    // 头部
-    const V_SYNC_DURATION = 300       // V-sync (1200Hz)
-    const VIS_BIT_DURATION = 30       // 每个 VIS 位 (1200/1300Hz)
-    const VIS_BITS = 10               // VIS 码位数 (起始位 + 8数据位 + 停止位)
-    const LEADER_DURATION = 1000      // Leader tone (1900Hz) - 1秒
-
-    // 每行 (150ms) - Robot36 分行发送 R 和 B
-    const H_SYNC_DURATION = 9         // 行同步脉冲 (1200Hz)
-    const SYNC_PORCH_DURATION = 3     // 同步门廊 (1900Hz)
-    const Y_DURATION = 88             // Y 通道 (亮度, 320 像素)
-    const SEP_DURATION = 4.5          // 通道间隔 (1500Hz)
-    const PORCH_DURATION = 1.5        // 色度门廊 (1900Hz)
-    const CR_CB_DURATION = 44         // R/B 通道 (色度, 160 像素)
-
-    // 每行持续时间 (150ms)
-    const lineDuration = H_SYNC_DURATION + SYNC_PORCH_DURATION +
-                         Y_DURATION +
-                         SEP_DURATION + PORCH_DURATION +
-                         CR_CB_DURATION
-
-    // 头部采样数
-    let totalSamples = 0
-    totalSamples += Math.floor(this.sampleRate * (V_SYNC_DURATION / 1000))
-    totalSamples += Math.floor(this.sampleRate * (VIS_BIT_DURATION / 1000)) * VIS_BITS
-    totalSamples += Math.floor(this.sampleRate * (LEADER_DURATION / 1000))
-
-    // 所有行采样数
-    totalSamples += Math.floor(this.sampleRate * (lineDuration / 1000)) * height
-
-    // 多预留 10%
-    return Math.floor(totalSamples * 1.1)
-  }
-
-  // 主入口：从 ImageData 生成 PCM 音频 (Robot36 标准)
-  encodeFromImageData(imageData) {
-    let { width, height, data } = imageData
-    if (!ArrayBuffer.isView(data) && !Array.isArray(data)) {
-      console.error('ImageData.data 不是数组:', typeof data)
-      return new Float32Array(0)
-    }
-
-    if (data.buffer && data.BYTES_PER_ELEMENT) {
-      data = new Uint8Array(data.buffer)
-    }
-
-    const halfWidth = Math.floor(width / 2)
-
-    // Robot36 标准时序 (ms) - 必须与 calculateTotalSamples() 保持一致
-    const V_SYNC_DURATION = 300        // V-sync (1200Hz)
-    const VIS_BIT_DURATION = 30        // VIS 位 (1200/1300Hz)
-    const LEADER_DURATION = 1000        // Leader tone (1900Hz)
-    const H_SYNC_DURATION = 9           // 行同步脉冲 (1200Hz)
-    const SYNC_PORCH_DURATION = 3       // 同步门廊 (1900Hz)
-    const Y_DURATION = 88               // Y 通道 (亮度, 320 像素)
-    const SEP_DURATION = 4.5           // 通道间隔 (1500Hz)
-    const PORCH_DURATION = 1.5         // 色度门廊 (1900Hz)
-    const CR_CB_DURATION = 44           // R/B 通道 (色度, 160 像素)
-
-    const Y_PIXEL_TIME = Y_DURATION / width
-    const CR_CB_PIXEL_TIME = CR_CB_DURATION / halfWidth
-
-    // 预分配音频缓冲区
-    const totalSamples = this.calculateTotalSamples(width, height)
-    console.log('[SSTV] 预分配采样数:', totalSamples)
-    this.audioBuffer = new Float32Array(totalSamples)
-    this.bufferIndex = 0
-
-    // 1. 头部信号 (标准 SSTV 头部)
-    // 标准格式: V-sync(1200Hz, 300ms) + VIS(1200/1300Hz, 10 bits) + Leader(1900Hz, 1s)
-    // 参考: https://www.sstv-handbook.com/
-
-    // 1.1 垂直同步 (V-sync): 1200Hz, 300ms
-    this.addTone(1200, 300)
-
-    // 1.2 VIS 信号 (Robot36 模式代码: 8 = 0b01000)
-    // 格式: 起始位(1200Hz) + 8位数据(LSB first) + 停止位(1200Hz)
-    // 注意: 数据位 1=1300Hz, 0=1200Hz (标准 SSTV 定义)
-    // Robot36 VIS 码 = 8 = 00001000 (binary, LSB first transmission)
-    const visCode = 8  // Robot36 mode code
-
-    this.addTone(1200, VIS_BIT_DURATION)  // 起始位 (1200Hz)
-    for (let i = 0; i < 8; i++) {       // 数据位 (LSB first)
-      const bit = (visCode >> i) & 1
-      const freq = bit ? 1300 : 1200  // 1=1300Hz, 0=1200Hz
-      this.addTone(freq, VIS_BIT_DURATION)
-    }
-    this.addTone(1200, VIS_BIT_DURATION)  // 停止位 (1200Hz)
-
-    // 1.3 Leader tone: 1900Hz, 1000ms (帮助解码器稳定)
-    this.addTone(1900, 1000)
-
-    // 2. 逐行编码 (Robot36: 分行发送 Y+B 和 Y+R)
-    // 偶数行: Y + B
-    // 奇数行: Y + R
-    // 两行合并成一个完整扫描线
-    for (let row = 0; row < height; row++) {
-      // 2.1 行同步脉冲 + 门廊
-      this.addTone(1200, H_SYNC_DURATION)       // 同步脉冲 (1200Hz)
-      this.addTone(1900, SYNC_PORCH_DURATION)   // 同步门廊 (1900Hz)
-
-      // 2.2 发送 Y 通道 (亮度)
-      for (let col = 0; col < width; col++) {
-        const idx = (row * width + col) * 4
-        let pixelValue
-        if (idx + 2 >= data.length) {
-          pixelValue = 0
-        } else {
-          // 正确使用亮度公式: Y = 0.299*R + 0.587*G + 0.114*B
-          const r = data[idx]
-          const g = data[idx + 1]
-          const b = data[idx + 2]
-          pixelValue = Math.round(0.299 * r + 0.587 * g + 0.114 * b)
-        }
-        const freq = 1500 + (pixelValue / 255) * 800  // 1500-2300Hz
-        this.addTone(freq, Y_PIXEL_TIME)
-      }
-
-      // 2.3 间隔 + 门廊
-      this.addTone(1500, SEP_DURATION)      // 间隔 (1500Hz)
-      this.addTone(1900, PORCH_DURATION)    // 色度门廊 (1900Hz)
-
-      // 2.4 发送色度通道 (R 或 B, 子采样)
-      // 偶数行: B 通道 (映射到奇数列: 1, 3, 5, ...)
-      // 奇数行: R 通道 (映射到偶数列: 0, 2, 4, ...)
-      const isEvenRow = (row % 2 === 0)
-      for (let col = 0; col < halfWidth; col++) {
-        let srcCol
-        if (isEvenRow) {
-          // B 通道: 奇数列
-          srcCol = Math.min(col * 2 + 1, width - 1)
-        } else {
-          // R 通道: 偶数列
-          srcCol = Math.min(col * 2, width - 1)
-        }
-
-        const idx = (row * width + srcCol) * 4
-        let pixelValue
-        if (idx + 2 >= data.length) {
-          pixelValue = 0
-        } else {
-          pixelValue = isEvenRow ? data[idx + 2] : data[idx]  // B 或 R
-        }
-
-        const freq = 1500 + (pixelValue / 255) * 800  // 1500-2300Hz
-        this.addTone(freq, CR_CB_PIXEL_TIME)
-      }
-    }
-
-    console.log('[SSTV] 实际生成采样数:', this.bufferIndex)
-    console.log('[SSTV] 缓冲区使用率:', (this.bufferIndex / totalSamples * 100).toFixed(2) + '%')
-
-    return this.audioBuffer.slice(0, this.bufferIndex)
-  }
-
-  // 添加 VIS 位 (标准 SSTV: 1=1300Hz, 0=1200Hz)
-  addVisBit(bit, durationMs) {
-    const freq = bit ? 1300 : 1200  // bit 1 = 1300Hz, bit 0 = 1200Hz
-    this.addTone(freq, durationMs)
-  }
-
-  // 生成指定频率的单频音 (保持相位连续)
-  addTone(frequency, durationMs) {
-    const sampleCount = Math.round(this.sampleRate * (durationMs / 1000))
-    const angularVelocity = 2 * Math.PI * frequency / this.sampleRate
-
-    for (let i = 0; i < sampleCount; i++) {
-      const sample = Math.sin(this.currentPhase) * 0.8
-      this.currentPhase += angularVelocity
-
-      if (this.bufferIndex < this.audioBuffer.length) {
-        this.audioBuffer[this.bufferIndex++] = sample
-      }
-    }
-
-    // 保持相位在合理范围内，避免溢出
-    this.currentPhase = this.currentPhase % (2 * Math.PI)
-  }
-
-  // 兼容旧接口
-  async imageToAudio(imageData, width, height) {
-    const { data } = imageData
-    const mockImageData = { width, height, data }
-    return this.encodeFromImageData(mockImageData)
-  }
-
-  floatTo16BitPCM(output, offset, input) {
-    for (let i = 0; i < input.length; i++, offset += 2) {
-      const val = input[i]
-      const clamped = Math.max(-1, Math.min(1, val))
-      // 将 [-1, 1] 浮点数转换为 16-bit PCM
-      // 负数: [-1, 0) -> [-32768, 0)
-      // 正数: [0, 1] -> [0, 32767]
-      let intValue
-      if (clamped < 0) {
-        intValue = Math.floor(clamped * 0x8000)  // -32768 to 0
-      } else {
-        intValue = Math.floor(clamped * 0x7FFF)  // 0 to 32767
-      }
-      output.setInt16(offset, intValue, true)  // 小端序
-    }
-  }
-
-  encodeWav(samples) {
-    const dataSize = samples.length * 2
-    const buffer = new ArrayBuffer(44 + dataSize)
-    const view = new DataView(buffer)
-    
-    // 辅助函数：写入字符串
-    const writeString = (offset, str) => {
-      for (let i = 0; i < str.length; i++) {
-        view.setUint8(offset + i, str.charCodeAt(i))
-      }
-    }
-    
-    // RIFF 头 (偏移 0-11)
-    writeString(0, 'RIFF')
-    // Chunk size = 文件总大小 - 8
-    view.setUint32(4, 36 + dataSize, true)  // 小端序
-    
-    // WAVE 头 (偏移 8-11)
-    writeString(8, 'WAVE')
-    
-    // fmt 子块 (偏移 12-35)
-    writeString(12, 'fmt ')
-    view.setUint32(16, 16, true)        // fmt 块大小 (PCM = 16)
-    view.setUint16(20, 1, true)          // 音频格式 (PCM = 1)
-    view.setUint16(22, 1, true)          // 声道数 (单声道 = 1)
-    view.setUint32(24, this.sampleRate, true) // 采样率
-    view.setUint32(28, this.sampleRate * 2, true) // 字节率 = SampleRate * NumChannels * BitsPerSample/8
-    view.setUint16(32, 2, true)          // 块对齐 = NumChannels * BitsPerSample/8
-    view.setUint16(34, 16, true)         // 位深度 (16 bits)
-    
-    // data 子块 (偏移 36-43)
-    writeString(36, 'data')
-    view.setUint32(40, dataSize, true)    // 数据大小
-    
-    // 写入音频数据 (偏移 44 开始)
-    this.floatTo16BitPCM(view, 44, samples)
-    
-    console.log('[SSTV] WAV文件生成完成')
-    console.log('[SSTV] 文件大小:', buffer.byteLength, '字节')
-    console.log('[SSTV] 数据大小:', dataSize, '字节')
-    console.log('[SSTV] 采样数:', samples.length)
-    
-    return buffer
-  }
-}
-
-class SSTVDecoder {
-  constructor() {
-    this.sampleRate = 8000
-    this.SYNC_FREQ = 1200
-    this.BLANK_FREQ = 1500
-    this.PORCH_FREQ = 1900
-    this.COLOR_MIN = 1500
-    this.COLOR_MAX = 2300
-
-    // Robot36 标准时序 (ms) - 每行 150ms
-    this.H_SYNC_TIME = 9       // 行同步脉冲
-    this.SYNC_PORCH_TIME = 3   // 同步门廊
-    this.Y_TIME = 88           // Y 通道 (亮度, 320 像素)
-    this.SEP_TIME = 4.5        // 通道间隔
-    this.PORCH_TIME = 1.5      // 色度门廊
-    this.CR_CB_TIME = 44       // R/B 通道 (色度, 160 像素)
-
-    // 每行持续时间 (150ms)
-    this.LINE_TIME = this.H_SYNC_TIME + this.SYNC_PORCH_TIME +
-                     this.Y_TIME + this.SEP_TIME + this.PORCH_TIME +
-                     this.CR_CB_TIME
-
-    this.imageWidth = 320
-    this.imageHeight = 240
-    this.currentFormat = 'Robot36'
-
-    this.reset()
-  }
-
-  reset() {
-    this.currentLine = 0
-    this.imageData = new Uint8ClampedArray(this.imageWidth * this.imageHeight * 4)
-    this.audioBuffer = []
-    this.isDecoding = false
-    this.onProgress = null
-    this.onComplete = null
-
-    // 状态机: SEARCHING -> SYNC -> IMAGE
-    this.state = 'SEARCHING'
-    this.lineStartSample = 0
-    this.sampleCount = 0
-    this.totalSamples = 0
-
-    // 行内像素采样 (Robot36: 每行 Y + (R 或 B))
-    this.currentChannel = 'Y'
-    this.channelPixelIndex = 0
-    this.yPixels = []       // Y 通道像素
-    this.redPixels = []     // R 通道像素 (奇数行)
-    this.bluePixels = []    // B 通道像素 (偶数行)
-    this.prevLinePixels = null  // 前一行的像素，用于合并
-
-    // 同步检测
-    this.consecutiveSync = 0
-    this.syncSamples = 0
-    this.lastFreq = 0
-
-    // 音频结束检测
-    this.lastAudioTime = 0
-    this.silenceCount = 0
-
-    // VIS 检测
-    this.visDetected = false
-  }
-
-  processAudioFrame(frameBuffer) {
-    if (!this.isDecoding) return
-    if (!frameBuffer || frameBuffer.length === 0) return
-
-    this.lastAudioTime = Date.now()
-    this.audioBuffer.push(...frameBuffer)
-    this.totalSamples += frameBuffer.length
-
-    while (this.audioBuffer.length >= 32) {
-      this.processAudioData()
-    }
-  }
-
-  processAudioData() {
-    if (!this.isDecoding) return
-    if (this.audioBuffer.length < 32) return
-
-    const windowSize = 32
-    const samples = this.audioBuffer.splice(0, windowSize)
-    this.sampleCount += windowSize
-
-    const freq = this.detectFrequency(samples)
-    const isSync = Math.abs(freq - this.SYNC_FREQ) < 100
-
-    switch (this.state) {
-      case 'SEARCHING':
-        // 寻找连续的 1200Hz 同步信号（行同步）
-        if (isSync) {
-          this.consecutiveSync++
-          this.syncSamples += windowSize
-          // 行同步约 9ms，在 8kHz 采样率下约 72 个采样
-          if (this.consecutiveSync >= 3) {
-            this.state = 'SYNC'
-            this.lineStartSample = this.sampleCount
-            this.currentLine = 0
-            this.consecutiveSync = 0
-            this.syncSamples = 0
-            this.visDetected = true
-          }
-        } else {
-          this.consecutiveSync = Math.max(0, this.consecutiveSync - 1)
-          if (this.consecutiveSync === 0) this.syncSamples = 0
-        }
-        break
-
-      case 'SYNC':
-        // 等待同步脉冲结束
-        if (!isSync) {
-          const samplesSinceSync = this.sampleCount - this.lineStartSample
-          const timeSinceSync = (samplesSinceSync / this.sampleRate) * 1000
-
-          if (timeSinceSync > 3) {  // 同步脉冲结束，开始图像行
-            this.state = 'IMAGE'
-            this.currentChannel = 'GREEN'
-            this.channelPixelIndex = 0
-            this.greenPixels = []
-            this.redPixels = []
-            this.bluePixels = []
-            this.lineStartSample = this.sampleCount
-          }
-        }
-        break
-
-      case 'IMAGE':
-        const samplesInLine = this.sampleCount - this.lineStartSample
-        const timeInLine = (samplesInLine / this.sampleRate) * 1000
-
-        // 检测新行同步
-        if (isSync) {
-          if (this.consecutiveSync === 0) {
-            this.saveCurrentLine()
-
-            this.currentLine++
-            this.consecutiveSync = 1
-
-            if (this.currentLine >= this.imageHeight) {
-              this.isDecoding = false
-              if (this.onComplete) {
-                this.onComplete(this.imageData, this.imageWidth, this.imageHeight)
-              }
-              this.state = 'SEARCHING'
-              return
-            }
-
-            if (this.onProgress) {
-              const progress = Math.floor((this.currentLine / this.imageHeight) * 100)
-              this.onProgress(progress, this.currentLine)
-            }
-
-            this.currentChannel = 'GREEN'
-            this.channelPixelIndex = 0
-            this.greenPixels = []
-            this.redPixels = []
-            this.bluePixels = []
-            this.lineStartSample = this.sampleCount
-          }
-          return
-        }
-
-        this.consecutiveSync = Math.max(0, this.consecutiveSync - 1)
-        this.samplePixel(freq, timeInLine)
-        break
-    }
-
-    this.lastFreq = freq
-
-    if (this.audioBuffer.length === 0) {
-      this.silenceCount++
-      if (this.silenceCount > 100 && this.currentLine > 10) {
-        this.isDecoding = false
-        if (this.onComplete) {
-          this.onComplete(this.imageData, this.imageWidth, this.imageHeight)
-        }
-        this.state = 'SEARCHING'
-      }
-    } else {
-      this.silenceCount = 0
-    }
-  }
-
-  samplePixel(freq, timeInLine) {
-    // Robot36: 每行只有 Y + (R 或 B)，两行合并成一个完整扫描线
-    // 偶数行: Y + B
-    // 奇数行: Y + R
-    let channelStart, channelEnd
-
-    if (this.currentChannel === 'Y') {
-      channelStart = this.H_SYNC_TIME + this.SYNC_PORCH_TIME
-      channelEnd = channelStart + this.Y_TIME
-      if (timeInLine >= channelEnd) {
-        this.currentChannel = 'CR_CB'  // 色度通道 (R 或 B)
-        this.channelPixelIndex = 0
-        return
-      }
-    } else {
-      // 色度通道
-      channelStart = this.H_SYNC_TIME + this.SYNC_PORCH_TIME + this.Y_TIME + this.SEP_TIME + this.PORCH_TIME
-      channelEnd = channelStart + this.CR_CB_TIME
-    }
-
-    if (timeInLine < channelStart) return
-
-    const channelTime = timeInLine - channelStart
-    const pixelsPerChannel = this.currentChannel === 'Y' ? this.imageWidth : this.imageWidth / 2
-
-    const pixelIndex = Math.floor((channelTime / this.getChannelDuration(this.currentChannel)) * pixelsPerChannel)
-
-    if (pixelIndex > this.channelPixelIndex && pixelIndex < pixelsPerChannel) {
-      const gray = this.frequencyToGray(freq)
-
-      if (this.currentChannel === 'Y') {
-        this.yPixels.push(gray)
-      } else {
-        // 色度通道: 偶数行是 B, 奇数行是 R
-        if (this.currentLine % 2 === 0) {
-          this.bluePixels.push(gray)  // 偶数行: B
-        } else {
-          this.redPixels.push(gray)   // 奇数行: R
-        }
-      }
-
-      this.channelPixelIndex = pixelIndex
-    }
-  }
-
-  getChannelDuration(channel) {
-    if (channel === 'Y') return this.Y_TIME
-    return this.CR_CB_TIME
-  }
-
-  saveCurrentLine() {
-    // Robot36: 两行合并成一个完整扫描线
-    // 偶数行: Y + B
-    // 奇数行: Y + R
-    // 合并: 使用偶数行的 Y+B 和奇数行的 Y+R
-
-    if (this.currentLine >= this.imageHeight) return
-
-    const lineIndex = Math.floor(this.currentLine / 2)  // 两行合并成一行
-    const width = this.imageWidth
-
-    // 如果是偶数行，保存 Y 和 B
-    if (this.currentLine % 2 === 0) {
-      if (this.yPixels.length === 0) return
-
-      this.prevLinePixels = {
-        y: [...this.yPixels],
-        b: [...this.bluePixels]
-      }
-
-      // 偶数行先不保存到 imageData，等奇数行到了再合并
-      // 但是第一行（偶数行）需要单独处理
-      if (this.currentLine === 0 && this.yPixels.length > 0) {
-        // 第一行：只保存 Y，R 和 B 暂时用 Y 代替
-        for (let x = 0; x < width; x++) {
-          const idx = (lineIndex * width + x) * 4
-          const yIdx = Math.floor(x * this.yPixels.length / width)
-          const y = this.yPixels[Math.min(yIdx, this.yPixels.length - 1)] || 0
-          this.imageData[idx] = y      // R 暂时用 Y
-          this.imageData[idx + 1] = y  // G = Y
-          this.imageData[idx + 2] = y  // B 暂时用 Y
-          this.imageData[idx + 3] = 255
-        }
-      }
-    } else {
-      // 奇数行: 有 Y 和 R，与前一行的 Y 和 B 合并
-      if (!this.prevLinePixels || this.yPixels.length === 0) return
-
-      const prevY = this.prevLinePixels.y
-      const prevB = this.prevLinePixels.b
-      const currY = this.yPixels
-      const currR = this.redPixels
-
-      for (let x = 0; x < width; x++) {
-        const idx = (lineIndex * width + x) * 4
-
-        // 使用当前行的 Y（或者前一行的 Y，取哪个？）
-        // 从 Java 代码看，它使用了当前行的 Y
-        const yIdx = Math.floor(x * currY.length / width)
-        const y = currY[Math.min(yIdx, currY.length - 1)] || 0
-
-        // R: 从当前行获取（子采样）
-        let r = y
-        if (currR.length > 0) {
-          const rIdx = Math.floor((x / 2) * currR.length / (width / 2))
-          r = currR[Math.min(rIdx, currR.length - 1)] || y
-        }
-
-        // B: 从前一行获取（子采样）
-        let b = y
-        if (prevB.length > 0) {
-          const bIdx = Math.floor(((x + 1) / 2) * prevB.length / (width / 2))
-          b = prevB[Math.min(bIdx, prevB.length - 1)] || y
-        }
-
-        this.imageData[idx] = r
-        this.imageData[idx + 1] = y
-        this.imageData[idx + 2] = b
-        this.imageData[idx + 3] = 255
-      }
-    }
-
-    // 重置像素数组
-    this.yPixels = []
-    this.redPixels = []
-    this.bluePixels = []
-  }
-
-  detectFrequency(samples) {
-    const N = samples.length
-    let maxEnergy = 0
-    let bestFreq = 1900
-
-    for (let freq = 1200; freq <= 2300; freq += 25) {
-      const energy = this.goertzel(samples, freq, N)
-      if (energy > maxEnergy) {
-        maxEnergy = energy
-        bestFreq = freq
-      }
-    }
-
-    return bestFreq
-  }
-
-  goertzel(samples, targetFreq, N) {
-    const k = Math.round(0.5 + (N * targetFreq) / this.sampleRate)
-    const w = (2 * Math.PI * k) / N
-    const coeff = 2 * Math.cos(w)
-
-    let s0 = 0, s1 = 0
-
-    for (let i = 0; i < N; i++) {
-      const s2 = samples[i] + coeff * s1 - s0
-      s0 = s1
-      s1 = s2
-    }
-
-    const power = s1 * s1 + s0 * s0 - coeff * s1 * s0
-    return power / N
-  }
-
-  frequencyToGray(freq) {
-    if (freq < this.COLOR_MIN) return 0
-    if (freq > this.COLOR_MAX) return 255
-    const ratio = (freq - this.COLOR_MIN) / (this.COLOR_MAX - this.COLOR_MIN)
-    return Math.floor(ratio * 255)
-  }
-}
+// 导入拆分后的模块 (对应 Java SSTVEncoder2 项目结构)
+const { createMode } = require('./sstv-factory')
+const SSTVDecoder = require('./sstv-decoder')
 
 Page({
   data: {
@@ -618,8 +9,8 @@ Page({
     uploadImage: '',
     imageWidth: 0,
     imageHeight: 0,
-    quality: 80,
-    sensitivity: 50,
+    quality: 80,  // 对应 app.wxss 中的默认质量
+    sensitivity: 50,  // 对应 app.wxss 中的默认灵敏度
     isEncoding: false,
     isDecoding: false,
     audioFilePath: '',
@@ -630,12 +21,10 @@ Page({
     audioDurationStr: '0:00',
     audioCurrentTimeStr: '0:00',
     audioFileSize: '',
-    audioFormat: 'WAV',
+    audioFormat: 'WAV',  // 对应 app.wxss 中的音频格式
     decodedImage: '',
     decodeProgress: 0,
     scanLine: 0,
-    sstvEncoder: null,
-    sstvDecoder: null,
     recorderManager: null,
     audioContext: null,
     currentTheme: 'radio',
@@ -643,8 +32,8 @@ Page({
     callsign: '',
     showCallsign: false,
     showCallsignInput: false,
-    callsignX: 10,  // 默认左下角内侧 (距离左边10px)
-    callsignY: 210,  // 默认左下角内侧 (距离底部30px = 240-30)
+    callsignX: 20,  // 默认左下角内侧 (距离左边20px)
+    callsignY: 200,  // 默认左下角内侧 (距离底部40px = 240-40)
     callsignTouchStartX: 0,
     callsignTouchStartY: 0
   },
@@ -708,10 +97,13 @@ Page({
     try {
       const savedTheme = wx.getStorageSync('appTheme') || 'radio'
       this.setData({ currentTheme: savedTheme })
-      // 设置统一的导航栏背景色
+      
+      // 根据主题设置导航栏颜色
+      const app = getApp()
+      const themeConfig = app.THEMES[savedTheme] || app.THEMES.radio
       wx.setNavigationBarColor({
-        frontColor: '#000000',
-        backgroundColor: '#F9F7F4',
+        frontColor: themeConfig.navText,
+        backgroundColor: themeConfig.navBg,
         animation: {
           duration: 0,
           timingFunc: 'linear'
@@ -723,10 +115,9 @@ Page({
   },
 
   initSSTV() {
-    // 只保存类引用，不通过 setData 传输（避免大量数据传输）
-    this.encoder = new SSTVEncoder()
+    // 使用工厂方法创建编码器实例 (对应 Java 的 ModeFactory)
+    this.encoder = createMode('Robot36')
     this.decoder = new SSTVDecoder()
-    // 如果需要访问，使用 this.encoder 和 this.decoder
   },
 
   initRecorder() {
@@ -790,10 +181,26 @@ Page({
         wx.getImageInfo({
           src: tempFilePath,
           success: (info) => {
+            // 读取呼号，默认显示为 CQ DE + 个人呼号
+            let myCallSign = ''
+            let callsign = ''
+            let showCallsign = false
+            try {
+              myCallSign = wx.getStorageSync('myCallSign') || ''
+              if (myCallSign) {
+                callsign = 'CQ DE ' + myCallSign
+                showCallsign = true
+              }
+            } catch (e) {
+              console.error('读取呼号失败', e)
+            }
+
             this.setData({
               uploadImage: tempFilePath,
               imageWidth: info.width,
-              imageHeight: info.height
+              imageHeight: info.height,
+              callsign: callsign,
+              showCallsign: showCallsign
             })
             this.resizeImage(tempFilePath)
           }
@@ -830,11 +237,12 @@ Page({
     this.setData({ sensitivity: e.detail.value })
   },
 
+  onEncodeTap() {
+    if (!this.data.uploadImage || this.data.isEncoding) return
+    this.startEncode()
+  },
+
   async startEncode() {
-    if (!this.data.uploadImage) {
-      wx.showToast({ title: '请先选择图片', icon: 'none' })
-      return
-    }
 
     this.setData({ isEncoding: true, audioFilePath: '' })
     wx.showLoading({ title: '正在生成...' })
@@ -1283,9 +691,9 @@ Page({
         showCallsign: false
       })
     } else {
-      // 如果未显示，则显示
+      // 如果未显示，则显示，格式为 CQ DE + 呼号
       this.setData({
-        callsign: myCallSign,
+        callsign: 'CQ DE ' + myCallSign,
         showCallsign: true
       })
       wx.showToast({ title: '呼号已添加', icon: 'success' })

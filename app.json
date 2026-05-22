@@ -1,9 +1,6 @@
 {
   "pages": [
     "pages/index/index",
-    "pages/logs/logs",
-    "pages/sstv/sstv",
-    "pages/log-detail/log-detail",
     "pages/mine/mine",
     "pages/web-view/web-view"
   ],
@@ -16,5 +13,29 @@
   },
   "style": "v2",
   "lazyCodeLoading": "requiredComponents",
-  "sitemapLocation": "sitemap.json"
+  "sitemapLocation": "sitemap.json",
+  "subpackages": [
+    {
+      "root": "pages/sstv",
+      "pages": [
+        "sstv"
+      ],
+      "independent": true
+    },
+    {
+      "root": "pages/logs",
+      "pages": [
+        "logs",
+        "log-detail/log-detail"
+      ]
+    }
+  ],
+  "preloadRule": {
+    "pages/index/index": {
+      "packages": [
+        "pages/logs"
+      ],
+      "network": "all"
+    }
+  }
 }

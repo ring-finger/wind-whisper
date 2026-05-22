@@ -98,7 +98,7 @@ Page({
     wx.vibrateShort({ type: VIBRATE_TYPE })
     const id = e.currentTarget.dataset.id
     wx.navigateTo({
-      url: '/pages/log-detail/log-detail?id=' + id
+      url: '/pages/logs/log-detail/log-detail?id=' + id
     })
   },
 
@@ -225,7 +225,7 @@ Page({
     wx.vibrateShort({ type: VIBRATE_TYPE })
     const id = e.currentTarget.dataset.id
     wx.navigateTo({
-      url: '/pages/log-detail/log-detail?id=' + id
+      url: '/pages/logs/log-detail/log-detail?id=' + id
     })
   },
 

@@ -3,11 +3,18 @@ App({
   THEMES: {
     radio: {
       name: '无线电',
-      navColor: '#2C5C97'
+      navBg: '#F9F7F4',
+      navText: '#000000'
     },
     morandi: {
       name: '奶油莫兰迪',
-      navColor: '#C4643E'
+      navBg: '#F8F2E9',
+      navText: '#000000'
+    },
+    dark: {
+      name: '深色',
+      navBg: '#1A1A2E',
+      navText: '#FFFFFF'
     }
   },
 
@@ -77,24 +84,24 @@ App({
 
   initTheme() {
     try {
-      // 设置统一的导航栏背景色为浅灰色
+      const savedTheme = wx.getStorageSync(this.STORAGE_THEME) || 'radio'
+      const themeConfig = this.THEMES[savedTheme] || this.THEMES.radio
+      
       wx.setNavigationBarColor({
-        frontColor: '#000000',
-        backgroundColor: '#F9F7F4',
+        frontColor: themeConfig.navText,
+        backgroundColor: themeConfig.navBg,
         animation: {
           duration: 0,
           timingFunc: 'linear'
         }
       })
       
-      const savedTheme = wx.getStorageSync(this.STORAGE_THEME) || 'radio'
-      if (savedTheme === 'morandi') {
-        const pages = getCurrentPages()
-        if (pages.length > 0) {
-          const currentPage = pages[pages.length - 1]
-          if (currentPage && currentPage.setData) {
-            currentPage.setData({})
-          }
+      // 触发页面重新渲染以应用主题CSS类
+      const pages = getCurrentPages()
+      if (pages.length > 0) {
+        const currentPage = pages[pages.length - 1]
+        if (currentPage && currentPage.setData) {
+          currentPage.setData({ currentTheme: savedTheme })
         }
       }
     } catch (e) {

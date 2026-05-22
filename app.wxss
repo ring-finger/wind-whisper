@@ -27,6 +27,19 @@ page {
   --warning: #F57C00;
   --error: #D32F2F;
   --info: #2C5C97;
+  /* RGB 格式变量（用于半透明叠加层） */
+  --text-primary-rgb: 26, 43, 66;
+  --text-inverse-rgb: 255, 255, 255;
+  --accent-primary-rgb: 44, 92, 151;
+  --error-rgb: 211, 47, 47;
+  /* 渐变辅助色 - 第1主题 */
+  --gradient-accent1: #A55555;
+  --gradient-accent2: #6B9A5F;
+  --gradient-accent3: #A85540;
+  /* 操作按钮颜色（用于半透明叠加层） */
+  --action-blue-rgb: 59, 130, 246;
+  --action-red-rgb: 220, 38, 38;
+  --info-soft: rgba(107, 142, 174, 0.1);
   /* 导航栏背景色 - 统一浅色系 */
   --nav-bg: #F9F7F4;           /* 超浅暖灰背景 */
   --nav-text: #443D33;         /* 中性文字色 */
@@ -73,7 +86,71 @@ page {
   --warning: #D4A373;
   --error: #BB6464;
   --info: #6B8EAE;
+  /* RGB 格式变量（用于半透明叠加层） */
+  --text-primary-rgb: 58, 50, 38;
+  --text-inverse-rgb: 248, 242, 233;
+  --accent-primary-rgb: 196, 100, 62;
+  --error-rgb: 187, 100, 100;
+  /* 渐变辅助色 - 第2主题（莫兰迪） */
+  --gradient-accent1: #A55555;
+  --gradient-accent2: #6B9A5F;
+  --gradient-accent3: #A85540;
+  /* 操作按钮颜色（用于半透明叠加层） */
+  --action-blue-rgb: 107, 142, 174;
+  --action-red-rgb: 187, 100, 100;
+  --info-soft: rgba(147, 142, 130, 0.1);
   /* 导航栏背景色 - 统一使用浅色系，不随主题变化 */
+
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+/* 深色主题 - Dark Theme */
+.theme-wrapper.theme-dark {
+  --bg-primary: #1A1A2E;
+  --bg-main: #1A1A2E;
+  --card-bg: #2A2A3E;
+  --border-color: #3A3A4E;
+  --shadow-color: rgba(0, 0, 0, 0.35);
+  --text-primary: #D0D0D0;
+  --text-main: #D0D0D0;
+  --text-secondary: #888888;
+  --text-sec: #888888;
+  --text-placeholder: #555555;
+  --text-inverse: #1A1A2E;
+  --color-log: #1E2A1E;
+  --color-decode: #1E2A1E;
+  --color-qso: #2A1E1E;
+  --color-profile: #1E1E2A;
+  --accent-primary: #5B9BD5;
+  --primary-color: #5B9BD5;
+  --primary-soft: rgba(91, 155, 213, 0.15);
+  --accent-active: #5A9A5F;
+  --accent-secondary: #D84315;
+  --accent-orange: #D84315;
+  --lcd-bg: #2A2A3E;
+  --success: #5A9A5F;
+  --warning: #D4A373;
+  --error: #D32F2F;
+  --info: #5B9BD5;
+  /* RGB 格式变量（用于半透明叠加层） */
+  --text-primary-rgb: 208, 208, 208;
+  --text-inverse-rgb: 26, 26, 46;
+  --accent-primary-rgb: 91, 155, 213;
+  --error-rgb: 211, 47, 47;
+  /* 渐变辅助色 - 深色主题 */
+  --gradient-accent1: #A55555;
+  --gradient-accent2: #5A9A5F;
+  --gradient-accent3: #D84315;
+  /* 操作按钮颜色（用于半透明叠加层） */
+  --action-blue-rgb: 91, 155, 213;
+  --action-red-rgb: 211, 47, 47;
+  --info-soft: rgba(91, 155, 213, 0.12);
+  /* 导航栏背景色 - 深色 */
+  --nav-bg: #1A1A2E;
+  --nav-text: #D0D0D0;
+  --nav-text-active: #5B9BD5;
+  --nav-border: #3A3A4E;
 
   background-color: var(--bg-primary);
   color: var(--text-primary);
@@ -275,7 +352,7 @@ page {
   font-weight: 600;
   margin-top: 32rpx;
   border: none;
-  box-shadow: 0 8rpx 28rpx rgba(44, 92, 151, 0.35);
+  box-shadow: 0 8rpx 28rpx rgba(var(--accent-primary-rgb), 0.35);
   text-align: center;
 }
 

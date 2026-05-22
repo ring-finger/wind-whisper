@@ -984,12 +984,12 @@ Page({
       if (log) {
         const logData = encodeURIComponent(JSON.stringify(log))
         wx.navigateTo({
-          url: `/pages/log-detail/log-detail?shareId=${shareId}&logId=${id}&logData=${logData}`
+          url: `/pages/logs/log-detail/log-detail?shareId=${shareId}&logId=${id}&logData=${logData}`
         })
       }
     } else {
       wx.navigateTo({
-        url: '/pages/log-detail/log-detail?id=' + id
+        url: '/pages/logs/log-detail/log-detail?id=' + id
       })
     }
   },

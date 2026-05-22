@@ -108,28 +108,28 @@
   justify-content: center;
   padding: 12rpx 16rpx;
   border-radius: 16rpx;
-  background: rgba(0, 0, 0, 0.65);
+  background: rgba(var(--text-primary-rgb), 0.65);
   backdrop-filter: blur(20rpx);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.3);
-  border: 2rpx solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4rpx 12rpx var(--shadow-color);
+  border: 2rpx solid rgba(var(--text-inverse-rgb), 0.2);
 }
 
 .action-btn-small:active {
   transform: scale(0.92);
-  background: rgba(0, 0, 0, 0.85);
-  border-color: rgba(255, 255, 255, 0.4);
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.5);
+  background: rgba(var(--text-primary-rgb), 0.85);
+  border-color: rgba(var(--text-inverse-rgb), 0.4);
+  box-shadow: 0 2rpx 8rpx var(--shadow-color);
 }
 
 .action-btn-small.reselect:active {
-  background: rgba(59, 130, 246, 0.8);
-  border-color: rgba(59, 130, 246, 0.6);
+  background: rgba(var(--action-blue-rgb), 0.8);
+  border-color: rgba(var(--action-blue-rgb), 0.6);
 }
 
 .action-btn-small.remove:active {
-  background: rgba(220, 38, 38, 0.9);
-  border-color: rgba(220, 38, 38, 0.7);
+  background: rgba(var(--action-red-rgb), 0.9);
+  border-color: rgba(var(--action-red-rgb), 0.7);
 }
 
 .action-icon {
@@ -140,28 +140,28 @@
 
 .action-label {
   font-size: 20rpx;
-  color: rgba(255, 255, 255, 0.95);
+  color: rgba(var(--text-inverse-rgb), 0.95);
   font-weight: 500;
   letter-spacing: 2rpx;
-  text-shadow: 0 1rpx 2rpx rgba(0, 0, 0, 0.5);
+  text-shadow: 0 1rpx 2rpx rgba(var(--text-primary-rgb), 0.5);
 }
 
 .action-btn-small.reselect {
-  background: rgba(59, 130, 246, 0.75);
-  border-color: rgba(59, 130, 246, 0.5);
+  background: rgba(var(--action-blue-rgb), 0.75);
+  border-color: rgba(var(--action-blue-rgb), 0.5);
 }
 
 .action-btn-small.reselect .action-label {
-  color: #FFFFFF;
+  color: var(--text-inverse);
 }
 
 .action-btn-small.remove {
-  background: rgba(220, 38, 38, 0.75);
-  border-color: rgba(220, 38, 38, 0.5);
+  background: rgba(var(--action-red-rgb), 0.75);
+  border-color: rgba(var(--action-red-rgb), 0.5);
 }
 
 .action-btn-small.remove .action-label {
-  color: #FFFFFF;
+  color: var(--text-inverse);
 }
 
 .image-size-label {
@@ -169,8 +169,8 @@
   bottom: 20rpx;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.6);
-  color: #FFFFFF;
+  background: rgba(var(--text-primary-rgb), 0.6);
+  color: var(--text-inverse);
   font-size: 22rpx;
   padding: 8rpx 20rpx;
   border-radius: 20rpx;
@@ -196,13 +196,21 @@
   justify-content: center;
 }
 
+/* 按钮主题色 - 使用 CSS 变量，跟随主题统一变化 */
 .action-btn.primary {
-  background: linear-gradient(135deg, var(--accent-primary), #A85540);
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
   color: var(--text-inverse);
+  opacity: 1;
+}
+
+.action-btn.btn-disabled {
+  background: var(--border-color);
+  color: var(--text-placeholder);
+  opacity: 0.6;
 }
 
 .action-btn.danger {
-  background: linear-gradient(135deg, var(--error), #A55555);
+  background: linear-gradient(135deg, var(--error), var(--gradient-accent1));
   color: var(--text-inverse);
 }
 
@@ -270,7 +278,7 @@
 }
 
 .status-circle.active {
-  background: linear-gradient(135deg, var(--accent-active), #6B9A5F);
+  background: linear-gradient(135deg, var(--accent-active), var(--gradient-accent2));
   animation: pulse 1s infinite;
 }
 
@@ -320,7 +328,7 @@
 
 .preview-canvas {
   border-radius: 12rpx;
-  background: var(--text-primary);
+  background: var(--card-bg);
   display: block;
   margin: 0 auto;
 }
@@ -393,7 +401,7 @@
 /* 提示 */
 .tips {
   padding: 20rpx;
-  background: rgba(107, 142, 174, 0.1);
+  background: var(--info-soft);
   margin: 20rpx;
   border-radius: 16rpx;
   border-left: 6rpx solid var(--info);
@@ -442,15 +450,15 @@
   gap: 6rpx;
   padding: 8rpx 20rpx;
   border-radius: 20rpx;
-  background: rgba(59, 130, 246, 0.15);
-  border: 2rpx solid rgba(59, 130, 246, 0.3);
+  background: rgba(var(--action-blue-rgb), 0.15);
+  border: 2rpx solid rgba(var(--action-blue-rgb), 0.3);
   transition: all 0.3s;
 }
 
 .audio-download-btn:active {
-  background: rgba(59, 130, 246, 0.3);
+  background: rgba(var(--action-blue-rgb), 0.3);
   transform: scale(0.95);
-  border-color: rgba(59, 130, 246, 0.6);
+  border-color: rgba(var(--action-blue-rgb), 0.6);
 }
 
 .download-icon {
@@ -460,7 +468,7 @@
 
 .download-text {
   font-size: 22rpx;
-  color: #3B82F6;
+  color: rgb(var(--action-blue-rgb));
   font-weight: 500;
 }
 
@@ -503,7 +511,7 @@
 
 .audio-progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--accent-primary), #A85540);
+  background: linear-gradient(90deg, var(--accent-primary), var(--gradient-accent3));
   border-radius: 4rpx;
   transition: width 0.3s;
 }
@@ -518,7 +526,7 @@
   width: 96rpx !important;
   height: 96rpx !important;
   border-radius: 50% !important;
-  background: linear-gradient(135deg, var(--accent-primary), #A85540) !important;
+  background: linear-gradient(135deg, var(--accent-primary), var(--gradient-accent3)) !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -530,7 +538,7 @@
 }
 
 .audio-play-btn.playing {
-  background: linear-gradient(135deg, var(--error), #A55555) !important;
+  background: linear-gradient(135deg, var(--error), var(--gradient-accent1)) !important;
 }
 
 .audio-play-btn::after {
@@ -540,7 +548,7 @@
 
 .play-icon {
   font-size: 36rpx;
-  color: #FFFFFF;
+  color: var(--text-inverse);
 }
 
 .audio-info-tags {
@@ -552,7 +560,7 @@
 .info-tag {
   font-size: 20rpx;
   color: var(--accent-primary);
-  background: rgba(196, 100, 62, 0.1);
+  background: var(--primary-soft);
   padding: 8rpx 16rpx;
   border-radius: 8rpx;
   font-weight: 500;
@@ -572,7 +580,7 @@
   position: absolute;
   z-index: 999;
   padding: 8rpx 16rpx;
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(var(--text-primary-rgb), 0.7);
   border-radius: 8rpx;
   display: none;
   cursor: move;
@@ -590,8 +598,8 @@
 .callsign-text {
   font-size: 32rpx;
   font-weight: bold;
-  color: #FFFFFF;
-  text-shadow: 2rpx 2rpx 4rpx rgba(0, 0, 0, 0.8);
+  color: var(--text-inverse);
+  text-shadow: 2rpx 2rpx 4rpx rgba(var(--text-primary-rgb), 0.8);
   font-family: monospace;
   white-space: nowrap;
 }
@@ -600,7 +608,7 @@
 
 /* 呼号按钮样式 */
 .callsign-btn {
-  background: rgba(196, 100, 62, 0.1) !important;
+  background: var(--primary-soft) !important;
   border: 2rpx solid var(--accent-primary) !important;
 }
 
