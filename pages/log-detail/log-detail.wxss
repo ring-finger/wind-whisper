@@ -26,8 +26,6 @@
   align-items: flex-start;
   flex-wrap: wrap;
   gap: 12rpx;
-  padding: 30rpx 30rpx 20rpx;
-  border-bottom: 1rpx solid var(--border-color);
 }
 
 .callsign {
@@ -162,4 +160,69 @@
 .edit-btn {
   background: var(--accent-primary);
   color: var(--text-inverse);
+}
+
+/* 可点击项样式 */
+.copyable-item {
+  border-radius: 8rpx;
+  padding: 8rpx 12rpx;
+  margin: -8rpx -12rpx;
+  transition: background-color 0.15s ease;
+}
+
+.copyable-item-hover {
+  background: var(--bg-primary) !important;
+}
+
+.copyable-header {
+  padding: 30rpx 30rpx 20rpx;
+  border-bottom: 1rpx solid var(--border-color);
+  border-radius: 8rpx;
+  transition: background-color 0.15s ease;
+}
+
+.copyable-header-hover {
+  background: rgba(44, 92, 151, 0.05) !important;
+}
+
+.copy-hint {
+  font-size: 22rpx;
+  color: var(--text-secondary);
+  opacity: 0.6;
+  margin-top: 8rpx;
+}
+
+/* 复制成功提示 */
+.copy-toast {
+  position: fixed;
+  top: 120rpx;
+  left: 50%;
+  transform: translateX(-50%) translateY(-20rpx);
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  padding: 16rpx 32rpx;
+  border-radius: 40rpx;
+  font-size: 26rpx;
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  z-index: 1000;
+  opacity: 0;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  pointer-events: none;
+}
+
+.copy-toast-show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.copy-toast-icon {
+  color: #4caf50;
+  font-size: 28rpx;
+  font-weight: bold;
+}
+
+.copy-toast-text {
+  color: #fff;
 }

@@ -334,12 +334,6 @@
   line-height: 1;
 }
 
-.copyright {
-  margin-top: 16rpx;
-  font-size: 22rpx;
-  color: var(--text-secondary);
-}
-
 /* 响应式适配 */
 @media (min-width: 768px) {
   .page-home {

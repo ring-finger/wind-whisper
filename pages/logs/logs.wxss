@@ -420,8 +420,8 @@
   box-sizing: border-box;
 }
 
-.call-suggestions,
-.frequency-suggestions {
+/* 建议列表通用容器 */
+.suggestions-wrap {
   margin-top: 12rpx;
   background: var(--card-bg);
   border-radius: 12rpx;
@@ -429,15 +429,29 @@
   overflow: hidden;
 }
 
+/* 建议列表标题（如"最近使用"） */
+.suggestions-label {
+  padding: 12rpx 28rpx 4rpx;
+  font-size: 20rpx;
+  color: var(--text-secondary);
+}
+
 .suggestion-item {
   padding: 20rpx 28rpx;
   border-bottom: 1rpx solid var(--border-color);
   font-size: 28rpx;
   color: var(--text-primary);
+  transition: background-color 0.15s ease;
 }
 
 .suggestion-item:last-child {
   border-bottom: none;
+}
+
+/* 默认最近使用项的样式 */
+.suggestion-recent {
+  color: var(--accent-primary);
+  font-weight: 500;
 }
 
 .weather-icons {

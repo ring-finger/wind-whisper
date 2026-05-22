@@ -55,7 +55,9 @@ Page({
     myRst: '',
     theirRst: '',
     bjtDateTimeFull: '',
-    utcDateTimeFull: ''
+    utcDateTimeFull: '',
+    showCopyToast: false,
+    copyToastMsg: ''
   },
 
   onLoad(options) {
@@ -328,6 +330,118 @@ Page({
     } catch (e) {
       return '未知'
     }
+  },
+
+  // 显示复制成功提示
+  showCopyFeedback(msg) {
+    this.setData({
+      showCopyToast: true,
+      copyToastMsg: msg || '已复制'
+    })
+    // 1.5秒后自动隐藏
+    if (this._copyToastTimer) clearTimeout(this._copyToastTimer)
+    this._copyToastTimer = setTimeout(() => {
+      this.setData({ showCopyToast: false })
+    }, 1500)
+  },
+
+  // 复制完整日志（结构化文本格式）
+  copyFullLog() {
+    wx.vibrateShort({ type: VIBRATE_TYPE })
+    const log = this.data.log
+    if (!log) return
+
+    // 获取我的呼号
+    const myCallSign = wx.getStorageSync('myCallSign') || ''
+
+    // 如果未设置呼号，提醒用户去设置
+    if (!myCallSign) {
+      wx.showModal({
+        title: '未设置个人呼号',
+        content: '复制的日志中将不包含您的呼号。是否前往"我的"页面设置？',
+        confirmText: '去设置',
+        cancelText: '继续复制',
+        success: (res) => {
+          if (res.confirm) {
+            wx.switchTab({
+              url: '/pages/mine/mine'
+            })
+          } else {
+            // 用户选择继续复制（无个人呼号）
+            this.doCopyFullLog('')
+          }
+        }
+      })
+      return
+    }
+
+    this.doCopyFullLog(myCallSign)
+  },
+
+  // 执行完整日志复制
+  doCopyFullLog(myCallSign) {
+    const log = this.data.log
+
+    const lines = [
+      `=== 通联日志 ===`,
+      ``,
+      `我的呼号: ${myCallSign || '-'}`,
+      `对方呼号: ${log.callSign || '-'}`,
+      `日期(BJT): ${this.data.bjtDateTimeFull || '-'}`,
+      `日期(UTC): ${this.data.utcDateTimeFull || '-'}`,
+      `频率: ${log.frequency || '-'} MHz`,
+      `模式: ${log.mode || '-'}`,
+      `己方RST: ${this.data.myRst || '-'}`,
+      `对方RST: ${this.data.theirRst || '-'}`
+    ]
+
+    if (log.qth) lines.push(`位置: ${log.qth}`)
+    if (log.equipment) lines.push(`设备: ${log.equipment}`)
+    if (log.antenna) lines.push(`天线: ${log.antenna}`)
+    if (this.data.powerDisplay) lines.push(`功率: ${this.data.powerDisplay}`)
+    if (log.weather) lines.push(`天气: ${this.data.weatherText || log.weather}`)
+    if (log.notes) lines.push(`备注: ${log.notes}`)
+    
+    lines.push(``)
+    lines.push(`记录时间: ${this.data.recordTime || ''}`)
+
+    const text = lines.join('\n')
+
+    wx.setClipboardData({
+      data: text,
+      success: () => {
+        this.showCopyFeedback('完整日志已复制')
+      },
+      fail: () => {
+        wx.showToast({ title: '复制失败', icon: 'none' })
+      }
+    })
+  },
+
+  // 复制单个字段
+  copyField(e) {
+    wx.vibrateShort({ type: VIBRATE_TYPE })
+    const dataset = e.currentTarget.dataset
+    const label = dataset.label || '字段'
+    
+    // 优先使用 data-value，否则从 log 中取
+    let value = dataset.value
+    if (!value && this.data.log) {
+      value = this.data.log[dataset.field]
+    }
+    if (!value) value = ''
+
+    const text = String(value)
+
+    wx.setClipboardData({
+      data: text,
+      success: () => {
+        this.showCopyFeedback(`${label} 已复制`)
+      },
+      fail: () => {
+        wx.showToast({ title: '复制失败', icon: 'none' })
+      }
+    })
   },
 
   deleteLog() {

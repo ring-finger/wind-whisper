@@ -94,11 +94,75 @@ Page({
     })
   },
 
+  // 跳转到今日通联日志
+  goToTodayLogs() {
+    wx.vibrateShort({ type: VIBRATE_TYPE })
+    wx.navigateTo({
+      url: '/pages/logs/logs?filter=today'
+    })
+  },
+
+  // 跳转到本周通联日志
+  goToWeekLogs() {
+    wx.vibrateShort({ type: VIBRATE_TYPE })
+    wx.navigateTo({
+      url: '/pages/logs/logs?filter=week'
+    })
+  },
+
+  // 跳转到本月通联日志
+  goToMonthLogs() {
+    wx.vibrateShort({ type: VIBRATE_TYPE })
+    wx.navigateTo({
+      url: '/pages/logs/logs?filter=month'
+    })
+  },
+
+  // 跳转到全部通联日志
+  goToAllLogs() {
+    wx.vibrateShort({ type: VIBRATE_TYPE })
+    wx.navigateTo({
+      url: '/pages/logs/logs'
+    })
+  },
+
   viewLogDetail(e) {
     wx.vibrateShort({ type: VIBRATE_TYPE })
     const id = e.currentTarget.dataset.id
     wx.navigateTo({
       url: '/pages/log-detail/log-detail?id=' + id
+    })
+  },
+
+  // 跳转到今日通联日志
+  goToTodayLogs() {
+    wx.vibrateShort({ type: VIBRATE_TYPE })
+    wx.navigateTo({
+      url: '/pages/logs/logs?filter=today'
+    })
+  },
+
+  // 跳转到本周通联日志
+  goToWeekLogs() {
+    wx.vibrateShort({ type: VIBRATE_TYPE })
+    wx.navigateTo({
+      url: '/pages/logs/logs?filter=week'
+    })
+  },
+
+  // 跳转到本月通联日志
+  goToMonthLogs() {
+    wx.vibrateShort({ type: VIBRATE_TYPE })
+    wx.navigateTo({
+      url: '/pages/logs/logs?filter=month'
+    })
+  },
+
+  // 跳转到全部通联日志（按频段浏览）
+  goToAllLogs() {
+    wx.vibrateShort({ type: VIBRATE_TYPE })
+    wx.navigateTo({
+      url: '/pages/logs/logs'
     })
   },
 
@@ -218,6 +282,38 @@ Page({
     wx.vibrateShort({ type: VIBRATE_TYPE })
     wx.navigateTo({
       url: '/pages/sstv/sstv'
+    })
+  },
+
+  // 跳转到今日通联日志
+  goToTodayLogs() {
+    wx.vibrateShort({ type: VIBRATE_TYPE })
+    wx.navigateTo({
+      url: '/pages/logs/logs?filter=today'
+    })
+  },
+
+  // 跳转到本周通联日志
+  goToWeekLogs() {
+    wx.vibrateShort({ type: VIBRATE_TYPE })
+    wx.navigateTo({
+      url: '/pages/logs/logs?filter=week'
+    })
+  },
+
+  // 跳转到本月通联日志
+  goToMonthLogs() {
+    wx.vibrateShort({ type: VIBRATE_TYPE })
+    wx.navigateTo({
+      url: '/pages/logs/logs?filter=month'
+    })
+  },
+
+  // 跳转到全部通联日志
+  goToAllLogs() {
+    wx.vibrateShort({ type: VIBRATE_TYPE })
+    wx.navigateTo({
+      url: '/pages/logs/logs'
     })
   },
 
