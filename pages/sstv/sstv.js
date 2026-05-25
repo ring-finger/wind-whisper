@@ -101,13 +101,27 @@ Page({
       // 根据主题设置导航栏颜色
       const app = getApp()
       const themeConfig = app.THEMES[savedTheme] || app.THEMES.radio
+      
+      // 确保导航栏文字颜色是有效的（微信小程序要求只能是 #ffffff 或 #000000）
+      let navText = '#000000'
+      if (savedTheme === 'dark') {
+        navText = '#ffffff'
+      }
+      
       wx.setNavigationBarColor({
-        frontColor: themeConfig.navText,
-        backgroundColor: themeConfig.navBg,
+        frontColor: navText,
+        backgroundColor: themeConfig.navBg || '#F9F7F4',
         animation: {
           duration: 0,
           timingFunc: 'linear'
         }
+      })
+      
+      // 动态设置页面背景色，确保与主题一致
+      wx.setBackgroundColor({
+        backgroundColor: themeConfig.bgPrimary || '#F4F7FA',
+        backgroundColorTop: themeConfig.bgPrimary || '#F4F7FA',
+        backgroundColorBottom: themeConfig.bgPrimary || '#F4F7FA'
       })
     } catch (e) {
       console.error('加载主题失败', e)
@@ -463,22 +477,7 @@ Page({
         }
         this.updateTimer = setTimeout(() => {
           this.setData({ decodeProgress: progress, scanLine })
-          
-          // 实时更新预览图片 - 降低频率，每20行更新一次
-          if (decoder.imageData && scanLine > 0 && scanLine % 20 === 0) {
-            this.decodedImageData = decoder.imageData
-            this.renderDecodedImage(
-              decoder.imageData, 
-              decoder.imageWidth, 
-              decoder.imageHeight
-            ).then((filePath) => {
-              this.setData({ decodedImage: filePath })
-            }).catch((err) => {
-              console.error('实时预览失败:', err)
-              // 失败时不重复尝试
-            })
-          }
-        }, 200) // 200ms 防抖
+        }, 500) // 500ms 防抖，减少UI更新频率
       }
       decoder.onComplete = (imageData, width, height) => {
         this.hasCompletedDecoding = true
@@ -487,6 +486,7 @@ Page({
         // 立即停止录音
         this.forceStopRecording()
         
+        // 解码完成后才渲染图片
         this.renderDecodedImage(imageData, width, height).then((filePath) => {
           this.setData({ 
             isDecoding: false,
@@ -782,6 +782,9 @@ Page({
       // 开始播放 - 每次都创建新的音频上下文
       const audioContext = wx.createInnerAudioContext()
       
+      // 保存到实例，用于后续控制
+      this.audioContext = audioContext
+      
       // 先设置 src
       audioContext.src = this.data.audioFilePath
       
@@ -919,6 +922,26 @@ Page({
             })
           }
         })
+      }
+    })
+  },
+
+  // 打开编码项目仓库
+  openEncoderRepo() {
+    wx.setClipboardData({
+      data: 'https://github.com/olgamiller/SSTVEncoder2',
+      success: () => {
+        wx.showToast({ title: '链接已复制', icon: 'success' })
+      }
+    })
+  },
+
+  // 打开解码项目仓库
+  openDecoderRepo() {
+    wx.setClipboardData({
+      data: 'https://github.com/xdsopl/robot36',
+      success: () => {
+        wx.showToast({ title: '链接已复制', icon: 'success' })
       }
     })
   }
