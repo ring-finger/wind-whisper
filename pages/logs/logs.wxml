@@ -61,16 +61,18 @@
         <input class="lcd-input font-mono" type="digit" value="{{formData.frequency}}" bindinput="onFrequencyInput" bindfocus="onFrequencyFocus" placeholder="0.000" />
         <text class="lcd-suffix font-mono">MHz</text>
       </view>
-      <view wx:if="{{frequencySuggestions.length > 0}}" class="frequency-suggestions">
-        <view wx:for="{{frequencySuggestions}}" wx:key="*this" class="suggestion-item" hover-class="button-hover" bindtap="selectFrequency" data-frequency="{{item}}">{{item}} MHz</view>
+      <view wx:if="{{frequencySuggestions.length > 0}}" class="suggestions-wrap">
+        <view class="suggestions-label" wx:if="{{formData.frequency.length === 0}}">最近使用</view>
+        <view wx:for="{{frequencySuggestions}}" wx:key="*this" class="suggestion-item {{formData.frequency.length === 0 ? 'suggestion-recent' : ''}}" hover-class="button-hover" bindtap="selectFrequency" data-frequency="{{item}}">{{item}} MHz</view>
       </view>
     </view>
 
     <view class="float-card">
       <view class="form-label">呼号 CALLSIGN</view>
       <input class="form-input font-mono callsign-input" value="{{formData.callSign}}" bindinput="onCallSignInput" placeholder="CALLSIGN" confirm-type="done" />
-      <view wx:if="{{callSuggestions.length > 0}}" class="call-suggestions">
-        <view wx:for="{{callSuggestions}}" wx:key="*this" class="suggestion-item" hover-class="button-hover" bindtap="selectCallSign" data-callsign="{{item}}">{{item}}</view>
+      <view wx:if="{{callSuggestions.length > 0}}" class="suggestions-wrap">
+        <view class="suggestions-label" wx:if="{{formData.callSign.length === 0}}">最近使用</view>
+        <view wx:for="{{callSuggestions}}" wx:key="*this" class="suggestion-item {{formData.callSign.length === 0 ? 'suggestion-recent' : ''}}" hover-class="button-hover" bindtap="selectCallSign" data-callsign="{{item}}">{{item}}</view>
       </view>
     </view>
 

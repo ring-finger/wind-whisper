@@ -4,17 +4,20 @@ App({
     radio: {
       name: '无线电',
       navBg: '#F9F7F4',
-      navText: '#000000'
+      navText: '#000000',
+      bgPrimary: '#F4F7FA'
     },
     morandi: {
       name: '奶油莫兰迪',
       navBg: '#F8F2E9',
-      navText: '#000000'
+      navText: '#000000',
+      bgPrimary: '#F5F0E6'
     },
     dark: {
       name: '深色',
       navBg: '#1A1A2E',
-      navText: '#FFFFFF'
+      navText: '#FFFFFF',
+      bgPrimary: '#1A1A2E'
     }
   },
 

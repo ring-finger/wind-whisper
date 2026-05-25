@@ -57,9 +57,9 @@
       </view>
 
       <view class="control-group">
-        <view class="action-btn primary {{uploadImage && !isEncoding ? '' : 'btn-disabled'}}" bindtap="onEncodeTap">
+        <button class="action-btn {{uploadImage && !isEncoding ? 'primary' : 'btn-disabled'}}" bindtap="onEncodeTap">
           {{isEncoding ? '正在生成音频...' : '生成SSTV音频'}}
-        </view>
+        </button>
       </view>
 
       <view class="audio-panel" wx:if="{{audioFilePath}}">
@@ -119,32 +119,20 @@
         </button>
       </view>
 
-      <!-- 实时解码图片预览 -->
-      <view class="decode-preview" wx:if="{{isDecoding || decodedImage}}">
-        <view class="preview-header">
-          <text class="preview-title">📺 实时解码</text>
-        </view>
-        <canvas 
-          class="preview-canvas" 
-          type="2d" 
-          id="decodeCanvas"
-          style="width: 320rpx; height: 240rpx;"
-        ></canvas>
-        <view class="preview-info">
-          <text wx:if="{{isDecoding}}">扫描线: {{scanLine}} / 240</text>
-          <text wx:if="{{!isDecoding && decodedImage}}">解码完成</text>
-        </view>
-      </view>
-
+      <!-- 解码进度 -->
       <view class="decode-progress" wx:if="{{isDecoding}}">
+        <view class="progress-info">
+          <text class="progress-scan-line">扫描线: {{scanLine}} / 240</text>
+        </view>
         <view class="progress-bar">
           <view class="progress-fill" style="{{'width:' + decodeProgress + '%;'}}"></view>
         </view>
         <text class="progress-text">解码进度: {{decodeProgress}}%</text>
       </view>
 
+      <!-- 解码结果 -->
       <view class="result-image-container" wx:if="{{decodedImage}}">
-        <text class="result-label">解码结果</text>
+        <text class="result-label">🎉 解码完成</text>
         <image class="result-image" src="{{decodedImage}}" mode="aspectFit" />
         <view class="result-actions">
           <button class="action-btn primary" bindtap="saveToAlbum">保存到相册</button>
@@ -176,6 +164,20 @@
         <text>2. 将音频源靠近手机麦克风</text>
         <text>3. 点击开始监听按钮</text>
         <text>4. 等待解码完成后保存图片</text>
+      </view>
+    </view>
+
+    <!-- 开源项目致谢 -->
+    <view class="acknowledgment" wx:if="{{currentTab === 'encode'}}">
+      <text class="ack-title"> 感谢开源项目</text>
+      <view class="ack-content">
+        <text class="ack-item">SSTVEncoder2 (olgamiller)</text>
+      </view>
+    </view>
+    <view class="acknowledgment" wx:if="{{currentTab === 'decode'}}">
+      <text class="ack-title"> 感谢开源项目</text>
+      <view class="ack-content">
+        <text class="ack-item">robot36 (xdsopl)</text>
       </view>
     </view>
   </view>

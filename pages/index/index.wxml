@@ -17,19 +17,19 @@
 
   <!-- 统计卡片区域 -->
   <view class="stats-grid">
-    <view class="stat-card">
+    <view class="stat-card" hover-class="button-hover" bindtap="goToTodayLogs">
       <text class="stat-value">{{stats.todayLogs || 0}}</text>
       <text class="stat-label">今日通联</text>
     </view>
-    <view class="stat-card">
+    <view class="stat-card" hover-class="button-hover" bindtap="goToWeekLogs">
       <text class="stat-value">{{stats.weekLogs || 0}}</text>
       <text class="stat-label">本周通联</text>
     </view>
-    <view class="stat-card">
+    <view class="stat-card" hover-class="button-hover" bindtap="goToMonthLogs">
       <text class="stat-value">{{stats.monthLogs || 0}}</text>
       <text class="stat-label">本月通联</text>
     </view>
-    <view class="stat-card">
+    <view class="stat-card" hover-class="button-hover" bindtap="goToAllLogs">
       <text class="stat-value">{{stats.bandCount || 0}}</text>
       <text class="stat-label">频段数</text>
     </view>
@@ -99,7 +99,6 @@
     <view class="fab-btn" hover-class="fab-hover" bindtap="goToAddQSO">
       <text class="fab-icon">+</text>
     </view>
-    <view class="copyright">@BA4IWA</view>
   </view>
   </view>
 </view>

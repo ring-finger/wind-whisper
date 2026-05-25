@@ -82,8 +82,11 @@ class SSTVDecoder {
     this.audioBuffer.push(...frameBuffer)
     this.totalSamples += frameBuffer.length
 
-    while (this.audioBuffer.length >= 32) {
+    // 限制每次处理的样本数，避免阻塞UI线程
+    let processed = 0
+    while (this.audioBuffer.length >= 32 && processed < 10) {
       this.processAudioData()
+      processed++
     }
   }
 

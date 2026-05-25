@@ -11,7 +11,7 @@ const STORAGE_NICK = 'wxMineNickName'
 const STORAGE_THEME = 'appTheme'
 
 // 当前版本号 - 每次发布新版本时更新
-const CURRENT_VERSION = '1.2.4'
+const CURRENT_VERSION = '1.2.5'
 
 // 更新日志内容
 const UPDATE_LOGS = [
@@ -20,8 +20,8 @@ const UPDATE_LOGS = [
     date: '2026-05-12',
     title: '功能优化',
     content: [
-      '优化日志添加流程，更便捷的使用方式',
-      '我的分享更友好的展示方式'
+      '根据用户使用习惯，首页统计可以点击跳转日志列表',
+      '根据用户使用习惯，日志详情页点击信息可复制'
     ]
   }
 ]

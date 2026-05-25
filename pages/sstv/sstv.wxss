@@ -1,3 +1,9 @@
+/* 确保页面背景色与主题一致 */
+page {
+  background-color: transparent;
+  height: 100%;
+}
+
 .container {
   min-height: 100vh;
   background: var(--bg-primary);
@@ -180,6 +186,8 @@
 /* 按钮 */
 .control-group {
   padding: 0 20rpx;
+  display: flex;
+  justify-content: center;
 }
 
 .action-btn {
@@ -198,20 +206,20 @@
 
 /* 按钮主题色 - 使用 CSS 变量，跟随主题统一变化 */
 .action-btn.primary {
-  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
-  color: var(--text-inverse);
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary)) !important;
+  color: var(--text-inverse) !important;
   opacity: 1;
 }
 
 .action-btn.btn-disabled {
-  background: var(--border-color);
-  color: var(--text-placeholder);
+  background: var(--border-color) !important;
+  color: var(--text-placeholder) !important;
   opacity: 0.6;
 }
 
 .action-btn.danger {
-  background: linear-gradient(135deg, var(--error), var(--gradient-accent1));
-  color: var(--text-inverse);
+  background: linear-gradient(135deg, var(--error), var(--gradient-accent1)) !important;
+  color: var(--text-inverse) !important;
 }
 
 .action-btn.secondary {
@@ -226,6 +234,27 @@
 .action-btn[disabled] {
   background: var(--border-color);
   color: var(--text-placeholder);
+}
+
+/* 重置 button 标签的默认样式 */
+button.action-btn {
+  border: none !important;
+  outline: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border-radius: 16rpx !important;
+  font-size: 32rpx !important;
+  font-weight: 600 !important;
+  line-height: 88rpx !important;
+  height: 88rpx !important;
+  min-height: 88rpx !important;
+  text-align: center !important;
+  box-shadow: 0 4rpx 12rpx var(--shadow-color) !important;
+  transition: all 0.3s !important;
+}
+
+button.action-btn::after {
+  border: none !important;
 }
 
 /* 设置区域 */
@@ -305,6 +334,8 @@
 
 .decode-controls {
   padding: 0 20rpx;
+  display: flex;
+  justify-content: center;
 }
 
 /* 解码预览 */
@@ -345,6 +376,17 @@
   background: var(--card-bg);
   margin: 20rpx;
   border-radius: 16rpx;
+}
+
+.progress-info {
+  margin-bottom: 15rpx;
+  text-align: center;
+}
+
+.progress-scan-line {
+  font-size: 28rpx;
+  color: var(--accent-primary);
+  font-weight: 600;
 }
 
 .progress-bar {
@@ -420,6 +462,45 @@
   font-size: 26rpx;
   color: var(--text-secondary);
   line-height: 1.8;
+}
+
+/* 开源项目致谢 */
+.acknowledgment {
+  padding: 20rpx;
+  background: var(--card-bg);
+  margin: 20rpx;
+  border-radius: 16rpx;
+  border-left: 6rpx solid var(--accent-primary);
+}
+
+.ack-title {
+  display: block;
+  font-size: 28rpx;
+  color: var(--accent-primary);
+  font-weight: 600;
+  margin-bottom: 15rpx;
+}
+
+.ack-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.ack-item {
+  display: block;
+  font-size: 24rpx;
+  color: var(--text-primary);
+  line-height: 1.6;
+}
+
+.ack-link {
+  display: block;
+  font-size: 22rpx;
+  color: var(--accent-primary);
+  line-height: 1.6;
+  padding-left: 20rpx;
+  word-break: break-all;
 }
 
 /* 新音频面板样式 */
