@@ -1,31 +1,41 @@
 <view class="theme-wrapper">
   <scroll-view scroll-y class="container">
+    <!-- 复制成功提示 -->
+    <view class="copy-toast {{showCopyToast ? 'copy-toast-show' : ''}}" >
+      <text class="copy-toast-icon">✓</text>
+      <text class="copy-toast-text">{{copyToastMsg}}</text>
+    </view>
+
     <view class="log-detail-card">
-    <view class="card-header">
-      <view class="callsign font-mono">{{log.callSign}}</view>
-      <view class="date font-mono">{{bjtDateTimeFull}}</view>
+    <!-- 卡片头部：点击复制完整日志 -->
+    <view class="copyable-header" hover-class="copyable-header-hover" bindtap="copyFullLog">
+      <view class="card-header">
+        <view class="callsign font-mono">{{log.callSign}}</view>
+        <view class="date font-mono">{{bjtDateTimeFull}}</view>
+      </view>
+      <view class="copy-hint">点击此处复制完整日志</view>
     </view>
 
     <view class="info-section">
       <view class="section-title">基础信息</view>
       <view class="info-grid">
-        <view class="info-item">
+        <view class="info-item copyable-item" hover-class="copyable-item-hover" bindtap="copyField" data-field="frequency" data-label="频率">
           <text class="info-label">频率</text>
           <text class="info-value font-mono">{{log.frequency}} MHz</text>
         </view>
-        <view class="info-item">
+        <view class="info-item copyable-item" hover-class="copyable-item-hover" bindtap="copyField" data-field="mode" data-label="模式">
           <text class="info-label">模式</text>
           <text class="info-value font-mono">{{log.mode}}</text>
         </view>
-        <view class="info-item">
+        <view class="info-item copyable-item" hover-class="copyable-item-hover" bindtap="copyField" data-field="bjt" data-label="BJT时间" data-value="{{bjtDateTimeFull}}">
           <text class="info-label">BJT</text>
           <text class="info-value font-mono">{{bjtDateTimeFull}}</text>
         </view>
-        <view class="info-item">
+        <view class="info-item copyable-item" hover-class="copyable-item-hover" bindtap="copyField" data-field="utc" data-label="UTC时间" data-value="{{utcDateTimeFull}}">
           <text class="info-label">UTC</text>
           <text class="info-value font-mono">{{utcDateTimeFull}}</text>
         </view>
-        <view class="info-item" wx:if="{{log.qth}}">
+        <view class="info-item copyable-item" hover-class="copyable-item-hover" bindtap="copyField" data-field="qth" data-label="位置" wx:if="{{log.qth}}">
           <text class="info-label">位置</text>
           <text class="info-value">{{log.qth}}</text>
         </view>
@@ -35,15 +45,15 @@
     <view class="info-section" wx:if="{{log.equipment || log.antenna || log.power}}">
       <view class="section-title">设备信息</view>
       <view class="info-grid">
-        <view class="info-item" wx:if="{{log.equipment}}">
+        <view class="info-item copyable-item" hover-class="copyable-item-hover" bindtap="copyField" data-field="equipment" data-label="设备" wx:if="{{log.equipment}}">
           <text class="info-label">设备</text>
           <text class="info-value">{{log.equipment}}</text>
         </view>
-        <view class="info-item" wx:if="{{log.antenna}}">
+        <view class="info-item copyable-item" hover-class="copyable-item-hover" bindtap="copyField" data-field="antenna" data-label="天线" wx:if="{{log.antenna}}">
           <text class="info-label">天线</text>
           <text class="info-value">{{log.antenna}}</text>
         </view>
-        <view class="info-item" wx:if="{{powerDisplay}}">
+        <view class="info-item copyable-item" hover-class="copyable-item-hover" bindtap="copyField" data-field="power" data-label="功率" data-value="{{powerDisplay}}" wx:if="{{powerDisplay}}">
           <text class="info-label">功率</text>
           <text class="info-value">{{powerDisplay}}</text>
         </view>
@@ -53,11 +63,11 @@
     <view class="info-section">
       <view class="section-title">信号报告</view>
       <view class="info-grid">
-        <view class="info-item">
+        <view class="info-item copyable-item" hover-class="copyable-item-hover" bindtap="copyField" data-field="myRst" data-label="己方RST" data-value="{{myRst}}">
           <text class="info-label">己方 RST</text>
           <text class="info-value font-mono rst-accent">{{myRst}}</text>
         </view>
-        <view class="info-item">
+        <view class="info-item copyable-item" hover-class="copyable-item-hover" bindtap="copyField" data-field="theirRst" data-label="对方RST" data-value="{{theirRst}}">
           <text class="info-label">对方 RST</text>
           <text class="info-value font-mono rst-accent">{{theirRst}}</text>
         </view>
@@ -67,14 +77,14 @@
     <view class="info-section" wx:if="{{log.weather || log.notes}}">
       <view class="section-title">其他信息</view>
       <view class="info-grid">
-        <view class="info-item info-item-block" wx:if="{{log.weather}}">
+        <view class="info-item info-item-block copyable-item" hover-class="copyable-item-hover" bindtap="copyField" data-field="weather" data-label="天气" data-value="{{weatherText || log.weather}}" wx:if="{{log.weather}}">
           <text class="info-label">天气 WX</text>
           <view class="info-value weather-detail-row">
             <text wx:if="{{weatherIcon}}" class="weather-detail-emoji">{{weatherIcon}}</text>
             <text class="weather-detail-text">{{weatherText || log.weather}}</text>
           </view>
         </view>
-        <view class="info-remarks" wx:if="{{log.notes}}">
+        <view class="info-remarks copyable-item" hover-class="copyable-item-hover" bindtap="copyField" data-field="notes" data-label="备注" data-value="{{log.notes}}" wx:if="{{log.notes}}">
           <text class="info-label">备注</text>
           <text class="info-value">{{log.notes}}</text>
         </view>

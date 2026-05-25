@@ -164,6 +164,11 @@ Page({
       this._switchToAddOnShow = true
     }
     
+    // 处理筛选参数（从首页统计卡片跳转）
+    if (options && options.filter) {
+      this._pendingFilter = options.filter
+    }
+    
     // 处理分享链接
     if (options && options.shareId) {
       this.loadSharedLogs(options.shareId)
@@ -196,32 +201,38 @@ Page({
 
   onShow() {
     this.loadTheme()
-    
+
     // 检查是否需要切换到添加页
     if (this._switchToAddOnShow) {
       this._switchToAddOnShow = false
-      
-      this.setData({ 
+      this.setData({
         currentTab: 'add',
-        rstFocus: {
-          theirRst: 'r',
-          myRst: 'r'
-        }
+        rstFocus: { theirRst: 'r', myRst: 'r' }
       }, () => {
-        // 页面渲染完成后滚动到顶部
-        setTimeout(() => {
-          wx.pageScrollTo({ scrollTop: 0, duration: 0 })
-        }, 100)
+        setTimeout(() => { wx.pageScrollTo({ scrollTop: 0, duration: 0 }) }, 100)
       })
-      return
     }
-    
-    if (this.data.currentTab === 'list') {
+
+    // 应用待处理的筛选（从首页统计卡片跳转）
+    let shouldLoadLogs = this.data.currentTab === 'list'
+    if (this._pendingFilter) {
+      const filter = this._pendingFilter
+      this._pendingFilter = null
+      this.applyPresetFilter(filter)
+      shouldLoadLogs = false
+    }
+
+    if (shouldLoadLogs) {
       this.loadLogs()
     }
+
+    // 统一加载推荐数据和分享数据
     this.loadCallSuggestions()
-    this.loadMyShares()  // 加载我的分享数量
-    
+    if (this.data.currentTab === 'add') {
+      this.loadFrequencySuggestions()
+    }
+    this.loadMyShares()
+
     // 检查是否需要显示分享引导闪烁效果
     this.checkShareGuide()
   },
@@ -364,6 +375,7 @@ Page({
         this.loadLogs()
       } else {
         this.initDateTime()
+        this.loadFrequencySuggestions()
       }
     })
   },
@@ -962,6 +974,44 @@ Page({
     this.setData({ dateFrom: '', dateTo: '' }, () => this.applyFilter())
   },
 
+  // 应用预设筛选（从首页统计卡片跳转）
+  applyPresetFilter(filter) {
+    const now = new Date()
+    let dateFrom = ''
+    let dateTo = ''
+
+    if (filter === 'today') {
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+      const dateStr = ymdFromParts(today.getFullYear(), today.getMonth() + 1, today.getDate())
+      dateFrom = dateStr
+      dateTo = dateStr
+    } else if (filter === 'week') {
+      // 计算本周一
+      const dayOfWeek = now.getDay() || 7
+      const monday = new Date(now.getTime() - (dayOfWeek - 1) * 24 * 60 * 60 * 1000)
+      dateFrom = ymdFromParts(monday.getFullYear(), monday.getMonth() + 1, monday.getDate())
+      // 计算本周日
+      const sunday = new Date(monday.getTime() + 6 * 24 * 60 * 60 * 1000)
+      dateTo = ymdFromParts(sunday.getFullYear(), sunday.getMonth() + 1, sunday.getDate())
+    } else if (filter === 'month') {
+      // 本月1日
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
+      dateFrom = ymdFromParts(firstDay.getFullYear(), firstDay.getMonth() + 1, firstDay.getDate())
+      // 本月最后一天
+      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+      dateTo = ymdFromParts(lastDay.getFullYear(), lastDay.getMonth() + 1, lastDay.getDate())
+    }
+
+    this.setData({
+      dateFrom,
+      dateTo,
+      searchExpanded: true,
+      currentTab: 'list'
+    }, () => {
+      this.loadLogs()
+    })
+  },
+
   openDetail(e) {
     const id = e.currentTarget.dataset.id
     const shareId = e.currentTarget.dataset.shareid
@@ -1005,23 +1055,38 @@ Page({
     if (value.length > 0) {
       this.filterCallSuggestions(value)
     } else {
-      this.setData({ callSuggestions: [] })
+      // 输入清空时，恢复默认最近3条
+      this.loadCallSuggestions()
     }
   },
 
   filterCallSuggestions(input) {
     const history = app.globalData.callHistory || []
-    const filtered = history.filter(item => item.toUpperCase().includes(input.toUpperCase())).slice(0, 5)
+    const currentCallSign = this.data.formData.callSign
+    const filtered = history.filter(item => 
+      item.toUpperCase().includes(input.toUpperCase()) && item !== currentCallSign
+    ).slice(0, 5)
     this.setData({ callSuggestions: filtered })
   },
 
+  // 加载最近3条去重呼号（默认展示）
   loadCallSuggestions() {
     const history = app.globalData.callHistory || []
-    this.setData({ callSuggestions: history.slice(0, 5) })
+    const seen = new Set()
+    const recent = []
+    for (const item of history) {
+      if (!seen.has(item)) {
+        seen.add(item)
+        recent.push(item)
+        if (recent.length >= 3) break
+      }
+    }
+    this.setData({ callSuggestions: recent })
   },
 
   selectCallSign(e) {
     const callSign = e.currentTarget.dataset.callsign
+    // 选中后清空推荐列表，避免已选中的值重复出现在联想中
     this.setData({ 'formData.callSign': callSign, callSuggestions: [] })
     wx.vibrateShort({ type: VIBRATE_TYPE })
   },
@@ -1050,36 +1115,30 @@ Page({
     if (value.length > 0) {
       this.filterFrequencySuggestions(value)
     } else {
-      this.setData({ frequencySuggestions: [], isUHF: false, isVHF: false })
+      // 输入清空时，恢复默认最近3条
+      this.loadFrequencySuggestions()
     }
   },
 
-  // 频率输入框聚焦时，加载缓存的频率列表
+  // 频率输入框聚焦时，加载最近3条频率
   onFrequencyFocus() {
     this.loadFrequencySuggestions()
   },
 
-  // 加载所有历史频率列表
+  // 加载最近3条去重频率（默认展示）
   loadFrequencySuggestions() {
     try {
       const logs = wx.getStorageSync('contactLogs') || []
-      const frequencySet = new Set(logs.map(log => log.frequency).filter(f => f))
-      const frequencies = Array.from(frequencySet)
-      // 按使用频率排序（最近使用的在前）
-      const recentFreqs = []
-      const otherFreqs = []
-      logs.forEach(log => {
-        if (log.frequency && !recentFreqs.includes(log.frequency)) {
-          recentFreqs.push(log.frequency)
+      const seen = new Set()
+      const recent = []
+      for (const log of logs) {
+        if (log.frequency && !seen.has(log.frequency)) {
+          seen.add(log.frequency)
+          recent.push(log.frequency)
+          if (recent.length >= 3) break
         }
-      })
-      frequencies.forEach(f => {
-        if (!recentFreqs.includes(f)) {
-          otherFreqs.push(f)
-        }
-      })
-      const sortedFreqs = [...recentFreqs, ...otherFreqs].slice(0, 8)
-      this.setData({ frequencySuggestions: sortedFreqs })
+      }
+      this.setData({ frequencySuggestions: recent, isUHF: false, isVHF: false })
     } catch (e) {
       console.error('加载频率历史失败', e)
     }
@@ -1088,19 +1147,30 @@ Page({
   filterFrequencySuggestions(input) {
     try {
       const logs = wx.getStorageSync('contactLogs') || []
-      const frequencySet = new Set(logs.map(log => log.frequency).filter(f => f))
-      const frequencies = Array.from(frequencySet)
-      const filtered = frequencies.filter(freq => freq.includes(input)).slice(0, 5)
+      const seen = new Set()
+      const matched = []
+      const currentFrequency = this.data.formData.frequency
+      // 按日志顺序遍历，保留最近匹配的项在前
+      for (let i = logs.length - 1; i >= 0; i--) {
+        const f = logs[i].frequency
+        if (f && f.includes(input) && !seen.has(f) && f !== currentFrequency) {
+          seen.add(f)
+          matched.push(f)
+        }
+      }
+      const filtered = matched.reverse().slice(0, 5)
       this.setData({ frequencySuggestions: filtered })
     } catch (e) {
-      console.error('加载频率历史失败', e)
+      console.error('过滤频率建议失败', e)
     }
   },
 
   selectFrequency(e) {
     const frequency = e.currentTarget.dataset.frequency
-    this.setData({ 'formData.frequency': frequency, frequencySuggestions: [] })
+    this.setData({ 'formData.frequency': frequency })
     this.updateFrequencyRangeStatus(frequency)
+    // 选中后清空推荐列表，避免已选中的值重复出现在联想中
+    this.setData({ frequencySuggestions: [] })
     wx.vibrateShort({ type: VIBRATE_TYPE })
   },
 
