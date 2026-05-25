@@ -156,13 +156,13 @@
         <text>1. 点击上传区域选择图片</text>
         <text>2. 图片会被自动调整为SSTV格式</text>
         <text>3. 调整呼号位置</text>
-        <text>4. 点击生成按钮创建音频</text>
+        <text>4. 点击生成按钮创建音频（当前只支持Robot36）</text>
         <text>5. 通过无线电发射音频信号</text>
       </view>
       <view class="tips-content" wx:if="{{currentTab === 'decode'}}">
         <text>1. 确保环境安静，减少背景噪音</text>
         <text>2. 将音频源靠近手机麦克风</text>
-        <text>3. 点击开始监听按钮</text>
+        <text>3. 点击开始监听按钮（当前只支持Robot36）</text>
         <text>4. 等待解码完成后保存图片</text>
       </view>
     </view>
