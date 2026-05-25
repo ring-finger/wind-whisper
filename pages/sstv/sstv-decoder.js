@@ -71,6 +71,14 @@ class SSTVDecoder {
     if (!frameBuffer || frameBuffer.length === 0) return
 
     this.lastAudioTime = Date.now()
+    
+    // 防止内存无限增长：限制缓冲区最大 96000 采样 (约 12s @ 8kHz)
+    const MAX_BUFFER = 96000
+    if (this.audioBuffer.length + frameBuffer.length > MAX_BUFFER) {
+      // 丢弃最旧的一半数据
+      this.audioBuffer.splice(0, this.audioBuffer.length - MAX_BUFFER / 2)
+    }
+    
     this.audioBuffer.push(...frameBuffer)
     this.totalSamples += frameBuffer.length
 
@@ -143,6 +151,8 @@ class SSTVDecoder {
 
             if (this.currentLine >= this.imageHeight) {
               this.isDecoding = false
+              // 刷新最后一行残留数据（偶数行数据在 prevLinePixels 中未写入 imageData）
+              this.flushLastLine()
               if (this.onComplete) {
                 this.onComplete(this.imageData, this.imageWidth, this.imageHeight)
               }
@@ -176,6 +186,8 @@ class SSTVDecoder {
       this.silenceCount++
       if (this.silenceCount > 100 && this.currentLine > 10) {
         this.isDecoding = false
+        // 刷新最后一行残留数据
+        this.flushLastLine()
         if (this.onComplete) {
           this.onComplete(this.imageData, this.imageWidth, this.imageHeight)
         }
@@ -310,6 +322,35 @@ class SSTVDecoder {
     this.yPixels = []
     this.redPixels = []
     this.bluePixels = []
+  }
+
+  // 刷新最后一行残留数据（偶数行数据暂存在 prevLinePixels 未写入 imageData）
+  flushLastLine() {
+    if (!this.prevLinePixels || !this.prevLinePixels.y) return
+    
+    const lineIndex = Math.floor(this.currentLine / 2)
+    const width = this.imageWidth
+    const prevY = this.prevLinePixels.y
+    const prevB = this.prevLinePixels.b
+
+    for (let x = 0; x < width; x++) {
+      const idx = (lineIndex * width + x) * 4
+      const yIdx = Math.min(x, prevY.length - 1)
+      const y = prevY[yIdx] || 0
+
+      let b = y
+      if (prevB.length > 0) {
+        const bIdx = Math.min(Math.floor(x / 2), prevB.length - 1)
+        b = prevB[bIdx] || y
+      }
+
+      this.imageData[idx] = y      // R 暂用 Y（无 R 数据）
+      this.imageData[idx + 1] = y  // G = Y
+      this.imageData[idx + 2] = b  // B
+      this.imageData[idx + 3] = 255
+    }
+
+    this.prevLinePixels = null
   }
 
   detectFrequency(samples) {

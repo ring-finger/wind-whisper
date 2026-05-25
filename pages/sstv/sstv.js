@@ -1,7 +1,25 @@
 const VIBRATE_TYPE = 'medium'
 // 导入拆分后的模块 (对应 Java SSTVEncoder2 项目结构)
-const { createMode } = require('./sstv-factory')
+const Robot36 = require('./sstv-robot36')
+const Scottie1 = require('./sstv-scottie1')
 const SSTVDecoder = require('./sstv-decoder')
+
+/**
+ * SSTV 模式工厂方法
+ * @param {string} modeName - 模式名称
+ * @param {number} sampleRate - 采样率
+ */
+function createMode(modeName, sampleRate) {
+  switch (modeName) {
+    case 'Robot36':
+      return new Robot36(sampleRate || 48000)
+    case 'Scottie1':
+      return new Scottie1(sampleRate || 48000)
+    default:
+      console.warn('[SSTV] 未知模式:', modeName, '，使用默认模式 Robot36')
+      return new Robot36(sampleRate || 48000)
+  }
+}
 
 Page({
   data: {
@@ -139,8 +157,13 @@ Page({
       
       if (this.data.isDecoding && this.decoder) {
         try {
-          // 将 ArrayBuffer 转换为 Float32Array
-          const floatArray = new Float32Array(frameBuffer)
+          // WeChat PCM 录音返回 Int16 格式 (16-bit signed integer Little-Endian)
+          // 需手动转换为归一化的 Float32Array [-1.0, 1.0]
+          const int16Array = new Int16Array(frameBuffer)
+          const floatArray = new Float32Array(int16Array.length)
+          for (let i = 0; i < int16Array.length; i++) {
+            floatArray[i] = int16Array[i] / 32768.0
+          }
           
           // 处理音频帧用于解码
           this.decoder.processAudioFrame(floatArray)
