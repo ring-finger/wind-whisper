@@ -1,12 +1,12 @@
-/* 确保页面背景色与主题一致 */
+/* 页面背景色 - 静态颜色 */
 page {
-  background-color: transparent;
+  background-color: #F5F6FA;
   height: 100%;
 }
 
 .container {
   min-height: 100vh;
-  background: var(--bg-primary);
+  background: #F5F6FA;
   padding-bottom: 40rpx;
 }
 
@@ -21,10 +21,10 @@ page {
 /* 标签栏 */
 .tab-bar {
   display: flex;
-  background: var(--card-bg);
+  background: #FFFFFF;
   padding: 20rpx 0;
   margin-bottom: 20rpx;
-  box-shadow: 0 2rpx 10rpx var(--shadow-color);
+  box-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.08);
 }
 
 .tab-item {
@@ -32,25 +32,25 @@ page {
   text-align: center;
   padding: 20rpx;
   font-size: 30rpx;
-  color: var(--text-secondary);
+  color: #666666;
   border-bottom: 4rpx solid transparent;
   transition: all 0.3s;
 }
 
 .tab-item.active {
-  color: var(--accent-primary);
-  border-bottom-color: var(--accent-primary);
+  color: #4A90D9;
+  border-bottom-color: #4A90D9;
   font-weight: 600;
 }
 
 /* 上传区域 */
 .upload-area {
-  background: var(--card-bg);
+  background: #FFFFFF;
   border-radius: 20rpx;
   padding: 60rpx 40rpx;
   text-align: center;
   margin: 20rpx;
-  border: 4rpx dashed var(--border-color);
+  border: 4rpx dashed #E0E0E0;
   transition: all 0.3s;
   position: relative;
   overflow: hidden;
@@ -63,13 +63,13 @@ page {
 
 .upload-area:active {
   opacity: 0.8;
-  border-color: var(--accent-primary);
+  border-color: #4A90D9;
 }
 
 .upload-area.has-image {
   padding:0;
   border-style: solid;
-  border-color: var(--border-color);
+  border-color: #E0E0E0;
   overflow: visible;
 }
 
@@ -81,13 +81,13 @@ page {
 .upload-text {
   display: block;
   font-size: 32rpx;
-  color: var(--text-primary);
+  color: #1A1A2E;
   margin-bottom: 10rpx;
 }
 
 .upload-hint {
   font-size: 24rpx;
-  color: var(--text-secondary);
+  color: #666666;
 }
 
 .upload-preview {
@@ -114,28 +114,28 @@ page {
   justify-content: center;
   padding: 12rpx 16rpx;
   border-radius: 16rpx;
-  background: rgba(var(--text-primary-rgb), 0.65);
+  background: rgba(26,26,46,0.65);
   backdrop-filter: blur(20rpx);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4rpx 12rpx var(--shadow-color);
-  border: 2rpx solid rgba(var(--text-inverse-rgb), 0.2);
+  box-shadow: 0 4rpx 12rpx rgba(0,0,0,0.08);
+  border: 2rpx solid rgba(255,255,255,0.2);
 }
 
 .action-btn-small:active {
   transform: scale(0.92);
-  background: rgba(var(--text-primary-rgb), 0.85);
-  border-color: rgba(var(--text-inverse-rgb), 0.4);
-  box-shadow: 0 2rpx 8rpx var(--shadow-color);
+  background: rgba(26,26,46,0.85);
+  border-color: rgba(255,255,255,0.4);
+  box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.08);
 }
 
 .action-btn-small.reselect:active {
-  background: rgba(var(--action-blue-rgb), 0.8);
-  border-color: rgba(var(--action-blue-rgb), 0.6);
+  background: rgba(74,144,217,0.8);
+  border-color: rgba(74,144,217,0.6);
 }
 
 .action-btn-small.remove:active {
-  background: rgba(var(--action-red-rgb), 0.9);
-  border-color: rgba(var(--action-red-rgb), 0.7);
+  background: rgba(255,107,107,0.9);
+  border-color: rgba(255,107,107,0.7);
 }
 
 .action-icon {
@@ -146,28 +146,28 @@ page {
 
 .action-label {
   font-size: 20rpx;
-  color: rgba(var(--text-inverse-rgb), 0.95);
+  color: rgba(255,255,255,0.95);
   font-weight: 500;
   letter-spacing: 2rpx;
-  text-shadow: 0 1rpx 2rpx rgba(var(--text-primary-rgb), 0.5);
+  text-shadow: 0 1rpx 2rpx rgba(26,26,46,0.5);
 }
 
 .action-btn-small.reselect {
-  background: rgba(var(--action-blue-rgb), 0.75);
-  border-color: rgba(var(--action-blue-rgb), 0.5);
+  background: rgba(74,144,217,0.75);
+  border-color: rgba(74,144,217,0.5);
 }
 
 .action-btn-small.reselect .action-label {
-  color: var(--text-inverse);
+  color: #FFFFFF;
 }
 
 .action-btn-small.remove {
-  background: rgba(var(--action-red-rgb), 0.75);
-  border-color: rgba(var(--action-red-rgb), 0.5);
+  background: rgba(255,107,107,0.75);
+  border-color: rgba(255,107,107,0.5);
 }
 
 .action-btn-small.remove .action-label {
-  color: var(--text-inverse);
+  color: #FFFFFF;
 }
 
 .image-size-label {
@@ -175,8 +175,8 @@ page {
   bottom: 20rpx;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(var(--text-primary-rgb), 0.6);
-  color: var(--text-inverse);
+  background: rgba(26,26,46,0.6);
+  color: #FFFFFF;
   font-size: 22rpx;
   padding: 8rpx 20rpx;
   border-radius: 20rpx;
@@ -204,27 +204,27 @@ page {
   justify-content: center;
 }
 
-/* 按钮主题色 - 使用 CSS 变量，跟随主题统一变化 */
+/* 按钮主题色 - 静态颜色（独立分包无法使用主包主题） */
 .action-btn.primary {
-  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary)) !important;
-  color: var(--text-inverse) !important;
+  background: linear-gradient(135deg, #4A90D9, #6CB4EE) !important;
+  color: #FFFFFF !important;
   opacity: 1;
 }
 
 .action-btn.btn-disabled {
-  background: var(--border-color) !important;
-  color: var(--text-placeholder) !important;
+  background: #E0E0E0 !important;
+  color: #999999 !important;
   opacity: 0.6;
 }
 
 .action-btn.danger {
-  background: linear-gradient(135deg, var(--error), var(--gradient-accent1)) !important;
-  color: var(--text-inverse) !important;
+  background: linear-gradient(135deg, #FF6B6B, #FF8A80) !important;
+  color: #FFFFFF !important;
 }
 
 .action-btn.secondary {
-  background: var(--bg-primary);
-  color: var(--text-primary);
+  background: #F5F6FA;
+  color: #1A1A2E;
 }
 
 .action-btn:active {
@@ -232,8 +232,8 @@ page {
 }
 
 .action-btn[disabled] {
-  background: var(--border-color);
-  color: var(--text-placeholder);
+  background: #E0E0E0;
+  color: #999999;
 }
 
 /* 重置 button 标签的默认样式 */
@@ -249,7 +249,7 @@ button.action-btn {
   height: 88rpx !important;
   min-height: 88rpx !important;
   text-align: center !important;
-  box-shadow: 0 4rpx 12rpx var(--shadow-color) !important;
+  box-shadow: 0 4rpx 12rpx rgba(0,0,0,0.08) !important;
   transition: all 0.3s !important;
 }
 
@@ -260,7 +260,7 @@ button.action-btn::after {
 /* 设置区域 */
 .encode-settings, .decode-settings {
   padding: 20rpx;
-  background: var(--card-bg);
+  background: #FFFFFF;
   margin: 20rpx;
   border-radius: 16rpx;
 }
@@ -273,7 +273,7 @@ button.action-btn::after {
 
 .setting-label {
   font-size: 28rpx;
-  color: var(--text-primary);
+  color: #1A1A2E;
   width: 140rpx;
 }
 
@@ -283,7 +283,7 @@ button.action-btn::after {
 
 .setting-value {
   font-size: 26rpx;
-  color: var(--accent-primary);
+  color: #4A90D9;
   width: 80rpx;
   text-align: right;
 }
@@ -298,7 +298,7 @@ button.action-btn::after {
   width: 160rpx;
   height: 160rpx;
   border-radius: 50%;
-  background: var(--color-log);
+  background: #F5F5F5;
   margin: 0 auto 20rpx;
   display: flex;
   align-items: center;
@@ -307,7 +307,7 @@ button.action-btn::after {
 }
 
 .status-circle.active {
-  background: linear-gradient(135deg, var(--accent-active), var(--gradient-accent2));
+  background: linear-gradient(135deg, #5BA3E6, #82B1FF);
   animation: pulse 1s infinite;
 }
 
@@ -323,13 +323,13 @@ button.action-btn::after {
 .status-text {
   display: block;
   font-size: 32rpx;
-  color: var(--text-primary);
+  color: #1A1A2E;
   margin-bottom: 10rpx;
 }
 
 .status-hint {
   font-size: 24rpx;
-  color: var(--text-secondary);
+  color: #666666;
 }
 
 .decode-controls {
@@ -340,7 +340,7 @@ button.action-btn::after {
 
 /* 解码预览 */
 .decode-preview {
-  background: var(--card-bg);
+  background: #FFFFFF;
   margin: 20rpx;
   padding: 20rpx;
   border-radius: 16rpx;
@@ -353,13 +353,13 @@ button.action-btn::after {
 
 .preview-title {
   font-size: 26rpx;
-  color: var(--text-primary);
+  color: #1A1A2E;
   font-weight: 600;
 }
 
 .preview-canvas {
   border-radius: 12rpx;
-  background: var(--card-bg);
+  background: #FFFFFF;
   display: block;
   margin: 0 auto;
 }
@@ -367,13 +367,13 @@ button.action-btn::after {
 .preview-info {
   margin-top: 15rpx;
   font-size: 24rpx;
-  color: var(--text-secondary);
+  color: #666666;
 }
 
 /* 解码进度 */
 .decode-progress {
   padding: 20rpx;
-  background: var(--card-bg);
+  background: #FFFFFF;
   margin: 20rpx;
   border-radius: 16rpx;
 }
@@ -385,13 +385,13 @@ button.action-btn::after {
 
 .progress-scan-line {
   font-size: 28rpx;
-  color: var(--accent-primary);
+  color: #4A90D9;
   font-weight: 600;
 }
 
 .progress-bar {
   height: 20rpx;
-  background: var(--bg-primary);
+  background: #F5F6FA;
   border-radius: 10rpx;
   overflow: hidden;
   margin-bottom: 10rpx;
@@ -399,20 +399,20 @@ button.action-btn::after {
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--accent-active), var(--accent-secondary));
+  background: linear-gradient(90deg, #5BA3E6, #6CB4EE);
   transition: width 0.3s;
 }
 
 .progress-text {
   font-size: 26rpx;
-  color: var(--text-secondary);
+  color: #666666;
   text-align: center;
 }
 
 /* 结果图片 */
 .result-image-container {
   padding: 20rpx;
-  background: var(--card-bg);
+  background: #FFFFFF;
   margin: 20rpx;
   border-radius: 16rpx;
 }
@@ -420,7 +420,7 @@ button.action-btn::after {
 .result-label {
   display: block;
   font-size: 28rpx;
-  color: var(--text-primary);
+  color: #1A1A2E;
   margin-bottom: 15rpx;
 }
 
@@ -443,16 +443,16 @@ button.action-btn::after {
 /* 提示 */
 .tips {
   padding: 20rpx;
-  background: var(--info-soft);
+  background: #D1ECF1;
   margin: 20rpx;
   border-radius: 16rpx;
-  border-left: 6rpx solid var(--info);
+  border-left: 6rpx solid #17A2B8;
 }
 
 .tips-title {
   display: block;
   font-size: 28rpx;
-  color: var(--info);
+  color: #17A2B8;
   font-weight: 600;
   margin-bottom: 15rpx;
 }
@@ -460,23 +460,23 @@ button.action-btn::after {
 .tips-content text {
   display: block;
   font-size: 26rpx;
-  color: var(--text-secondary);
+  color: #666666;
   line-height: 1.8;
 }
 
 /* 开源项目致谢 */
 .acknowledgment {
   padding: 20rpx;
-  background: var(--card-bg);
+  background: #FFFFFF;
   margin: 20rpx;
   border-radius: 16rpx;
-  border-left: 6rpx solid var(--accent-primary);
+  border-left: 6rpx solid #4A90D9;
 }
 
 .ack-title {
   display: block;
   font-size: 28rpx;
-  color: var(--accent-primary);
+  color: #4A90D9;
   font-weight: 600;
   margin-bottom: 15rpx;
 }
@@ -490,14 +490,14 @@ button.action-btn::after {
 .ack-item {
   display: block;
   font-size: 24rpx;
-  color: var(--text-primary);
+  color: #1A1A2E;
   line-height: 1.6;
 }
 
 .ack-link {
   display: block;
   font-size: 22rpx;
-  color: var(--accent-primary);
+  color: #4A90D9;
   line-height: 1.6;
   padding-left: 20rpx;
   word-break: break-all;
@@ -505,11 +505,11 @@ button.action-btn::after {
 
 /* 新音频面板样式 */
 .audio-panel {
-  background: var(--card-bg);
+  background: #FFFFFF;
   margin: 20rpx;
   border-radius: 20rpx;
   padding: 30rpx;
-  box-shadow: 0 4rpx 20rpx var(--shadow-color);
+  box-shadow: 0 4rpx 20rpx rgba(0,0,0,0.08);
 }
 
 .audio-header {
@@ -531,15 +531,15 @@ button.action-btn::after {
   gap: 6rpx;
   padding: 8rpx 20rpx;
   border-radius: 20rpx;
-  background: rgba(var(--action-blue-rgb), 0.15);
-  border: 2rpx solid rgba(var(--action-blue-rgb), 0.3);
+  background: rgba(74,144,217,0.15);
+  border: 2rpx solid rgba(74,144,217,0.3);
   transition: all 0.3s;
 }
 
 .audio-download-btn:active {
-  background: rgba(var(--action-blue-rgb), 0.3);
+  background: rgba(74,144,217,0.3);
   transform: scale(0.95);
-  border-color: rgba(var(--action-blue-rgb), 0.6);
+  border-color: rgba(74,144,217,0.6);
 }
 
 .download-icon {
@@ -549,20 +549,20 @@ button.action-btn::after {
 
 .download-text {
   font-size: 22rpx;
-  color: rgb(var(--action-blue-rgb));
+  color: rgb(74,144,217);
   font-weight: 500;
 }
 
 .audio-title {
   font-size: 28rpx;
   font-weight: 600;
-  color: var(--text-primary);
+  color: #1A1A2E;
 }
 
 .audio-format {
   font-size: 22rpx;
-  color: var(--text-secondary);
-  background: var(--bg-primary);
+  color: #666666;
+  background: #F5F6FA;
   padding: 6rpx 16rpx;
   border-radius: 8rpx;
 }
@@ -576,7 +576,7 @@ button.action-btn::after {
 
 .audio-time {
   font-size: 22rpx;
-  color: var(--text-secondary);
+  color: #666666;
   font-family: ui-monospace, SFMono-Regular, monospace;
   min-width: 60rpx;
   text-align: center;
@@ -585,14 +585,14 @@ button.action-btn::after {
 .audio-progress-bar {
   flex: 1;
   height: 8rpx;
-  background: var(--bg-primary);
+  background: #F5F6FA;
   border-radius: 4rpx;
   overflow: hidden;
 }
 
 .audio-progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--accent-primary), var(--gradient-accent3));
+  background: linear-gradient(90deg, #4A90D9, #B388FF);
   border-radius: 4rpx;
   transition: width 0.3s;
 }
@@ -607,7 +607,7 @@ button.action-btn::after {
   width: 96rpx !important;
   height: 96rpx !important;
   border-radius: 50% !important;
-  background: linear-gradient(135deg, var(--accent-primary), var(--gradient-accent3)) !important;
+  background: linear-gradient(135deg, #4A90D9, #B388FF) !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -619,7 +619,7 @@ button.action-btn::after {
 }
 
 .audio-play-btn.playing {
-  background: linear-gradient(135deg, var(--error), var(--gradient-accent1)) !important;
+  background: linear-gradient(135deg, #FF6B6B, #FF8A80) !important;
 }
 
 .audio-play-btn::after {
@@ -629,7 +629,7 @@ button.action-btn::after {
 
 .play-icon {
   font-size: 36rpx;
-  color: var(--text-inverse);
+  color: #FFFFFF;
 }
 
 .audio-info-tags {
@@ -640,8 +640,8 @@ button.action-btn::after {
 
 .info-tag {
   font-size: 20rpx;
-  color: var(--accent-primary);
-  background: var(--primary-soft);
+  color: #4A90D9;
+  background: #E3F2FD;
   padding: 8rpx 16rpx;
   border-radius: 8rpx;
   font-weight: 500;
@@ -661,7 +661,7 @@ button.action-btn::after {
   position: absolute;
   z-index: 999;
   padding: 8rpx 16rpx;
-  background: rgba(var(--text-primary-rgb), 0.7);
+  background: rgba(26,26,46,0.7);
   border-radius: 8rpx;
   display: none;
   cursor: move;
@@ -679,8 +679,8 @@ button.action-btn::after {
 .callsign-text {
   font-size: 32rpx;
   font-weight: bold;
-  color: var(--text-inverse);
-  text-shadow: 2rpx 2rpx 4rpx rgba(var(--text-primary-rgb), 0.8);
+  color: #FFFFFF;
+  text-shadow: 2rpx 2rpx 4rpx rgba(26,26,46,0.8);
   font-family: monospace;
   white-space: nowrap;
 }
@@ -689,11 +689,11 @@ button.action-btn::after {
 
 /* 呼号按钮样式 */
 .callsign-btn {
-  background: var(--primary-soft) !important;
-  border: 2rpx solid var(--accent-primary) !important;
+  background: #E3F2FD !important;
+  border: 2rpx solid #4A90D9 !important;
 }
 
 .callsign-btn .action-icon,
 .callsign-btn .action-label {
-  color: var(--accent-primary) !important;
+  color: #4A90D9 !important;
 }

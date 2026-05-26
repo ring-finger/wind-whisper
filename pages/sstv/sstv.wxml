@@ -1,9 +1,8 @@
-<view class="theme-wrapper theme-{{currentTheme}}">
-  <view class="container">
-    <canvas type="2d" id="resizeCanvas" class="hidden-canvas" style="width: 320px; height: 240px;"></canvas>
-    <canvas type="2d" id="encodeCanvas" class="hidden-canvas" style="width: 320px; height: 240px;"></canvas>
-    <canvas type="2d" id="tempCanvas" class="hidden-canvas" style="width: 320px; height: 240px;"></canvas>
-    <canvas type="2d" id="pixelCanvas" class="hidden-canvas" style="width: 320px; height: 240px;"></canvas>
+<view class="container">
+  <canvas type="2d" id="resizeCanvas" class="hidden-canvas" style="width: 320px; height: 240px;"></canvas>
+  <canvas type="2d" id="encodeCanvas" class="hidden-canvas" style="width: 320px; height: 240px;"></canvas>
+  <canvas type="2d" id="tempCanvas" class="hidden-canvas" style="width: 320px; height: 240px;"></canvas>
+  <canvas type="2d" id="pixelCanvas" class="hidden-canvas" style="width: 320px; height: 240px;"></canvas>
 
     <view class="tab-bar">
       <view class="tab-item {{currentTab === 'encode' ? 'active' : ''}}" bindtap="switchTab" data-tab="encode">
@@ -105,14 +104,6 @@
 
     <!-- 解码界面 -->
     <view class="decode-panel" wx:if="{{currentTab === 'decode'}}">
-      <view class="decode-status">
-        <view class="status-circle {{isDecoding ? 'active' : ''}}">
-          <text class="status-icon">{{isDecoding ? '🎤' : '⏹️'}}</text>
-        </view>
-        <text class="status-text">{{isDecoding ? '正在监听...' : '点击开始监听'}}</text>
-        <text class="status-hint" wx:if="{{isDecoding}}">请将音频源靠近麦克风</text>
-      </view>
-
       <view class="decode-controls">
         <button class="action-btn {{isDecoding ? 'danger' : 'primary'}}" bindtap="toggleDecode">
           {{isDecoding ? '停止监听' : '开始监听'}}
@@ -181,4 +172,3 @@
       </view>
     </view>
   </view>
-</view>

@@ -45,7 +45,6 @@ Page({
     scanLine: 0,
     recorderManager: null,
     audioContext: null,
-    currentTheme: 'radio',
     // 呼号相关
     callsign: '',
     showCallsign: false,
@@ -57,14 +56,18 @@ Page({
   },
 
   onLoad() {
-    this.loadTheme()
     wx.setNavigationBarTitle({ title: 'SSTV图像传输' })
+    wx.setNavigationBarColor({
+      frontColor: '#000000',
+      backgroundColor: '#F9F7F4',
+      animation: { duration: 0, timingFunc: 'linear' }
+    })
     this.initSSTV()
     this.initRecorder()
   },
 
   onShow() {
-    this.loadTheme()
+    // 页面显示时无需加载主题
   },
 
   onHide() {
@@ -109,41 +112,6 @@ Page({
     }
     
     console.log('页面卸载，资源已清理')
-  },
-
-  loadTheme() {
-    try {
-      const savedTheme = wx.getStorageSync('appTheme') || 'radio'
-      this.setData({ currentTheme: savedTheme })
-      
-      // 根据主题设置导航栏颜色
-      const app = getApp()
-      const themeConfig = app.THEMES[savedTheme] || app.THEMES.radio
-      
-      // 确保导航栏文字颜色是有效的（微信小程序要求只能是 #ffffff 或 #000000）
-      let navText = '#000000'
-      if (savedTheme === 'dark') {
-        navText = '#ffffff'
-      }
-      
-      wx.setNavigationBarColor({
-        frontColor: navText,
-        backgroundColor: themeConfig.navBg || '#F9F7F4',
-        animation: {
-          duration: 0,
-          timingFunc: 'linear'
-        }
-      })
-      
-      // 动态设置页面背景色，确保与主题一致
-      wx.setBackgroundColor({
-        backgroundColor: themeConfig.bgPrimary || '#F4F7FA',
-        backgroundColorTop: themeConfig.bgPrimary || '#F4F7FA',
-        backgroundColorBottom: themeConfig.bgPrimary || '#F4F7FA'
-      })
-    } catch (e) {
-      console.error('加载主题失败', e)
-    }
   },
 
   initSSTV() {
