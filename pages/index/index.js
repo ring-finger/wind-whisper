@@ -19,7 +19,30 @@ Page({
     currentTheme: 'radio'
   },
 
+  // 统一获取 contactLogs，使用内存缓存避免重复同步读取
+  _getContactLogsFromCache() {
+    if (this._cache.contactLogs === null) {
+      this._cache.contactLogs = wx.getStorageSync('contactLogs') || []
+    }
+    return this._cache.contactLogs
+  },
+
+  // 更新 contactLogs 并同步到 Storage 和缓存
+  _updateContactLogsCache(logs) {
+    this._cache.contactLogs = logs
+    wx.setStorageSync('contactLogs', logs)
+  },
+
   onLoad() {
+    // 初始化内存缓存 - 避免在 Page 对象中定义非简单值
+    this._cache = {
+      appTheme: null,
+      myCallSign: null,
+      wxMineAvatarUrl: null,
+      wxMineNickName: null,
+      contactLogs: null
+    }
+    
     this.loadTheme()
     this.loadUserInfo()
     this.loadStats()
@@ -27,6 +50,8 @@ Page({
   },
 
   onShow() {
+    // 清理 contactLogs 缓存，确保获取最新数据
+    this._cache.contactLogs = null
     this.loadTheme()
     this.loadUserInfo()
     this.loadStats()
@@ -35,7 +60,11 @@ Page({
 
   loadTheme() {
     try {
-      const savedTheme = wx.getStorageSync('appTheme') || 'radio'
+      // 使用缓存，避免重复同步读取
+      if (this._cache.appTheme === null) {
+        this._cache.appTheme = wx.getStorageSync('appTheme') || 'radio'
+      }
+      const savedTheme = this._cache.appTheme
       this.setData({ currentTheme: savedTheme })
       // 设置统一的导航栏背景色
       wx.setNavigationBarColor({
@@ -53,13 +82,20 @@ Page({
 
   loadUserInfo() {
     try {
-      const myCallSign = wx.getStorageSync('myCallSign') || ''
-      const userAvatarUrl = wx.getStorageSync('wxMineAvatarUrl') || ''
-      const userNickName = wx.getStorageSync('wxMineNickName') || ''
+      // 使用缓存，避免重复同步读取
+      if (this._cache.myCallSign === null) {
+        this._cache.myCallSign = wx.getStorageSync('myCallSign') || ''
+      }
+      if (this._cache.wxMineAvatarUrl === null) {
+        this._cache.wxMineAvatarUrl = wx.getStorageSync('wxMineAvatarUrl') || ''
+      }
+      if (this._cache.wxMineNickName === null) {
+        this._cache.wxMineNickName = wx.getStorageSync('wxMineNickName') || ''
+      }
       this.setData({
-        userCallsign: myCallSign || '设置呼号',
-        userAvatarUrl: userAvatarUrl,
-        userNickName: userNickName
+        userCallsign: this._cache.myCallSign || '设置呼号',
+        userAvatarUrl: this._cache.wxMineAvatarUrl,
+        userNickName: this._cache.wxMineNickName
       })
     } catch (e) {
       console.error('加载用户信息失败', e)
@@ -118,57 +154,9 @@ Page({
     })
   },
 
-  // 跳转到全部通联日志
-  goToAllLogs() {
-    wx.vibrateShort({ type: VIBRATE_TYPE })
-    wx.navigateTo({
-      url: '/pages/logs/logs'
-    })
-  },
-
-  viewLogDetail(e) {
-    wx.vibrateShort({ type: VIBRATE_TYPE })
-    const id = e.currentTarget.dataset.id
-    wx.navigateTo({
-      url: '/pages/log-detail/log-detail?id=' + id
-    })
-  },
-
-  // 跳转到今日通联日志
-  goToTodayLogs() {
-    wx.vibrateShort({ type: VIBRATE_TYPE })
-    wx.navigateTo({
-      url: '/pages/logs/logs?filter=today'
-    })
-  },
-
-  // 跳转到本周通联日志
-  goToWeekLogs() {
-    wx.vibrateShort({ type: VIBRATE_TYPE })
-    wx.navigateTo({
-      url: '/pages/logs/logs?filter=week'
-    })
-  },
-
-  // 跳转到本月通联日志
-  goToMonthLogs() {
-    wx.vibrateShort({ type: VIBRATE_TYPE })
-    wx.navigateTo({
-      url: '/pages/logs/logs?filter=month'
-    })
-  },
-
-  // 跳转到全部通联日志（按频段浏览）
-  goToAllLogs() {
-    wx.vibrateShort({ type: VIBRATE_TYPE })
-    wx.navigateTo({
-      url: '/pages/logs/logs'
-    })
-  },
-
   loadStats() {
     try {
-      const logs = wx.getStorageSync('contactLogs') || []
+      const logs = this._getContactLogsFromCache()
       const now = new Date()
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
       const weekStart = todayStart - (now.getDay() || 7) * 24 * 60 * 60 * 1000
@@ -246,7 +234,7 @@ Page({
 
   loadRecentLogs() {
     try {
-      const logs = wx.getStorageSync('contactLogs') || []
+      const logs = this._getContactLogsFromCache()
       // 按时间排序，取前5条
       const sortedLogs = logs
         .sort((a, b) => {
@@ -262,67 +250,6 @@ Page({
     } catch (e) {
       console.error('加载最近通联失败', e)
     }
-  },
-
-  goToQSO() {
-    wx.vibrateShort({ type: VIBRATE_TYPE })
-    wx.navigateTo({
-      url: '/pages/logs/logs'
-    })
-  },
-
-  goToAddQSO() {
-    wx.vibrateShort({ type: VIBRATE_TYPE })
-    wx.navigateTo({
-      url: '/pages/logs/logs?tab=add'
-    })
-  },
-
-  goToSSTV() {
-    wx.vibrateShort({ type: VIBRATE_TYPE })
-    wx.navigateTo({
-      url: '/pages/sstv/sstv'
-    })
-  },
-
-  // 跳转到今日通联日志
-  goToTodayLogs() {
-    wx.vibrateShort({ type: VIBRATE_TYPE })
-    wx.navigateTo({
-      url: '/pages/logs/logs?filter=today'
-    })
-  },
-
-  // 跳转到本周通联日志
-  goToWeekLogs() {
-    wx.vibrateShort({ type: VIBRATE_TYPE })
-    wx.navigateTo({
-      url: '/pages/logs/logs?filter=week'
-    })
-  },
-
-  // 跳转到本月通联日志
-  goToMonthLogs() {
-    wx.vibrateShort({ type: VIBRATE_TYPE })
-    wx.navigateTo({
-      url: '/pages/logs/logs?filter=month'
-    })
-  },
-
-  // 跳转到全部通联日志
-  goToAllLogs() {
-    wx.vibrateShort({ type: VIBRATE_TYPE })
-    wx.navigateTo({
-      url: '/pages/logs/logs'
-    })
-  },
-
-  viewLogDetail(e) {
-    wx.vibrateShort({ type: VIBRATE_TYPE })
-    const id = e.currentTarget.dataset.id
-    wx.navigateTo({
-      url: '/pages/log-detail/log-detail?id=' + id
-    })
   },
 
   onShareAppMessage() {

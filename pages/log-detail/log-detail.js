@@ -61,6 +61,12 @@ Page({
   },
 
   onLoad(options) {
+    // 初始化内存缓存 - 避免在 Page 对象中定义非简单值
+    this._cache = {
+      appTheme: null,
+      contactLogs: null
+    }
+    
     // 检查是否有传递完整的日志数据（从分享列表进入）
     if (options.logData) {
       try {
@@ -99,9 +105,26 @@ Page({
     this.loadTheme()
   },
 
+  // 获取日志缓存
+  _getLogsFromCache() {
+    if (this._cache.contactLogs === null) {
+      this._cache.contactLogs = wx.getStorageSync('contactLogs') || []
+    }
+    return this._cache.contactLogs
+  },
+
+  // 更新日志缓存
+  _updateLogsCache(logs) {
+    this._cache.contactLogs = logs
+    wx.setStorageSync('contactLogs', logs)
+  },
+
   loadTheme() {
     try {
-      const savedTheme = wx.getStorageSync('appTheme') || 'radio'
+      if (this._cache.appTheme === null) {
+        this._cache.appTheme = wx.getStorageSync('appTheme') || 'radio'
+      }
+      const savedTheme = this._cache.appTheme
       // 设置统一的导航栏背景色
       wx.setNavigationBarColor({
         frontColor: '#000000',
@@ -215,7 +238,7 @@ Page({
 
   loadLogDetail(logId) {
     try {
-      const logs = wx.getStorageSync('contactLogs') || []
+      const logs = this._getLogsFromCache()
       const log = logs.find(item => item.id === logId)
       
       if (log) {
@@ -460,9 +483,9 @@ Page({
           // 定义删除本地日志的函数
           const deleteLocalLog = () => {
             try {
-              let logs = wx.getStorageSync('contactLogs') || []
+              let logs = this._getLogsFromCache()
               logs = logs.filter(item => item.id !== logId)
-              wx.setStorageSync('contactLogs', logs)
+              this._updateLogsCache(logs)
               
               wx.hideLoading()
               wx.showToast({

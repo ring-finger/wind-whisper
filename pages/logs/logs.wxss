@@ -633,12 +633,22 @@
   color: var(--text-inverse);
 }
 
+/* 添加表单内容区域 - 底部留白防止被固定按钮遮挡 */
+.add-form-body {
+  padding-bottom: 140rpx;
+}
+
+/* 保存按钮固定在底部居中，仅在添加表单时显示 */
 .submit-actions {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
   display: flex;
   justify-content: center;
-  width: 100%;
-  margin-top: 32rpx;
-  padding: 0 8rpx;
+  padding: 20rpx 32rpx;
+  padding-bottom: calc(20rpx + env(safe-area-inset-bottom));
+  z-index: 100;
   box-sizing: border-box;
 }
 
