@@ -27,6 +27,7 @@
 
   <!-- 添加通联表单 -->
   <view class="tab-panel {{currentTab === 'add' ? 'tab-panel-show' : ''}}" wx:if="{{currentTab === 'add'}}">
+    <view class="add-form-body">
     <view class="float-card header-card">
       <view class="header-strip">
         <view class="header-tz-btns font-mono">
@@ -216,8 +217,9 @@
       <view class="form-label">备注 NOTES</view>
       <textarea class="form-input textarea-minimal" value="{{formData.notes}}" bindinput="onNotesInput" placeholder="备注" auto-height />
     </view>
+  </view>
 
-    <view class="submit-actions">
+    <view class="submit-actions" wx:if="{{currentTab === 'add'}}">
       <button class="submit-btn" hover-class="button-hover" bindtap="submitLog">保存</button>
     </view>
   </view>

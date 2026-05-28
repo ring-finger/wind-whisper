@@ -156,6 +156,13 @@ Page({
   },
 
   onLoad(options) {
+    // 初始化内存缓存 - 避免在 Page 对象中定义非简单值
+    this._cache = {
+      appTheme: null,
+      contactLogs: null,
+      hasShownShareGuide: null
+    }
+
     this.loadTheme()
     this.initDateTime()
     
@@ -184,8 +191,11 @@ Page({
   // 初始化分享引导闪烁效果
   initShareGuide() {
     try {
-      // 从本地存储读取是否已展示过闪烁
-      const hasShownGuide = wx.getStorageSync('hasShownShareGuide')
+      // 优先使用内存缓存
+      if (this._cache.hasShownShareGuide === null) {
+        this._cache.hasShownShareGuide = wx.getStorageSync('hasShownShareGuide')
+      }
+      const hasShownGuide = this._cache.hasShownShareGuide
       
       // 如果还没有展示过，并且有通联记录，则显示闪烁效果
       if (!hasShownGuide) {
@@ -200,6 +210,8 @@ Page({
   },
 
   onShow() {
+    // 清理 contactLogs 缓存，确保获取最新数据
+    this._cache.contactLogs = null
     this.loadTheme()
 
     // 检查是否需要切换到添加页
@@ -240,7 +252,11 @@ Page({
   // 检查并显示分享引导闪烁效果
   checkShareGuide() {
     try {
-      const hasShownGuide = wx.getStorageSync('hasShownShareGuide')
+      // 优先使用内存缓存
+      if (this._cache.hasShownShareGuide === null) {
+        this._cache.hasShownShareGuide = wx.getStorageSync('hasShownShareGuide')
+      }
+      const hasShownGuide = this._cache.hasShownShareGuide
       
       // 如果还没有展示过闪烁，且通联记录已加载，则显示闪烁效果
       if (!hasShownGuide && this.data.filteredLogs && this.data.filteredLogs.length > 0) {
@@ -253,7 +269,11 @@ Page({
 
   loadTheme() {
     try {
-      const savedTheme = wx.getStorageSync('appTheme') || 'radio'
+      // 优先使用内存缓存
+      if (this._cache.appTheme === null) {
+        this._cache.appTheme = wx.getStorageSync('appTheme') || 'radio'
+      }
+      const savedTheme = this._cache.appTheme
       this.setData({ currentTheme: savedTheme })
       // 设置统一的导航栏背景色
       wx.setNavigationBarColor({
@@ -329,21 +349,21 @@ Page({
       selectedLogs: {},
       selectedLogsArray: [],
       currentShareId: this._currentShareId,  // 保存当前查看的分享ID
-      shareOwnerCallSign: shareData.myCallSign || 'TA'
+      shareOwnerCallSign: shareData.myCallSign || ''
     })
     
     // 显示过期提示
     if (shareData.remainDays) {
       wx.showModal({
         title: '分享的通联记录',
-        content: `来自 ${shareData.myCallSign || 'BA4IWA'} 的 ${sharedLogs.length} 条通联记录\n\n⚠️ 剩余有效期：${shareData.remainDays}天`,
+        content: `来自 ${shareData.myCallSign} 的 ${sharedLogs.length} 条通联记录\n\n⚠️ 剩余有效期：${shareData.remainDays}天`,
         showCancel: false,
         confirmText: '查看'
       })
     } else {
       wx.showModal({
         title: '分享的通联记录',
-        content: `来自 ${shareData.myCallSign || 'BA4IWA'} 的 ${sharedLogs.length} 条通联记录`,
+        content: `来自 ${shareData.myCallSign} 的 ${sharedLogs.length} 条通联记录`,
         showCancel: false,
         confirmText: '查看'
       })
@@ -433,9 +453,23 @@ Page({
     this.setData({ currentTimeType: type })
   },
 
+  // 获取日志（优先内存缓存）
+  _getLogsFromCache() {
+    if (this._cache.contactLogs === null) {
+      this._cache.contactLogs = wx.getStorageSync('contactLogs') || []
+    }
+    return this._cache.contactLogs
+  },
+
+  // 更新日志缓存（写入 storage 时同步更新缓存）
+  _updateLogsCache(logs) {
+    this._cache.contactLogs = logs
+    wx.setStorageSync('contactLogs', logs)
+  },
+
   loadLogs() {
     try {
-      const logs = wx.getStorageSync('contactLogs') || []
+      const logs = this._getLogsFromCache()
       this.setData({ 
         _allLogs: logs,
         currentShareId: null  // 清除分享ID，切回本地日志
@@ -453,6 +487,25 @@ Page({
   // ========== 分享功能 ==========
   enterShareMode() {
     wx.vibrateShort({ type: VIBRATE_TYPE })
+    
+    // 检查是否设置了呼号
+    const myCallSign = wx.getStorageSync('myCallSign')
+    if (!myCallSign) {
+      wx.showModal({
+        title: '请先设置呼号',
+        content: '分享通联记录需要设置您的呼号，请在"我的"页面中设置个人呼号后再试。',
+        confirmText: '去设置',
+        cancelText: '取消',
+        success: (res) => {
+          if (res.confirm) {
+            wx.switchTab({
+              url: '/pages/mine/mine'
+            })
+          }
+        }
+      })
+      return
+    }
     
     // 先刷新分享数量
     this.loadMyShares()
@@ -489,8 +542,9 @@ Page({
     // 如果正在显示闪烁效果
     if (this.data.showShareGuide) {
       try {
-        // 标记为已展示过
+        // 标记为已展示过（同步更新内存缓存）
         wx.setStorageSync('hasShownShareGuide', true)
+        this._cache.hasShownShareGuide = true
       } catch (e) {
         console.error('保存分享引导状态失败', e)
       }
@@ -566,7 +620,7 @@ Page({
       const db = wx.cloud.database()
       const shareCollection = db.collection('shareLogs')
       
-      const myCallSign = wx.getStorageSync('myCallSign') || 'BA4IWA'
+      const myCallSign = wx.getStorageSync('myCallSign')
       const shareData = {
         logs: selectedLogsData,
         myCallSign: myCallSign,
@@ -615,7 +669,7 @@ Page({
       const newShare = {
         id: shareId,
         logCount: logCount,
-        myCallSign: wx.getStorageSync('myCallSign') || 'BA4IWA',
+        myCallSign: wx.getStorageSync('myCallSign') || '',
         createTime: now.toISOString(),
         expireDaysLeft: SHARE_EXPIRE_DAYS,
         shareTitle: `${shareDateTime} · ${logCount}条通联`
@@ -806,8 +860,8 @@ Page({
             ctx.font = '28px sans-serif'
             ctx.fillText('📻 业余无线电通联日志', padding, 60)
 
-            // 呼号
-            const myCallSign = wx.getStorageSync('myCallSign') || 'BA4IWA'
+            // 呼号（已在 enterShareMode 中检查存在性）
+            const myCallSign = wx.getStorageSync('myCallSign')
             ctx.font = '36px sans-serif'
             ctx.fillStyle = '#e74c3c'
             ctx.fillText(myCallSign, padding, 110)
@@ -1128,7 +1182,7 @@ Page({
   // 加载最近3条去重频率（默认展示）
   loadFrequencySuggestions() {
     try {
-      const logs = wx.getStorageSync('contactLogs') || []
+      const logs = this._getLogsFromCache()
       const seen = new Set()
       const recent = []
       for (const log of logs) {
@@ -1146,7 +1200,7 @@ Page({
 
   filterFrequencySuggestions(input) {
     try {
-      const logs = wx.getStorageSync('contactLogs') || []
+      const logs = this._getLogsFromCache()
       const seen = new Set()
       const matched = []
       const currentFrequency = this.data.formData.frequency
@@ -1486,7 +1540,7 @@ Page({
 
   saveLog(log) {
     try {
-      let logs = wx.getStorageSync('contactLogs') || []
+      let logs = this._getLogsFromCache()
       
       // 补充当前用户的呼号（兼容历史数据）
       const myCallSign = wx.getStorageSync('myCallSign') || ''
@@ -1498,7 +1552,7 @@ Page({
       if (logs.length > 1000) {
         logs = logs.slice(0, 1000)
       }
-      wx.setStorageSync('contactLogs', logs)
+      this._updateLogsCache(logs)
       
       // 同步到云数据库
       this.syncLogToCloud(log)
@@ -1640,7 +1694,7 @@ Page({
     wx.showLoading({ title: '同步中...' })
     
     try {
-      const localLogs = wx.getStorageSync('contactLogs') || []
+      const localLogs = this._getLogsFromCache()
       
       if (localLogs.length === 0) {
         wx.hideLoading()
@@ -1757,8 +1811,8 @@ Page({
     const currentShareImage = app.globalData.currentShareImage
     
     if (currentShareId) {
-      const myCallSign = currentShareData?.myCallSign || 'BA4IWA'
-      const logCount = currentShareData?.logs?.length || 0
+      const myCallSign = currentShareData.myCallSign
+      const logCount = currentShareData.logs.length
       
       // 清理当前分享数据
       app.globalData.currentShareId = null
@@ -1795,8 +1849,8 @@ Page({
     const currentShareImage = app.globalData.currentShareImage
     
     if (currentShareId) {
-      const myCallSign = currentShareData?.myCallSign || 'BA4IWA'
-      const logCount = currentShareData?.logs?.length || 0
+      const myCallSign = currentShareData.myCallSign
+      const logCount = currentShareData.logs.length
       
       // 重置分享状态
       this.setData({
