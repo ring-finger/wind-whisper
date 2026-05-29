@@ -426,6 +426,9 @@ Page({
 
     try {
       wx.setStorageSync(STORAGE_THEME, newTheme)
+      // 清除 app 缓存，通知其他页面重新加载主题
+      app._cache.appTheme = null
+      app.initTheme()
     } catch (e) {
       console.error('保存主题失败', e)
     }
@@ -458,6 +461,9 @@ Page({
         const userInfo = wx.getStorageSync('userInfo') || {}
         userInfo.avatarUrl = path
         wx.setStorageSync('userInfo', userInfo)
+        // 清除首页缓存，确保返回首页时显示最新用户信息
+        app._cache.wxMineAvatarUrl = null
+        app._cache.wxMineNickName = null
       } catch (err) {
         console.error('保存头像路径失败', err)
       }
@@ -486,6 +492,9 @@ Page({
     try {
       wx.setStorageSync(STORAGE_NICK, v)
       this.setData({ userNickName: v })
+      // 清除首页缓存，确保返回首页时显示最新用户信息
+      app._cache.wxMineNickName = null
+      app._cache.wxMineAvatarUrl = null
     } catch (err) {
       console.error('保存昵称失败', err)
     }
@@ -532,6 +541,10 @@ Page({
               const userInfo = wx.getStorageSync('userInfo') || {}
               userInfo.callSign = callSign
               wx.setStorageSync('userInfo', userInfo)
+              // 清除首页缓存，确保返回首页时显示最新用户信息
+              app._cache.myCallSign = null
+              app._cache.wxMineAvatarUrl = null
+              app._cache.wxMineNickName = null
               wx.showToast({
                 title: '设置成功',
                 icon: 'success'
