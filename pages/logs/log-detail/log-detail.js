@@ -94,6 +94,8 @@ Page({
   },
 
   onShow() {
+    // 清除主题缓存，确保主题切换后能正确更新
+    this._cache.appTheme = null
     if (this.data.log) {
       // 如果是分享的日志，不重新加载
       if (this.data.isSharedLog) {
