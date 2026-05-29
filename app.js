@@ -111,7 +111,11 @@ App({
 
   initTheme() {
     try {
-      const savedTheme = wx.getStorageSync(this.STORAGE_THEME) || 'radio'
+      // 使用缓存，避免重复同步读取
+      if (this._cache.appTheme === null) {
+        this._cache.appTheme = wx.getStorageSync(this.STORAGE_THEME) || 'radio'
+      }
+      const savedTheme = this._cache.appTheme
       const themeConfig = this.THEMES[savedTheme] || this.THEMES.radio
       
       wx.setNavigationBarColor({
@@ -123,27 +127,12 @@ App({
         }
       })
       
-<<<<<<< HEAD
       // 触发页面重新渲染以应用主题CSS类
       const pages = getCurrentPages()
       if (pages.length > 0) {
         const currentPage = pages[pages.length - 1]
         if (currentPage && currentPage.setData) {
           currentPage.setData({ currentTheme: savedTheme })
-=======
-      // 使用缓存，避免重复同步读取
-      if (this._cache.appTheme === null) {
-        this._cache.appTheme = wx.getStorageSync(this.STORAGE_THEME) || 'radio'
-      }
-      const savedTheme = this._cache.appTheme
-      if (savedTheme === 'morandi') {
-        const pages = getCurrentPages()
-        if (pages.length > 0) {
-          const currentPage = pages[pages.length - 1]
-          if (currentPage && currentPage.setData) {
-            currentPage.setData({})
-          }
->>>>>>> origin/main
         }
       }
     } catch (e) {
