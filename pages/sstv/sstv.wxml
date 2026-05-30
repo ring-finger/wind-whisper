@@ -156,8 +156,8 @@
       </view>
       <view class="tips-content" wx:if="{{currentTab === 'decode'}}">
         <text>1. 点击按钮从聊天记录中选择 WAV 音频文件</text>
-        <text>2. 使用 FFT 算法解码（当前支持Robot36）</text>
-        <text>3. 等待解码完成后保存图片</text>
+        <text>2. FFT 算法解码，支持 Robot / Martin / Scottie 共7种模式</text>
+        <text>3. 自动识别模式，等待解码完成后保存图片</text>
       </view>
     </view>
 

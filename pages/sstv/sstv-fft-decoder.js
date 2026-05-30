@@ -10,7 +10,7 @@
  *   - 图像解码：逐像素 Hann 窗 FFT + barycentric 峰值插值
  *   - 输出：RGBA Uint8ClampedArray
  *
- * 当前支持模式：Robot 36 Color (VIS code = 8)
+ * 支持模式：Robot 36/72、Martin 1/2、Scottie 1/2/DX，共 7 种 (VIS 自动识别)
  */
 
 // ============================================================================
@@ -185,11 +185,12 @@ function fft(data, sampleRate, fftSizeHint) {
 }
 
 // ============================================================================
-// 3. Robot36 模式参数（移植自 spec.js）
+// 3. SSTV 模式参数（移植自 spec.js，支持全部 7 种模式）
 // ============================================================================
 
 const COL_FMT = { RGB: 'RGB', GBR: 'GBR', YUV: 'YUV', BW: 'BW' }
 
+// --- Robot 36 (VIS=8) ---
 const R36 = {
   NAME: 'Robot 36',
   COLOR: COL_FMT.YUV,
@@ -216,8 +217,115 @@ R36.PIXEL_TIME = R36.SCAN_TIME / R36.LINE_WIDTH
 R36.HALF_PIXEL_TIME = R36.HALF_SCAN_TIME / R36.LINE_WIDTH
 R36.WINDOW_FACTOR = 7.7
 
+// --- Robot 72 (VIS=12), 基于 R36 ---
+const R72 = Object.assign({}, R36, {
+  NAME: 'Robot 72',
+  SCAN_TIME: 0.138,
+  HALF_SCAN_TIME: 0.069,
+  CHAN_COUNT: 3,
+  HAS_ALT_SCAN: false,
+})
+R72.CHAN_TIME = R72.SEP_PULSE + R72.SCAN_TIME
+R72.HALF_CHAN_TIME = R72.SEP_PULSE + R72.HALF_SCAN_TIME
+R72.CHAN_OFFSETS = [R72.SYNC_PULSE + R72.SYNC_PORCH]
+R72.CHAN_OFFSETS.push(R72.CHAN_OFFSETS[0] + R72.CHAN_TIME + R72.SEP_PORCH)
+R72.CHAN_OFFSETS.push(R72.CHAN_OFFSETS[1] + R72.HALF_CHAN_TIME + R72.SEP_PORCH)
+R72.LINE_TIME = R72.CHAN_OFFSETS[2] + R72.HALF_SCAN_TIME
+R72.PIXEL_TIME = R72.SCAN_TIME / R72.LINE_WIDTH
+R72.HALF_PIXEL_TIME = R72.HALF_SCAN_TIME / R72.LINE_WIDTH
+R72.WINDOW_FACTOR = 4.88
+
+// --- Martin 1 (VIS=44) ---
+const M1 = {
+  NAME: 'Martin 1',
+  COLOR: COL_FMT.GBR,
+  LINE_WIDTH: 320,
+  LINE_COUNT: 256,
+  SCAN_TIME: 0.146432,
+  SYNC_PULSE: 0.004862,
+  SYNC_PORCH: 0.000572,
+  SEP_PULSE: 0.000572,
+  CHAN_COUNT: 3,
+  CHAN_SYNC: 0,
+  CHAN_OFFSETS: [],
+  HAS_START_SYNC: false,
+  HAS_HALF_SCAN: false,
+  HAS_ALT_SCAN: false,
+}
+M1.CHAN_TIME = M1.SEP_PULSE + M1.SCAN_TIME
+M1.CHAN_OFFSETS = [M1.SYNC_PULSE + M1.SYNC_PORCH]
+M1.CHAN_OFFSETS.push(M1.CHAN_OFFSETS[0] + M1.CHAN_TIME)
+M1.CHAN_OFFSETS.push(M1.CHAN_OFFSETS[1] + M1.CHAN_TIME)
+M1.LINE_TIME = M1.SYNC_PULSE + M1.SYNC_PORCH + 3 * M1.CHAN_TIME
+M1.PIXEL_TIME = M1.SCAN_TIME / M1.LINE_WIDTH
+M1.WINDOW_FACTOR = 2.34
+
+// --- Martin 2 (VIS=40), 基于 M1 ---
+const M2 = Object.assign({}, M1, {
+  NAME: 'Martin 2',
+  SCAN_TIME: 0.073216,
+})
+M2.CHAN_TIME = M2.SEP_PULSE + M2.SCAN_TIME
+M2.CHAN_OFFSETS = [M2.SYNC_PULSE + M2.SYNC_PORCH]
+M2.CHAN_OFFSETS.push(M2.CHAN_OFFSETS[0] + M2.CHAN_TIME)
+M2.CHAN_OFFSETS.push(M2.CHAN_OFFSETS[1] + M2.CHAN_TIME)
+M2.LINE_TIME = M2.SYNC_PULSE + M2.SYNC_PORCH + 3 * M2.CHAN_TIME
+M2.PIXEL_TIME = M2.SCAN_TIME / M2.LINE_WIDTH
+M2.WINDOW_FACTOR = 4.68
+
+// --- Scottie 1 (VIS=60) ---
+const S1 = {
+  NAME: 'Scottie 1',
+  COLOR: COL_FMT.GBR,
+  LINE_WIDTH: 320,
+  LINE_COUNT: 256,
+  SCAN_TIME: 0.13824,
+  SYNC_PULSE: 0.009,
+  SYNC_PORCH: 0.0015,
+  SEP_PULSE: 0.0015,
+  CHAN_COUNT: 3,
+  CHAN_SYNC: 2,
+  CHAN_OFFSETS: [],
+  HAS_START_SYNC: true,
+  HAS_HALF_SCAN: false,
+  HAS_ALT_SCAN: false,
+}
+S1.CHAN_TIME = S1.SEP_PULSE + S1.SCAN_TIME
+S1.CHAN_OFFSETS = [S1.SYNC_PULSE + S1.SYNC_PORCH + S1.CHAN_TIME]
+S1.CHAN_OFFSETS.push(S1.CHAN_OFFSETS[0] + S1.CHAN_TIME)
+S1.CHAN_OFFSETS.push(S1.SYNC_PULSE + S1.SYNC_PORCH)
+S1.LINE_TIME = S1.SYNC_PULSE + 3 * S1.CHAN_TIME
+S1.PIXEL_TIME = S1.SCAN_TIME / S1.LINE_WIDTH
+S1.WINDOW_FACTOR = 2.48
+
+// --- Scottie 2 (VIS=56), 基于 S1 ---
+const S2 = Object.assign({}, S1, {
+  NAME: 'Scottie 2',
+  SCAN_TIME: 0.088064,
+})
+S2.CHAN_TIME = S2.SEP_PULSE + S2.SCAN_TIME
+S2.CHAN_OFFSETS = [S2.SYNC_PULSE + S2.SYNC_PORCH + S2.CHAN_TIME]
+S2.CHAN_OFFSETS.push(S2.CHAN_OFFSETS[0] + S2.CHAN_TIME)
+S2.CHAN_OFFSETS.push(S2.SYNC_PULSE + S2.SYNC_PORCH)
+S2.LINE_TIME = S2.SYNC_PULSE + 3 * S2.CHAN_TIME
+S2.PIXEL_TIME = S2.SCAN_TIME / S2.LINE_WIDTH
+S2.WINDOW_FACTOR = 3.82
+
+// --- Scottie DX (VIS=76), 基于 S2 ---
+const SDX = Object.assign({}, S2, {
+  NAME: 'Scottie DX',
+  SCAN_TIME: 0.3456,
+})
+SDX.CHAN_TIME = SDX.SEP_PULSE + SDX.SCAN_TIME
+SDX.CHAN_OFFSETS = [SDX.SYNC_PULSE + SDX.SYNC_PORCH + SDX.CHAN_TIME]
+SDX.CHAN_OFFSETS.push(SDX.CHAN_OFFSETS[0] + SDX.CHAN_TIME)
+SDX.CHAN_OFFSETS.push(SDX.SYNC_PULSE + SDX.SYNC_PORCH)
+SDX.LINE_TIME = SDX.SYNC_PULSE + 3 * SDX.CHAN_TIME
+SDX.PIXEL_TIME = SDX.SCAN_TIME / SDX.LINE_WIDTH
+SDX.WINDOW_FACTOR = 0.98
+
 // ============================================================================
-// 4. 头部检测全局参数（移植自 spec.js）
+// 4. 头部检测全局参数 + VIS 映射表
 // ============================================================================
 
 const BREAK_OFFSET = 0.3
@@ -227,10 +335,15 @@ const HDR_SIZE = 0.03 + VIS_START_OFFSET_VAL       // = 0.64
 const HDR_WINDOW_SIZE = 0.01
 const VIS_BIT_SIZE = 0.03
 
+/** 全部 7 种 SSTV 模式，由 VIS 码自动选择 */
 const VIS_MAP = {
   8: R36,
-  // 未来可扩展更多模式
-  // 12: R72, 40: M2, 44: M1, 56: S2, 60: S1, 76: SDX,
+  12: R72,
+  40: M2,
+  44: M1,
+  56: S2,
+  60: S1,
+  76: SDX,
 }
 
 // ============================================================================
