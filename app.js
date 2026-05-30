@@ -111,7 +111,11 @@ App({
 
   initTheme() {
     try {
-      const savedTheme = wx.getStorageSync(this.STORAGE_THEME) || 'radio'
+      // 使用缓存，避免重复同步读取
+      if (this._cache.appTheme === null) {
+        this._cache.appTheme = wx.getStorageSync(this.STORAGE_THEME) || 'radio'
+      }
+      const savedTheme = this._cache.appTheme
       const themeConfig = this.THEMES[savedTheme] || this.THEMES.radio
       
       wx.setNavigationBarColor({

@@ -50,9 +50,8 @@ Page({
   },
 
   onShow() {
-    // 清理缓存，确保获取最新数据（mine页可能已更新主题/用户信息）
+    // 清理 contactLogs 缓存，确保获取最新数据
     this._cache.contactLogs = null
-    this._cache.appTheme = null
     this.loadTheme()
     this.loadUserInfo()
     this.loadStats()
@@ -67,10 +66,11 @@ Page({
       }
       const savedTheme = this._cache.appTheme
       this.setData({ currentTheme: savedTheme })
-      // 设置统一的导航栏背景色
+      // 根据主题动态设置导航栏颜色
+      const themeConfig = app.THEMES[savedTheme] || app.THEMES.radio
       wx.setNavigationBarColor({
-        frontColor: '#000000',
-        backgroundColor: '#F9F7F4',
+        frontColor: themeConfig.navText,
+        backgroundColor: themeConfig.navBg,
         animation: {
           duration: 0,
           timingFunc: 'linear'
