@@ -335,7 +335,14 @@ button.action-btn::after {
 .decode-controls {
   padding: 0 20rpx;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+}
+
+.decode-file-btn {
+  width: 100%;
+  font-size: 28rpx;
+  padding: 24rpx 20rpx;
 }
 
 /* 解码预览 */

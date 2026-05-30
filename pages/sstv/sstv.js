@@ -2,7 +2,7 @@ const VIBRATE_TYPE = 'medium'
 // 导入拆分后的模块 (对应 Java SSTVEncoder2 项目结构)
 const Robot36 = require('./sstv-robot36')
 const Scottie1 = require('./sstv-scottie1')
-const SSTVDecoder = require('./sstv-decoder')
+const SSTVFFTDecoder = require('./sstv-fft-decoder')
 
 /**
  * SSTV 模式工厂方法
@@ -43,7 +43,6 @@ Page({
     decodedImage: '',
     decodeProgress: 0,
     scanLine: 0,
-    recorderManager: null,
     audioContext: null,
     // 呼号相关
     callsign: '',
@@ -63,7 +62,6 @@ Page({
       animation: { duration: 0, timingFunc: 'linear' }
     })
     this.initSSTV()
-    this.initRecorder()
   },
 
   onShow() {
@@ -71,12 +69,6 @@ Page({
   },
 
   onHide() {
-    // 页面隐藏时停止录音，防止页面卡死
-    if (this.data.isDecoding) {
-      this.forceStopRecording()
-      this.setData({ isDecoding: false })
-    }
-    
     // 停止音频播放
     if (this.audioContext) {
       this.audioContext.stop()
@@ -90,15 +82,10 @@ Page({
       })
     }
     
-    console.log('页面隐藏，录音已停止')
+    console.log('页面隐藏')
   },
 
   onUnload() {
-    // 页面卸载时清理资源
-    if (this.data.isDecoding) {
-      this.forceStopRecording()
-    }
-    
     // 清理定时器
     if (this.updateTimer) {
       clearTimeout(this.updateTimer)
@@ -117,57 +104,220 @@ Page({
   initSSTV() {
     // 使用工厂方法创建编码器实例 (对应 Java 的 ModeFactory)
     this.encoder = createMode('Robot36')
-    this.decoder = new SSTVDecoder()
   },
 
-  initRecorder() {
-    const recorderManager = wx.getRecorderManager()
-    
-    // 录音开始事件
-    recorderManager.onStart(() => {
-      console.log('录音已开始')
-      wx.showToast({ title: '录音已开始', icon: 'success' })
-    })
-    
-    // 录音帧数据回调 - 关键！需要设置frameSize才会触发
-    recorderManager.onFrameRecorded((res) => {
-      const { frameBuffer } = res
-      if (!frameBuffer || frameBuffer.byteLength === 0) {
-        console.log('空帧数据')
-        return
+  /**
+   * 解析 WAV 文件头
+   * @param {ArrayBuffer} arrayBuffer
+   * @returns {{ sampleRate: number, samples: Float32Array, bitDepth: number, channels: number }}
+   */
+  /**
+   * 将 ArrayBuffer 中的 ASCII 字节转为字符串（兼容真机无 TextDecoder）
+   */
+  _bytesToStr(arrayBuffer, offset, length) {
+    let str = ''
+    const u8 = new Uint8Array(arrayBuffer, offset, length)
+    for (let i = 0; i < u8.length; i++) {
+      str += String.fromCharCode(u8[i])
+    }
+    return str
+  },
+
+  parseWavHeader(arrayBuffer) {
+    const view = new DataView(arrayBuffer)
+
+    // RIFF header
+    const riff = this._bytesToStr(arrayBuffer, 0, 4)
+    if (riff !== 'RIFF') throw new Error('不是有效的 WAV 文件: 缺少 RIFF 标识')
+
+    const fileSize = view.getUint32(4, true)
+    const wave = this._bytesToStr(arrayBuffer, 8, 4)
+    if (wave !== 'WAVE') throw new Error('不是有效的 WAV 文件: 缺少 WAVE 标识')
+
+    // 查找 fmt 和 data chunk
+    let offset = 12
+    let sampleRate = 0
+    let channels = 1
+    let bitDepth = 16
+    let dataOffset = -1
+    let dataSize = 0
+
+    while (offset < arrayBuffer.byteLength - 8) {
+      const chunkId = this._bytesToStr(arrayBuffer, offset, 4)
+      const chunkSize = view.getUint32(offset + 4, true)
+
+      if (chunkId === 'fmt ') {
+        const audioFormat = view.getUint16(offset + 8, true)
+        if (audioFormat !== 1) throw new Error('只支持 PCM 格式 WAV, 当前格式码: ' + audioFormat)
+        channels = view.getUint16(offset + 10, true)
+        sampleRate = view.getUint32(offset + 12, true)
+        bitDepth = view.getUint16(offset + 22, true)
+        if (bitDepth !== 8 && bitDepth !== 16) throw new Error('只支持 8/16-bit WAV, 当前: ' + bitDepth)
+      } else if (chunkId === 'data') {
+        dataOffset = offset + 8
+        dataSize = chunkSize
+        break
       }
-      
-      if (this.data.isDecoding && this.decoder) {
-        try {
-          // WeChat PCM 录音返回 Int16 格式 (16-bit signed integer Little-Endian)
-          // 需手动转换为归一化的 Float32Array [-1.0, 1.0]
-          const int16Array = new Int16Array(frameBuffer)
-          const floatArray = new Float32Array(int16Array.length)
-          for (let i = 0; i < int16Array.length; i++) {
-            floatArray[i] = int16Array[i] / 32768.0
-          }
-          
-          // 处理音频帧用于解码
-          this.decoder.processAudioFrame(floatArray)
-        } catch (err) {
-          console.error('处理音频帧失败:', err)
+
+      offset += 8 + chunkSize
+      // chunk 对齐到偶数字节
+      if (chunkSize % 2 !== 0) offset++
+    }
+
+    if (dataOffset < 0) throw new Error('WAV 文件缺少 data chunk')
+
+    // 提取 PCM 数据
+    const bytesPerSample = bitDepth / 8
+    const totalSamples = Math.floor(dataSize / bytesPerSample)
+    const samples = new Float32Array(totalSamples)
+
+    if (bitDepth === 16) {
+      for (let i = 0; i < totalSamples; i++) {
+        const bytePos = dataOffset + i * 2
+        if (bytePos + 1 >= arrayBuffer.byteLength) break
+        samples[i] = view.getInt16(bytePos, true) / 32768.0
+      }
+    } else { // 8-bit
+      for (let i = 0; i < totalSamples; i++) {
+        const bytePos = dataOffset + i
+        if (bytePos >= arrayBuffer.byteLength) break
+        samples[i] = (view.getUint8(bytePos) - 128) / 128.0
+      }
+    }
+
+    console.log('[WAV-Parser] 采样率=' + sampleRate + ' 通道=' + channels +
+      ' 位深=' + bitDepth + ' 样本数=' + totalSamples +
+      ' 时长=' + (totalSamples / sampleRate).toFixed(1) + 's')
+
+    // 如果是立体声，只取第一通道
+    if (channels > 1) {
+      const monoSamples = new Float32Array(Math.floor(totalSamples / channels))
+      for (let i = 0; i < monoSamples.length; i++) {
+        monoSamples[i] = samples[i * channels]
+      }
+      return { sampleRate, samples: monoSamples, bitDepth, channels }
+    }
+
+    return { sampleRate, samples: samples, bitDepth, channels }
+  },
+
+  /**
+   * 从聊天记录选择 SSTV 音频文件进行解码
+   */
+  chooseAudioForDecode() {
+    wx.chooseMessageFile({
+      count: 1,
+      type: 'file',
+      extension: ['wav'],
+      success: (res) => {
+        const filePath = res.tempFiles[0].path
+        console.log('[SSTV] 选择了音频文件:', filePath, '大小:', res.tempFiles[0].size)
+        this.decodeAudioFile(filePath)
+      },
+      fail: (err) => {
+        if (err.errMsg && err.errMsg.indexOf('cancel') < 0) {
+          console.error('[SSTV] 选择文件失败:', err)
+          wx.showToast({ title: '选择文件失败', icon: 'none' })
         }
       }
     })
-    
-    // 录音结束事件
-    recorderManager.onStop((res) => {
-      console.log('录音已停止', res)
+    wx.vibrateShort({ type: VIBRATE_TYPE })
+  },
+
+  /**
+   * 解码音频文件（核心流程）
+   * @param {string} filePath - WAV 文件路径
+   */
+  decodeAudioFile(filePath) {
+    this.setData({
+      isDecoding: true,
+      decodedImage: '',
+      decodeProgress: 0,
+      scanLine: 0
     })
-    
-    // 录音错误处理
-    recorderManager.onError((err) => {
-      console.error('录音错误:', err)
-      console.log('错误详情:', JSON.stringify(err))
-      this.setData({ isDecoding: false })
+
+    wx.showLoading({ title: '读取音频文件...' })
+
+    const fs = wx.getFileSystemManager()
+    fs.readFile({
+      filePath: filePath,
+      success: (res) => {
+        wx.hideLoading()
+
+        try {
+          // 解析 WAV
+          const { sampleRate, samples } = this.parseWavHeader(res.data)
+
+          wx.showLoading({ title: '正在解码 SSTV...' })
+
+          // 使用 setTimeout 让 UI 有机会更新
+          setTimeout(() => {
+            try {
+              const decoder = new SSTVFFTDecoder(samples, sampleRate, {
+                fftSize: 512,
+                onProgress: (percent) => {
+                  this.setData({
+                    decodeProgress: percent,
+                    scanLine: Math.round(percent / 100 * 240)
+                  })
+                }
+              })
+
+              const result = decoder.decode()
+              const { buffer, width, height } = result
+
+              wx.hideLoading()
+
+              // 渲染结果
+              this.renderDecodedImage(buffer, width, height).then((imagePath) => {
+                this.setData({
+                  isDecoding: false,
+                  decodedImage: imagePath,
+                  decodeProgress: 100,
+                  scanLine: 240
+                })
+                wx.showToast({ title: '解码完成', icon: 'success' })
+              }).catch((err) => {
+                console.error('渲染解码图片失败:', err)
+                this.setData({ isDecoding: false })
+                wx.showToast({ title: '渲染失败', icon: 'none' })
+              })
+            } catch (err) {
+              wx.hideLoading()
+              console.error('[SSTV] 解码失败:', err)
+              this.setData({ isDecoding: false })
+              wx.showModal({
+                title: '解码失败',
+                content: err.message || '未知错误',
+                showCancel: false
+              })
+            }
+          }, 100)
+
+        } catch (err) {
+          wx.hideLoading()
+          console.error('[SSTV] WAV 解析失败:', err)
+          this.setData({ isDecoding: false })
+          wx.showModal({
+            title: '文件解析失败',
+            content: err.message || '无效的音频文件',
+            showCancel: false
+          })
+        }
+      },
+      fail: (err) => {
+        wx.hideLoading()
+        console.error('[SSTV] 读取文件失败:', err)
+        this.setData({ isDecoding: false })
+        wx.showToast({ title: '读取文件失败', icon: 'none' })
+      }
     })
-    
-    this.recorderManager = recorderManager
+  },
+
+  // 保留 stopDecode 用于取消解码（按钮显示"取消解码"）
+  stopDecode() {
+    this.setData({ isDecoding: false })
+    wx.showToast({ title: '已取消解码', icon: 'none' })
   },
 
   switchTab(e) {
@@ -394,170 +544,6 @@ Page({
       this.setData({ isEncoding: false })
       wx.showToast({ title: '编码失败', icon: 'none' })
       console.error(err)
-    }
-  },
-
-  toggleDecode() {
-    if (this.data.isDecoding) {
-      this.stopDecode()
-    } else {
-      this.startDecode()
-    }
-  },
-
-  startDecode() {
-    // 检查权限
-    wx.getSetting({
-      success: (res) => {
-        if (!res.authSetting['scope.record']) {
-          wx.authorize({
-            scope: 'scope.record',
-            success: () => {
-              this._startDecoding()
-            },
-            fail: () => {
-              wx.showModal({
-                title: '需要麦克风权限',
-                content: '请在设置中开启麦克风权限',
-                success: (res) => {
-                  if (res.confirm) {
-                    wx.openSetting()
-                  }
-                }
-              })
-            }
-          })
-        } else {
-          this._startDecoding()
-        }
-      }
-    })
-  },
-
-  _startDecoding() {
-    this.decodedImageData = null // 保存解码后的图片数据
-    this.hasCompletedDecoding = false // 标记是否完成解码
-    
-    // 保持屏幕常量 - 防止息屏
-    wx.setKeepScreenOn({
-      keepScreenOn: true,
-      success: () => {
-        console.log('屏幕保持常亮成功')
-      },
-      fail: () => {
-        console.error('屏幕保持常亮失败')
-      }
-    })
-    
-    // 初始化
-    this.setData({ 
-      isDecoding: true, 
-      decodedImage: '', 
-      decodeProgress: 0, 
-      scanLine: 0
-    })
-    
-    const decoder = this.decoder
-    if (decoder) {
-      decoder.reset()
-      decoder.isDecoding = true // 确保解码器处于活动状态
-      decoder.onProgress = (progress, scanLine) => {
-        // 使用防抖更新UI，避免过于频繁的setData
-        if (this.updateTimer) {
-          clearTimeout(this.updateTimer)
-        }
-        this.updateTimer = setTimeout(() => {
-          this.setData({ decodeProgress: progress, scanLine })
-        }, 500) // 500ms 防抖，减少UI更新频率
-      }
-      decoder.onComplete = (imageData, width, height) => {
-        this.hasCompletedDecoding = true
-        this.decodedImageData = imageData
-        
-        // 立即停止录音
-        this.forceStopRecording()
-        
-        // 解码完成后才渲染图片
-        this.renderDecodedImage(imageData, width, height).then((filePath) => {
-          this.setData({ 
-            isDecoding: false,
-            decodedImage: filePath,
-            decodeProgress: 100
-          })
-          wx.showToast({ title: '解码完成', icon: 'success' })
-        }).catch((err) => {
-          console.error('渲染解码图片失败:', err)
-          this.setData({ isDecoding: false })
-          wx.showToast({ title: '解码失败', icon: 'none' })
-        })
-      }
-    } else {
-      console.error('解码器未初始化')
-      wx.showToast({ title: '解码器初始化失败', icon: 'none' })
-      wx.setKeepScreenOn({ keepScreenOn: false }) // 关闭屏幕常量
-      return
-    }
-    
-    // 尝试使用不同的音频格式和参数
-    const recordOptions = {
-      duration: 300000, // 5分钟，足以覆盖完整的音频
-      sampleRate: 8000,  // 降低采样率以提高兼容性
-      numberOfChannels: 1,
-      encodeBitRate: 16000,
-      format: 'pcm',  // 使用PCM格式，避免AAC编码问题
-      frameSize: 1  // 关键：设置frameSize才能触发onFrameRecorded
-    }
-    
-    try {
-      this.recorderManager.start(recordOptions)
-      wx.showToast({ title: '开始监听', icon: 'success' })
-    } catch (err) {
-      console.error('启动录音失败:', err)
-      this.setData({ isDecoding: false })
-      wx.setKeepScreenOn({ keepScreenOn: false }) // 关闭屏幕常量
-      wx.showToast({ title: '启动录音失败', icon: 'none' })
-    }
-  },
-  
-  // 强制停止录音（用于解码完成或停止按钮）
-  forceStopRecording() {
-    try {
-      if (this.recorderManager) {
-        this.recorderManager.stop()
-        console.log('录音已停止')
-      }
-    } catch (err) {
-      console.error('停止录音失败:', err)
-    }
-    
-    // 关闭屏幕常量
-    wx.setKeepScreenOn({ keepScreenOn: false })
-    
-    // 停止解码器
-    if (this.decoder) {
-      this.decoder.isDecoding = false
-    }
-  },
-
-  stopDecode() {
-    console.log('停止监听被调用')
-    
-    // 强制停止录音
-    this.forceStopRecording()
-    
-    // 立即更新页面状态 - 关键！否则UI不会更新
-    this.setData({ isDecoding: false })
-    
-    // 检查是否解码成功（或者已经有实时预览）
-    const hasDecodedImage = this.data.decodedImage && this.data.decodedImage.length > 0
-    const wasCompleted = this.hasCompletedDecoding
-    
-    if (hasDecodedImage || wasCompleted) {
-      wx.showToast({ title: '已停止，可以保存图片', icon: 'success' })
-    } else {
-      wx.showToast({ title: '已停止，未检测到有效信号', icon: 'none' })
-      // 如果没有解码成功，清空结果
-      this.setData({ decodedImage: '', decodeProgress: 0, scanLine: 0 })
     }
   },
 

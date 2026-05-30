@@ -202,6 +202,16 @@ function _createModeDecoder(visCode, sampleRate) {
 // 主解码器类（保持原有 API）
 // ============================================================================
 
+// 带时间戳的日志辅助函数
+const _log = (msg) => {
+  const d = new Date()
+  const ts = d.getHours().toString().padStart(2, '0') + ':' +
+    d.getMinutes().toString().padStart(2, '0') + ':' +
+    d.getSeconds().toString().padStart(2, '0') + '.' +
+    d.getMilliseconds().toString().padStart(3, '0')
+  console.log('[' + ts + '] ' + msg)
+}
+
 class SSTVDecoder {
   constructor() {
     this.sampleRate = 8000
@@ -235,24 +245,25 @@ class SSTVDecoder {
     this._imgReady = false
     this._completed = false
 
-    // 校准头检测
-    this._calAvg = 1900.0
-    this._calBreakTicks = 0
-    this._calLeaderTicks = 0
-    this._calTicks = -1
-    this._calGotBreak = false
-    this._calFound = false
-    this._calFreqAcc = 0
-    this._calFreqAccCnt = 0
+    // ===== 频率历史环形缓冲 (Robot36 scanLineBuffer) =====
+    this._FREQ_BUF_SIZE = this.sampleRate * 2  // 2秒
+    this._freqBuf = new Float32Array(this._FREQ_BUF_SIZE)
+    this._freqBufIdx = 0           // 当前写入位置
+    this._freqBufTotal = 0         // 已写入总数
+    this._freqBufPhase0Count = 0   // phase=0 期间已写入数量
 
-    // VIS 解码
-    this._visSS = 0
-    this._visLo = 0
-    this._visHi = 0
-    this._visTicks = -1
-    this._visBit = -1
-    this._visByte = 0
-    this._visDone = false
+    // ===== 校准头检测 (Robot36 handleHeader 风格) =====
+    this._calBreakBufIdx = -1      // 检测到潜在 break 时的 freqBufIdx
+    this._calBreakSamples = 0      // break 持续样本数
+    this._calLeaderPreSamples = 0  // break 前的 leader 持续样本数
+    this._calLeaderPostStart = 0   // break 后的 leader 开始样本号
+    this._calCheckCount = 0        // 尝试验证次数（用于降级日志频率）
+
+    // ===== VIS 解码 (Robot36 风格: 10-bit 含起止位+奇偶校验) =====
+    this._visBits = new Int32Array(10)
+    this._visBitIdx = 0
+    this._visBufStart = 0
+    this._visBitsReady = false
 
     // 行解码
     this._initTiming()
@@ -339,7 +350,7 @@ class SSTVDecoder {
         sum += a
         if (a > peak) peak = a
       }
-      console.log('[SSTV] 首帧音频: 样本数=' + frameBuffer.length +
+      _log('[SSTV] 首帧音频: 样本数=' + frameBuffer.length +
         ' avgAmp=' + (sum / frameBuffer.length).toFixed(4) +
         ' peak=' + peak.toFixed(4))
     }
@@ -366,7 +377,7 @@ class SSTVDecoder {
       this.silenceCount++
       if (this.silenceCount > 50 && this._lineY > 10) {
         if (!this._completed) {
-          console.log('[SSTV] 静音超时, 提前结束解码 (lineY=' + this._lineY + ', silenceCount=' + this.silenceCount + ')')
+          _log('[SSTV] 静音超时, 提前结束解码 (lineY=' + this._lineY + ', silenceCount=' + this.silenceCount + ')')
           this._onDecodeComplete()
         }
       }
@@ -434,15 +445,30 @@ class SSTVDecoder {
       const phaseNames = ['校准头搜寻', 'VIS解码', '图像数据']
       let extraInfo = ''
       if (this._phase === 0) {
-        extraInfo = ' calAvg=' + this._calAvg.toFixed(0) + 'Hz leaderTicks=' + this._calLeaderTicks +
-          ' breakTicks=' + this._calBreakTicks + ' gotBreak=' + this._calGotBreak
+        const calStateNames = ['搜寻leader', 'leader确认', 'break中', '等待验证', '???']
+        extraInfo = ' calState=' + (calStateNames[this._calState] || '?') +
+          ' leaderPre=' + Math.round((this._calLeaderPreSamples || 0) / drate * 1000) + 'ms' +
+          ' break=' + Math.round((this._calBreakSamples || 0) / drate * 1000) + 'ms' +
+          ' leaderPost=' + Math.round(((this._calLeaderPostSamples || 0)) / drate * 1000) + 'ms'
+        // SMA 平均频率（只有 datWins时更新）
+        if (this._calDatSMA && this._calDatSMA.cnt > 0) {
+          const smaAvg = this._calDatSMA.sum / this._calDatSMA.cnt
+          extraInfo += ' datAvgSMA=' + smaAvg.toFixed(0) + 'Hz SMAcnt=' + this._calDatSMA.cnt + '/200'
+        }
+        if (this._calLeaderStart) {
+          extraInfo += ' leadAcc=' + this._calLeaderStart + '/' + Math.floor(0.1 * drate)
+        }
         if (this._datFreqCount > 0) {
           extraInfo += ' datFreq[' + this._datFreqMin.toFixed(0) + '~' +
             (this._datFreqSum / this._datFreqCount).toFixed(0) + '~' +
             this._datFreqMax.toFixed(0) + '] n=' + this._datFreqCount
         }
+        // 环形缓冲统计
+        if (this._freqBufTotal > 0) {
+          extraInfo += ' freqBuf=' + (this._freqBufTotal / drate).toFixed(1) + 's'
+        }
       }
-      console.log('[SSTV] 状态: phase=' + phaseNames[this._phase] + ' lineY=' + this._lineY +
+      _log('[SSTV] 状态: phase=' + phaseNames[this._phase] + ' lineY=' + this._lineY +
         ' | cntFreq=' + finalCntFreq.toFixed(0) + 'Hz datFreq=' + finalDatFreq.toFixed(0) + 'Hz' +
         ' | DDC幅度 cnt=' + cntAvgMag.toFixed(4) + ' dat=' + datAvgMag.toFixed(4) +
         ' cnt胜率=' + cntWinPct + '%' +
@@ -460,28 +486,36 @@ class SSTVDecoder {
       this._datFreqCount = 0
     }
 
+    // --- 频率历史环形缓冲 ---
+    // 写入归一化频率: (freq - 1900) / 400 → 1500→-1, 1900→0, 2300→+1
+    this._freqBuf[this._freqBufIdx] = (finalDatFreq - 1900.0) / 400.0
+    this._freqBufIdx = (this._freqBufIdx + 1) % this._FREQ_BUF_SIZE
+    this._freqBufTotal++
+    if (this._phase === 0) this._freqBufPhase0Count++
+
     // --- 状态机 ---
     switch (this._phase) {
       case 0: // 搜寻校准头
         if (this._checkCalHeader(finalCntFreq, finalDatFreq, drate, !cntWins)) {
-          console.log('[SSTV] 检测到校准头, 进入 VIS 解码')
+          // 校准头已确认，暂停并将控制转给 VIS 解码
           this._phase = 1
           this._resetVIS()
-          this._resetCalHeader()
         }
         break
 
       case 1: { // VIS 解码
-        const visResult = this._checkVISCode(finalCntFreq, drate)
+        const visResult = this._checkVISCode(finalCntFreq, finalDatFreq, drate)
         if (visResult !== null) {
           if (visResult.valid) {
-            console.log('[SSTV] VIS = 0x' + visResult.code.toString(16))
+            _log('[SSTV] VIS = 0x' + visResult.code.toString(16) +
+              ' (bin=' + visResult.code.toString(2).padStart(8, '0') +
+              ') 原始位=' + JSON.stringify(visResult.bits))
             if (visResult.code === 0x88 || visResult.code === 8) {
               this._imgReady = true
               this._modeVisCode = visResult.code & 0x7F  // 去掉校验位
               const mode = _createModeDecoder(this._modeVisCode, this.sampleRate)
               if (mode) {
-                console.log('[SSTV] 使用模式解码器: ' + mode.getName())
+                _log('[SSTV] 使用模式解码器: ' + mode.getName())
                 this._modeDecoder = mode
                 this._modeDecoder.resetState()
                 if (this._modeDecoder.outputImage) {
@@ -492,13 +526,13 @@ class SSTVDecoder {
               }
               this._resetLineState()
               this._phase = 2
-              console.log('[SSTV] 开始解码图像')
+              _log('[SSTV] 开始解码图像')
             } else {
-              console.warn('[SSTV] VIS 不支持: 0x' + visResult.code.toString(16) + ', 回到校准头搜寻')
+              _log('[SSTV] [WARN] VIS 不支持: 0x' + visResult.code.toString(16) + ', 回到校准头搜寻')
               this._phase = 0
             }
           } else {
-            console.warn('[SSTV] VIS 解码失败, 回到校准头搜寻')
+            _log('[SSTV] [WARN] VIS 校验失败, 回到校准头搜寻')
             this._phase = 0
           }
         }
@@ -524,7 +558,7 @@ class SSTVDecoder {
    * @returns {SSTVModeDecoder|null} 模式解码器实例，或 null
    */
   _createModeDecoder(visCode, sampleRate) {
-    console.log('[SSTV] 创建模式解码器: VIS=' + visCode)
+    _log('[SSTV] 创建模式解码器: VIS=' + visCode)
 
     // Robot 36 Color
     if (visCode === 8) {
@@ -535,159 +569,440 @@ class SSTVDecoder {
     // if (visCode === 60) { return new Scottie1Decoder(sampleRate) }
     // if (visCode === 36) { return new Martin1Decoder(sampleRate) }
 
-    console.warn('[SSTV] 不支持的 VIS 代码: ' + visCode)
+    _log('[SSTV] [WARN] 不支持的 VIS 代码: ' + visCode)
     return null
   }
 
   // ========================================================================
-  // 校准头检测
+  // 校准头检测 (Robot36 handleHeader 风格, 基于频率缓冲区)
   // ========================================================================
 
   _resetCalHeader() {
-    this._calAvg = 1900.0
-    this._calBreakTicks = 0
-    this._calLeaderTicks = 0
-    this._calTicks = -1
-    this._calGotBreak = false
-    this._calFreqAcc = 0
-    this._calFreqAccCnt = 0
+    this._calBreakBufIdx = -1
+    this._calBreakSamples = 0
+    this._calLeaderPreSamples = 0
+    this._calLeaderPostStart = 0
+    this._calCheckCount = 0
   }
 
+  /**
+   * Robot36 风格校准头检测
+   *
+   * 原理: 不在逐样本 EMA 上检测 leader/break（噪声太大），
+   * 而是基于频率环形缓冲区 _freqBuf 做区域平均验证。
+   *
+   * Robot36 核心参数:
+   *   leaderToneFrequency  = 1900 Hz
+   *   toleranceFrequency   = 50 Hz   (理想, 手机声学放宽到 100Hz)
+   *   stopBitFrequency     = 1200 Hz
+   *   pulseThresholdFreq   = 1550 Hz (1900+1200)/2, 下降沿判断
+   *   leaderToneSeconds    = 0.3s
+   *   leaderToneTolerance  = 0.06s (20%)
+   */
   _checkCalHeader(cntFreq, datFreq, drate, datWins) {
-    const BREAK_LEN = 0.01
-    const LEADER_LEN = 0.3
-    const BREAK_TOL = 0.7
-    const LEADER_TOL = 0.3
+    const TRIG_LOW = 1250.0   // Schmitt 下阈值: cntFreq 低于此 → break 激活
+    const TRIG_HIGH = 1350.0  // Schmitt 上阈值: cntFreq 高于此 → break 释放
+    const LEADER_MIN_AVG = 1800.0  // leader 最低平均频率
+    const LEADER_MAX_AVG = 2000.0  // leader 最高平均频率
+    const BREAK_MIN_SAMPLES = Math.floor(0.007 * drate)  // 7ms
+    const BREAK_MAX_SAMPLES = Math.floor(0.014 * drate)  // 14ms (Break 10ms ± tolerance)
+    const LEADER_MIN_SAMPLES = Math.floor(0.2 * drate)   // 200ms (300ms - 33% tolerance)
 
-    // 数据通道频率窗口平均
-    const FRQ_WIN_SAMPLES = 50
+    // ===== 状态机 =====
+    // 0=搜寻leader, 1=检测到leader, 2=break开始, 3=break结束等待验证
+    if (!this._calState) this._calState = 0
+    if (!this._calLeaderStart) this._calLeaderStart = 0
+
+    // 累计数据通道 SMA —— 只在 datWins 时写入, 避免 cntWins 的 1500Hz 假值污染
+    // SMA 窗口 200 样本（25ms@8kHz），足够平滑相位噪声
+    const SMA_SIZE = 200
+    if (!this._calDatSMA) { this._calDatSMA = { sum: 0, cnt: 0, buf: new Float32Array(SMA_SIZE) }; this._calDatSMAPos = 0 }
     if (datWins) {
-      if (!this._calFreqAcc) { this._calFreqAcc = 0; this._calFreqAccCnt = 0 }
-      this._calFreqAcc += datFreq
-      this._calFreqAccCnt++
-      if (this._calFreqAccCnt >= FRQ_WIN_SAMPLES) {
-        const avgFreq = this._calFreqAcc / this._calFreqAccCnt
-        const datAlpha = 1.0 / (drate * 0.00238 + 1.0)
-        this._calAvg = datAlpha * avgFreq + (1.0 - datAlpha) * this._calAvg
-        this._calFreqAcc = 0
-        this._calFreqAccCnt = 0
+      const oldVal = this._calDatSMA.buf[this._calDatSMAPos]
+      this._calDatSMA.buf[this._calDatSMAPos] = datFreq
+      this._calDatSMAPos = (this._calDatSMAPos + 1) % SMA_SIZE
+      if (this._calDatSMA.cnt < SMA_SIZE) { this._calDatSMA.sum += datFreq; this._calDatSMA.cnt++ }
+      else { this._calDatSMA.sum += datFreq - oldVal }
+    }
+    const datAvg = this._calDatSMA.sum / Math.max(1, this._calDatSMA.cnt)
+
+    // 累计控制通道 20样本滑动平均（1.25ms 窗口 — 可检测 10ms break）
+    if (!this._calCntSMA) { this._calCntSMA = { sum: 0, cnt: 0, buf: new Float32Array(20) }; this._calCntSMAPos = 0 }
+    const oldCnt = this._calCntSMA.buf[this._calCntSMAPos]
+    this._calCntSMA.buf[this._calCntSMAPos] = cntFreq
+    this._calCntSMAPos = (this._calCntSMAPos + 1) % 20
+    if (this._calCntSMA.cnt < 20) { this._calCntSMA.sum += cntFreq; this._calCntSMA.cnt++ }
+    else { this._calCntSMA.sum += cntFreq - oldCnt }
+    const cntAvg = this._calCntSMA.sum / Math.max(1, this._calCntSMA.cnt)
+
+    // Schmitt trigger for break detection
+    if (!this._calTrigger) this._calTrigger = false
+    if (cntAvg < TRIG_LOW) this._calTrigger = true
+    else if (cntAvg > TRIG_HIGH) this._calTrigger = false
+
+    // 记录 break 前的 leader 持续样本数
+    if (datAvg >= LEADER_MIN_AVG && datAvg <= LEADER_MAX_AVG && !this._calTrigger) {
+      this._calLeaderPreSamples++
+      // 标记 leader 起始（用于 _freqBuf 中定位）
+      if (!this._calLeaderBegin) this._calLeaderBegin = this._freqBufTotal
+    } else if (this._calTrigger) {
+      // 进入 break，记录 leader 起始
+      if (!this._calLeaderBegin && this._calLeaderPreSamples > 0) {
+        this._calLeaderBegin = this._freqBufTotal - this._calLeaderPreSamples
       }
     }
 
-    // 1200Hz break 检测
-    this._calBreakTicks = (Math.abs(cntFreq - 1200.0) < 80.0)
-      ? this._calBreakTicks + 1 : 0
+    // ===== 状态转换 =====
+    switch (this._calState) {
+      case 0: // 搜寻 leader
+        if (datAvg >= LEADER_MIN_AVG && datAvg <= LEADER_MAX_AVG) {
+          this._calLeaderStart = (this._calLeaderStart || 0) + 1
+          if (this._calLeaderStart >= Math.floor(0.1 * drate)) { // 100ms
+            this._calState = 1
+            this._calLeaderPreSamples = this._calLeaderStart
+            this._calLeaderBegin = this._freqBufTotal - this._calLeaderStart
+            _log('[SSTV] 校准头: 检测到 leader 信号 (1900Hz), 持续 ' +
+              (this._calLeaderStart / drate * 1000).toFixed(0) + 'ms, datAvg=' + datAvg.toFixed(0) + 'Hz')
+          }
+        } else {
+          this._calLeaderStart = 0
+        }
+        break
 
-    // 1900Hz leader 检测
-    this._calLeaderTicks = (Math.abs(this._calAvg - 1900.0) < 100.0)
-      ? this._calLeaderTicks + 1 : 0
+      case 1: { // leader 已确认, 等待 break
+        if (datAvg >= LEADER_MIN_AVG && datAvg <= LEADER_MAX_AVG) {
+          this._calLeaderPreSamples++
+        }
 
-    const sigBreak = this._calBreakTicks >= Math.floor(drate * BREAK_TOL * BREAK_LEN)
-    const sigLeader = this._calLeaderTicks >= Math.floor(drate * LEADER_TOL * LEADER_LEN)
-
-    this._calTicks++
-
-    if (sigLeader && !sigBreak && this._calGotBreak &&
-        this._calTicks >= Math.floor(drate * (LEADER_LEN + BREAK_LEN) * LEADER_TOL) &&
-        this._calTicks <= Math.floor(drate * (LEADER_LEN + BREAK_LEN) * (2.0 - LEADER_TOL))) {
-      this._calGotBreak = false
-      return true
-    }
-
-    if (sigBreak && !sigLeader &&
-        this._calTicks >= Math.floor(drate * BREAK_LEN * BREAK_TOL) &&
-        this._calTicks <= Math.floor(drate * BREAK_LEN * (2.0 - BREAK_TOL))) {
-      this._calGotBreak = true
-    }
-
-    if (sigLeader && !sigBreak) {
-      if (this._calTicks < 0) {
-        console.log('[SSTV] 校准头: 检测到 leader 信号 (1900Hz) calAvg=' + this._calAvg.toFixed(0) + 'Hz')
+        if (!this._calTrigger) {
+          this._calBreakSamples = 0
+          break
+        }
+        this._calBreakSamples++
+        if (this._calBreakSamples >= BREAK_MIN_SAMPLES) {
+          this._calState = 2
+          this._calBreakBufIdx = this._freqBufTotal - this._calBreakSamples
+          _log('[SSTV] 校准头: break 下降沿 (cntAvg=' + cntAvg.toFixed(0) +
+            'Hz < ' + TRIG_LOW + 'Hz), breakSamples=' + this._calBreakSamples +
+            ', 前导leader ' + (this._calLeaderPreSamples / drate * 1000).toFixed(0) + 'ms')
+        }
+        break
       }
-      this._calTicks = 0
-      this._calGotBreak = false
-    }
 
-    if (sigBreak && !sigLeader && !this._calGotBreak) {
-      console.log('[SSTV] 校准头: 检测到 break 信号 (1200Hz), ticks=' + this._calTicks +
-        ' cntFreq=' + cntFreq.toFixed(0) + 'Hz')
+      case 2: { // break 中 —— 不再等待 Schmitt trigger 释放（cntAvg 在 leader 期间升不到 TRIG_HIGH）
+        // 直接按 break 持续时间判断：7~14ms 即判定为有效 break 并进入状态3
+        this._calBreakSamples++
+        if (this._calBreakSamples > BREAK_MAX_SAMPLES) {
+          // break 过长, 不是校准头, 重置
+          this._logCalFail('break 过长 (' + (this._calBreakSamples / drate * 1000).toFixed(0) + 'ms > ' +
+            (BREAK_MAX_SAMPLES / drate * 1000).toFixed(0) + 'ms)')
+          this._calState = 0
+          this._calLeaderPreSamples = 0
+          this._calBreakSamples = 0
+          this._calLeaderBegin = 0
+          break
+        }
+        // 在 BREAK_MIN~BREAK_MAX 范围内，进入状态3等待第二个leader
+        if (this._calBreakSamples >= BREAK_MIN_SAMPLES) {
+          this._calState = 3
+          this._calLeaderPostStart = this._freqBufTotal
+          this._calBreakBufIdx = this._freqBufTotal - this._calBreakSamples
+          _log('[SSTV] 校准头: break 结束 (持续 ' +
+            (this._calBreakSamples / drate * 1000).toFixed(0) + 'ms, datAvg=' + datAvg.toFixed(0) +
+            ' cntAvg=' + cntAvg.toFixed(0) + '), 等待第二个 leader')
+        }
+        break
+      }
+
+      case 3: { // 等待第二个 leader + 缓冲区验证
+        if (datAvg >= LEADER_MIN_AVG && datAvg <= LEADER_MAX_AVG) {
+          this._calLeaderPostSamples = (this._calLeaderPostSamples || 0) + 1
+        }
+
+        // 累积足够第二个 leader 数据后, 执行 Robot36 缓冲区验证
+        const postMinSamples = Math.floor(0.25 * drate)  // 250ms (验证需要200ms, 留余量)
+        if ((this._calLeaderPostSamples || 0) >= postMinSamples) {
+          const verified = this._verifyCalHeaderFromBuffer(drate)
+          if (verified) {
+            this._calState = 0
+            this._calLeaderPreSamples = 0
+            this._calBreakSamples = 0
+            this._calLeaderPostSamples = 0
+            this._calLeaderBegin = 0
+            this._calLeaderStart = 0
+            // 计算 VIS 解码在缓冲区中的起始位置
+            const breakBufIdx = this._calBreakBufIdx
+            this._visBufStart = breakBufIdx + this._calBreakSamples
+            this._visBitsReady = true
+            return true
+          }
+          this._calState = 0
+          this._calLeaderPreSamples = 0
+          this._calBreakSamples = 0
+          this._calLeaderPostSamples = 0
+          this._calLeaderBegin = 0
+          this._calLeaderStart = 0
+        }
+        break
+      }
     }
 
     return false
   }
 
+  /**
+   * Robot36 缓冲区验证: 在频率历史缓冲中验证校准头三件套
+   *   1. Break 前 300ms 区域平均频率 ≈ 1900±100Hz
+   *   2. Break 后 300ms 区域平均频率 ≈ 1900±100Hz
+   *   3. 找到 1550Hz 下降沿
+   *
+   * @returns {boolean} 验证通过
+   */
+  _verifyCalHeaderFromBuffer(drate) {
+    const buf = this._freqBuf
+    const bufSize = this._FREQ_BUF_SIZE
+    const total = this._freqBufTotal
+    const breakBufIdx = this._calBreakBufIdx  // break 开始的缓冲区位置
+    const breakSamples = this._calBreakSamples
+
+    // 计算缓冲区偏移
+    const bufIdxToOffset = (idx) => {
+      // idx 是绝对写入编号, total 是最新写入的编号
+      // offset=0 = 最新写入的样本
+      return total - idx - 1
+    }
+
+    const readFreq = (bufIdx, offsetFrom, count) => {
+      let sum = 0
+      let valid = 0
+      for (let i = 0; i < count; i++) {
+        const sampleIdx = bufIdx + offsetFrom + i
+        const offset = bufIdxToOffset(sampleIdx)
+        if (offset < 0 || offset >= bufSize) continue
+        const ringIdx = (this._freqBufIdx - 1 - offset + bufSize * 2) % bufSize
+        sum += buf[ringIdx] * 400.0 + 1900.0  // 反归一化
+        valid++
+      }
+      return valid > 0 ? sum / valid : 0
+    }
+
+    const LEADER_LEN_S = 0.3
+    const LEADER_TOL_S = 0.06  // 20%
+    const TOLERANCE = 100.0
+    const BREAK_THRESHOLD = 1550.0  // (1900+1200)/2
+
+    // ===== 1. 验证 break 前的 leader =====
+    const preTransition = Math.floor(0.003 * drate)  // 3ms 过渡区
+    const preVerSamples = Math.floor(LEADER_TOL_S * drate)
+    const preLeaderStart = breakBufIdx - Math.floor(0.03 * drate) - preVerSamples
+    const preAvgFreq = readFreq(breakBufIdx, -Math.floor(0.03 * drate) - preVerSamples, preVerSamples)
+
+    if (Math.abs(preAvgFreq - 1900.0) > TOLERANCE) {
+      this._logCalFail('break前leader频率偏差: ' + preAvgFreq.toFixed(0) + 'Hz (需 1900±' + TOLERANCE + 'Hz)')
+      return false
+    }
+    _log('[SSTV] 校准头验证: break前leader频率=' + preAvgFreq.toFixed(0) + 'Hz ✓')
+
+    // ===== 2. 验证 break 后的 leader（跳过过渡区域）=====
+    const postTransition = Math.floor(0.005 * drate)  // 5ms 过渡
+    const postVerSamples = Math.floor(0.2 * drate)  // 200ms
+    const postAvgFreq = readFreq(breakBufIdx + breakSamples + postTransition, 0, postVerSamples)
+
+    if (Math.abs(postAvgFreq - 1900.0) > TOLERANCE) {
+      this._logCalFail('break后leader频率偏差: ' + postAvgFreq.toFixed(0) + 'Hz (需 1900±' + TOLERANCE + 'Hz)')
+      return false
+    }
+    _log('[SSTV] 校准头验证: break后leader频率=' + postAvgFreq.toFixed(0) + 'Hz ✓')
+
+    // ===== 3. 找到 1550Hz 下降沿（VIS 码起始点）=====
+    const searchStart = breakBufIdx + Math.floor(LEADER_LEN_S * drate) - Math.floor(LEADER_TOL_S * drate)
+    const searchEnd = breakBufIdx + Math.floor(LEADER_LEN_S * drate) + Math.floor(LEADER_TOL_S * drate) +
+      Math.floor(0.03 * drate)  // +1 VIS bit
+    let visBeginIdx = -1
+
+    for (let i = searchStart; i < searchEnd; i++) {
+      const offset = bufIdxToOffset(i)
+      if (offset < 0 || offset >= bufSize) continue
+      const ringIdx = (this._freqBufIdx - 1 - offset + bufSize * 2) % bufSize
+      const freq = buf[ringIdx] * 400.0 + 1900.0
+      if (freq < BREAK_THRESHOLD) {
+        visBeginIdx = i
+        break
+      }
+    }
+
+    if (visBeginIdx < 0) {
+      this._logCalFail('未找到 1550Hz 下降沿 (breakBufIdx=' + breakBufIdx +
+        ' search[' + searchStart + '~' + searchEnd + '])')
+      return false
+    }
+
+    _log('[SSTV] 校准头验证: 找到1550Hz下降沿 ✓ (visBeginIdx=' + visBeginIdx +
+      ', break后leader=' + postAvgFreq.toFixed(0) + 'Hz, 进入校准头检测成功)')
+    this._visBufStart = visBeginIdx
+    this._visBitsReady = true
+    return true
+  }
+
+  _logCalFail(reason) {
+    // 降级日志: 每 50 次才输出一次
+    if (!this._calFailCount) this._calFailCount = 0
+    this._calFailCount++
+    if (this._calFailCount % 5 === 1) {
+      _log('[SSTV] 校准头验证失败 #' + this._calFailCount + ': ' + reason +
+        ' (共 ' + (this._freqBufTotal / this.sampleRate).toFixed(1) + ' 秒音频)')
+    }
+  }
+
   // ========================================================================
-  // VIS 解码
+  // VIS 解码 (Robot36 风格: 频率缓冲区 + 起止位 + 奇偶校验)
   // ========================================================================
 
   _resetVIS() {
-    this._visSS = 0
-    this._visLo = 0
-    this._visHi = 0
-    this._visTicks = -1
-    this._visBit = -1
+    this._visBits.fill(0)
+    this._visBitIdx = 0
+    this._visBitsReady = true  // 校准头已验证, VIS 已可用
     this._visByte = 0
     this._visDone = false
+    // VIS 解码不需要逐样本状态机了, 用缓冲区
+    this._visDecoded = false
+    _log('[SSTV] VIS解码准备: visBufStart=' + this._visBufStart +
+      ' (缓冲中有 ' + (this._freqBufTotal - this._visBufStart) + ' 个后续样本)')
   }
 
-  _checkVISCode(cntFreq, drate) {
-    const TOLERANCE = 0.9
-    const LENGTH = 0.03
+  /**
+   * Robot36 风格 VIS 解码: 从频率缓冲区读取
+   *
+   * VIS 格式: 10 bits × 30ms = 300ms
+   *   bit[0]: Start bit = 1200Hz
+   *   bit[1-7]: 7 data bits (1100Hz=1, 1300Hz=0)
+   *   bit[8]: Parity bit (偶校验)
+   *   bit[9]: Stop bit = 1200Hz
+   *
+   * 容差: ±50Hz
+   */
+  _checkVISCode(cntFreq, datFreq, drate) {
+    // 如果已经解码完成, 不再重复
+    if (this._visDecoded) return null
 
-    this._visSS = (Math.abs(cntFreq - 1200.0) < 50.0) ? this._visSS + 1 : 0
-    this._visLo = (Math.abs(cntFreq - 1300.0) < 50.0) ? this._visLo + 1 : 0
-    this._visHi = (Math.abs(cntFreq - 1100.0) < 50.0) ? this._visHi + 1 : 0
+    if (!this._visBitsReady) return null
+    this._visBitsReady = false  // 只执行一次
 
-    const thresh = Math.floor(drate * TOLERANCE * LENGTH)
-    const sigSS = this._visSS >= thresh
-    const sigLo = this._visLo >= thresh
-    const sigHi = this._visHi >= thresh
+    const visBitSamples = Math.floor(0.03 * drate)  // 30ms per bit
+    const transitionSamples = Math.floor(0.003 * drate)  // 3ms 过渡
+    const buf = this._freqBuf
+    const bufSize = this._FREQ_BUF_SIZE
 
-    if (sigSS) this._visSS = 0
-    if (sigLo) this._visLo = 0
-    if (sigHi) this._visHi = 0
+    // 计算 VIS 解码需要的总样本数
+    const totalVisSamples = 10 * visBitSamples
+    const available = this._freqBufTotal - this._visBufStart
 
-    this._visTicks++
-
-    if (this._visBit < 0) {
-      if (sigSS) {
-        this._visTicks = 0
-        this._visByte = 0
-        this._visBit = 0
-        console.log('[SSTV] VIS: 检测到 Start bit')
-      }
+    if (available < totalVisSamples) {
+      _log('[SSTV] [WARN] VIS: 缓冲数据不足 (需要:' + totalVisSamples + ' 可用:' + available + ')')
       return null
     }
 
-    const maxTicks = Math.floor(drate * 10.0 * LENGTH * (2.0 - TOLERANCE))
-    if (this._visTicks <= maxTicks) {
-      if (sigSS) {
-        const code = this._visByte
-        this._visBit = -1
-        console.log('[SSTV] VIS: Stop bit, 解码完成 code=0x' + code.toString(16) + ' (bin=' + code.toString(2).padStart(8, '0') + ')')
-        return { code, valid: true }
-      }
-      if (this._visBit < 8) {
-        const prevBit = this._visBit
-        if (sigLo) {
-          this._visBit++
-          console.log('[SSTV] VIS: bit[' + prevBit + '] = 0 (Lo/1300Hz) ticks=' + this._visTicks)
-        }
-        if (sigHi) {
-          this._visByte |= (1 << this._visBit)
-          const oldBit = this._visBit
-          this._visBit++
-          console.log('[SSTV] VIS: bit[' + oldBit + '] = 1 (Hi/1100Hz) ticks=' + this._visTicks + ' byte=0x' + this._visByte.toString(16))
-        }
-      }
-      return null
+    // 辅助函数: 从缓冲区读取指定偏移的频率值（归一化 → 真实频率）
+    const readFreqAtOffset = (offset) => {
+      const sampleIdx = this._visBufStart + offset
+      const bufOffset = this._freqBufTotal - sampleIdx - 1
+      if (bufOffset < 0 || bufOffset >= bufSize) return 0
+      const ringIdx = (this._freqBufIdx - 1 - bufOffset + bufSize * 2) % bufSize
+      return buf[ringIdx] * 400.0 + 1900.0
     }
 
-    const code = this._visByte
-    const hadEnoughBits = this._visBit >= 8
-    this._visBit = -1
-    console.warn('[SSTV] VIS: 超时 after ' + this._visTicks + ' ticks, bits=' + (this._visBit + 1) + ' byte=0x' + code.toString(16) + ' valid=' + hadEnoughBits)
-    return { code, valid: hadEnoughBits }
+    // 对每个 bit 积分频率（跳过过渡区）
+    const bitFreqs = new Float64Array(10)
+    const validSamples = visBitSamples - 2 * transitionSamples
+
+    for (let j = 0; j < 10; j++) {
+      let sum = 0
+      let cnt = 0
+      for (let i = transitionSamples; i < visBitSamples - transitionSamples; i++) {
+        const offset = j * visBitSamples + i
+        if (offset < totalVisSamples) {
+          sum += readFreqAtOffset(offset)
+          cnt++
+        }
+      }
+      bitFreqs[j] = cnt > 0 ? sum / cnt : 0
+    }
+
+    const STOP_FREQ = 1200.0
+    const ONE_FREQ = 1100.0
+    const ZERO_FREQ = 1300.0
+    const TOLERANCE = 100.0  // 放宽到 100Hz 容忍声学失真
+
+    // 详细位日志
+    const bitLabels = ['Start', '0', '1', '2', '3', '4', '5', '6', 'Parity', 'Stop']
+    let bitLog = ''
+    for (let i = 0; i < 10; i++) {
+      bitLog += ' [' + bitLabels[i] + ']=' + bitFreqs[i].toFixed(0) + 'Hz'
+    }
+    _log('[SSTV] VIS: 10位频率' + bitLog)
+
+    // ===== 1. 起止位验证 =====
+    if (Math.abs(bitFreqs[0] - STOP_FREQ) > TOLERANCE) {
+      _log('[SSTV] [WARN] VIS失败: Start bit 频率偏差 (期望1200Hz, 实际' + bitFreqs[0].toFixed(0) + 'Hz, 容差' + TOLERANCE + 'Hz)')
+      this._visDecoded = true
+      return { code: 0, valid: false, bits: Array.from(bitFreqs), failReason: 'START_BIT' }
+    }
+    if (Math.abs(bitFreqs[9] - STOP_FREQ) > TOLERANCE) {
+      _log('[SSTV] [WARN] VIS失败: Stop bit 频率偏差 (期望1200Hz, 实际' + bitFreqs[9].toFixed(0) + 'Hz, 容差' + TOLERANCE + 'Hz)')
+      this._visDecoded = true
+      return { code: 0, valid: false, bits: Array.from(bitFreqs), failReason: 'STOP_BIT' }
+    }
+
+    // ===== 2. 数据位验证（每 bit 必须接近 1100 或 1300）=====
+    const dataBits = []
+    for (let i = 1; i < 9; i++) {
+      const distToOne = Math.abs(bitFreqs[i] - ONE_FREQ)
+      const distToZero = Math.abs(bitFreqs[i] - ZERO_FREQ)
+      if (distToOne > TOLERANCE && distToZero > TOLERANCE) {
+        _log('[SSTV] [WARN] VIS失败: bit[' + (i - 1) + '] 频率模糊 (实际' + bitFreqs[i].toFixed(0) +
+          'Hz, 期望1100或1300±' + TOLERANCE + 'Hz)')
+        this._visDecoded = true
+        return { code: 0, valid: false, bits: Array.from(bitFreqs), failReason: 'BIT_' + (i - 1) + '_AMBIGUOUS' }
+      }
+      dataBits.push(distToOne < distToZero ? 1 : 0)
+    }
+
+    // ===== 3. 组合 7 位数据 + 奇偶校验 =====
+    let visCode = 0
+    for (let i = 0; i < 7; i++) {
+      visCode |= (dataBits[i]) << i
+    }
+    const parityBit = dataBits[7]
+
+    // 偶校验
+    let check = true
+    for (let i = 0; i < 7; i++) {
+      check ^= ((visCode >> i) & 1) !== 0
+    }
+
+    _log('[SSTV] VIS: 7位数据=' + visCode + ' (0x' + visCode.toString(16) +
+      ' bin=' + visCode.toString(2).padStart(7, '0') +
+      ') 校验位=' + parityBit + ' 偶校验=' + (check ? '✓' : '✗'))
+
+    if (!check) {
+      _log('[SSTV] [WARN] VIS失败: 偶校验不通过 (高8位原始码=0x' + (visCode | (parityBit << 7)).toString(16) + ')')
+      this._visDecoded = true
+      return { code: visCode | (parityBit << 7), valid: false, bits: Array.from(bitFreqs), failReason: 'PARITY' }
+    }
+
+    // ===== 4. 成功 =====
+    this._visDecoded = true
+    const fullCode = visCode | (parityBit << 7)  // 0x88 for Robot36
+    const modeName = (visCode === 8) ? 'Robot36 Color' :
+      (visCode === 12) ? 'Robot72 Color' :
+      (visCode === 60) ? 'Scottie 1' :
+      (visCode === 56) ? 'Scottie 2' :
+      (visCode === 76) ? 'Scottie DX' :
+      (visCode === 44) ? 'Martin 1' :
+      (visCode === 40) ? 'Martin 2' : 'Unknown'
+    _log('[SSTV] VIS成功: 模式=' + modeName + ' (0x' + fullCode.toString(16) + ')')
+
+    return { code: fullCode, valid: true, bits: Array.from(bitFreqs) }
   }
 
   // ========================================================================
@@ -717,14 +1032,14 @@ class SSTVDecoder {
       this._sepCount = 0
       this._yPixels.fill(0)
       this._uvPixels.fill(0)
-      console.log('[SSTV] 图像解码: 收到第一个行同步脉冲, 开始解码图像行')
+      _log('[SSTV] 图像解码: 收到第一个行同步脉冲, 开始解码图像行')
       return
     }
 
     this._lineTicks++
 
     if (horSync && this._lineTicks < (this._horLen - this._syncPorchLen)) {
-      console.warn('[SSTV] 行解码: 过早的行同步脉冲, 行=' + this._lineY + ' ticks=' + this._lineTicks + ' (期望≥' + (this._horLen - this._syncPorchLen) + '), 重置行')
+      _log('[SSTV] [WARN] 行解码: 过早的行同步脉冲, 行=' + this._lineY + ' ticks=' + this._lineTicks + ' (期望≥' + (this._horLen - this._syncPorchLen) + '), 重置行')
       this._lineTicks = 0
       this._yPixelX = 0
       this._uvPixelX = 0
@@ -749,7 +1064,7 @@ class SSTVDecoder {
     }
 
     if (this._lineTicks >= (this._horLen + this._syncPorchLen)) {
-      console.warn('[SSTV] 行解码: 行同步丢失/外推, 行=' + this._lineY + ' ticks=' + this._lineTicks + ' yPix=' + this._yPixelX + ' uvPix=' + this._uvPixelX)
+      _log('[SSTV] [WARN] 行解码: 行同步丢失/外推, 行=' + this._lineY + ' ticks=' + this._lineTicks + ' yPix=' + this._yPixelX + ' uvPix=' + this._uvPixelX)
       this._processLine()
       this._lineY++
       this._reportProgress()
@@ -774,7 +1089,7 @@ class SSTVDecoder {
       const prevOdd = this._odd
       this._odd = (this._sepCount < 0) ? 1 : 0
       if (this._odd !== prevOdd) {
-        console.log('[SSTV] 行解码: 行列奇偶修正, 行=' + this._lineY + ' odd=' + prevOdd + ' → ' + this._odd + ' sepCount=' + this._sepCount)
+        _log('[SSTV] 行解码: 行列奇偶修正, 行=' + this._lineY + ' odd=' + prevOdd + ' → ' + this._odd + ' sepCount=' + this._sepCount)
       }
       this._sepCount = 0
     }
@@ -905,7 +1220,7 @@ class SSTVDecoder {
     if (this._lineY % 2 === 0) return
 
     if (this._lineY % 20 === 1) {
-      console.log('[SSTV] 图像解码: ' + this._lineY + '/' + this.imageHeight + ' 行 (' + Math.floor(this._lineY / this.imageHeight * 100) + '%)')
+      _log('[SSTV] 图像解码: ' + this._lineY + '/' + this.imageHeight + ' 行 (' + Math.floor(this._lineY / this.imageHeight * 100) + '%)')
     }
 
     const width = this.imageWidth
@@ -967,7 +1282,7 @@ class SSTVDecoder {
     this._completed = true
     this.isDecoding = false
 
-    console.log('[SSTV] 解码完成:', this._lineY, '行')
+    _log('[SSTV] 解码完成:', this._lineY, '行')
 
     if (this.onComplete) {
       this.onComplete(this.imageData, this.imageWidth, this.imageHeight)

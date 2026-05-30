@@ -3,6 +3,7 @@
   <canvas type="2d" id="encodeCanvas" class="hidden-canvas" style="width: 320px; height: 240px;"></canvas>
   <canvas type="2d" id="tempCanvas" class="hidden-canvas" style="width: 320px; height: 240px;"></canvas>
   <canvas type="2d" id="pixelCanvas" class="hidden-canvas" style="width: 320px; height: 240px;"></canvas>
+  <canvas type="2d" id="decodeCanvas" class="hidden-canvas" style="width: 320px; height: 240px;"></canvas>
 
     <view class="tab-bar">
       <view class="tab-item {{currentTab === 'encode' ? 'active' : ''}}" bindtap="switchTab" data-tab="encode">
@@ -105,8 +106,11 @@
     <!-- 解码界面 -->
     <view class="decode-panel" wx:if="{{currentTab === 'decode'}}">
       <view class="decode-controls">
-        <button class="action-btn {{isDecoding ? 'danger' : 'primary'}}" bindtap="toggleDecode">
-          {{isDecoding ? '停止监听' : '开始监听'}}
+        <button class="action-btn primary decode-file-btn" bindtap="chooseAudioForDecode">
+          💬 从聊天记录选择音频
+        </button>
+        <button class="action-btn danger" wx:if="{{isDecoding}}" bindtap="stopDecode" style="margin-top: 12rpx;">
+          取消解码
         </button>
       </view>
 
@@ -151,10 +155,9 @@
         <text>5. 通过无线电发射音频信号</text>
       </view>
       <view class="tips-content" wx:if="{{currentTab === 'decode'}}">
-        <text>1. 确保环境安静，减少背景噪音</text>
-        <text>2. 将音频源靠近手机麦克风</text>
-        <text>3. 点击开始监听按钮（当前只支持Robot36）</text>
-        <text>4. 等待解码完成后保存图片</text>
+        <text>1. 点击按钮从聊天记录中选择 WAV 音频文件</text>
+        <text>2. 使用 FFT 算法解码（当前支持Robot36）</text>
+        <text>3. 等待解码完成后保存图片</text>
       </view>
     </view>
 
@@ -168,7 +171,7 @@
     <view class="acknowledgment" wx:if="{{currentTab === 'decode'}}">
       <text class="ack-title"> 感谢开源项目</text>
       <view class="ack-content">
-        <text class="ack-item">robot36 (xdsopl)</text>
+        <text class="ack-item">sstv-decoder (Equinoxis)</text>
       </view>
     </view>
   </view>

@@ -31,8 +31,7 @@ class Robot36 extends SSTVMode {
    */
   calculateTotalSamples(width, height) {
     // Robot36 标准时序 (单位: ms)
-    const PREAMBLE_LOW_DURATION = 300   // 前导低频 1200Hz
-    const PREAMBLE_HIGH_DURATION = 3000 // 前导高频 1900Hz
+    // 标准 SSTV 协议不需要前导信号，直接发送标准校准头
     const LEADER1_DURATION = 300        // 先导音 1900Hz
     const BREAK_DURATION = 10           // 短暂脉冲 1200Hz
     const LEADER2_DURATION = 300        // 再次先导音 1900Hz
@@ -53,10 +52,8 @@ class Robot36 extends SSTVMode {
                          SEP_DURATION + PORCH_DURATION +
                          CR_CB_DURATION
 
-    // 头部采样数
+    // 头部采样数（仅标准校准头，不含非标准前导）
     let totalSamples = 0
-    totalSamples += Math.round(this.sampleRate * (PREAMBLE_LOW_DURATION / 1000))
-    totalSamples += Math.round(this.sampleRate * (PREAMBLE_HIGH_DURATION / 1000))
     totalSamples += Math.round(this.sampleRate * (LEADER1_DURATION / 1000))
     totalSamples += Math.round(this.sampleRate * (BREAK_DURATION / 1000))
     totalSamples += Math.round(this.sampleRate * (LEADER2_DURATION / 1000))
@@ -84,9 +81,7 @@ class Robot36 extends SSTVMode {
       data = new Uint8Array(data.buffer)
     }
 
-    // Robot36 标准时序 (ms) - 必须与 calculateTotalSamples() 保持一致
-    const PREAMBLE_LOW_DURATION = 300   // 前导低频 1200Hz
-    const PREAMBLE_HIGH_DURATION = 3000 // 前导高频 1900Hz
+    // Robot36 标准时序 (ms) - 仅标准校准头，不含非标准前导
     const LEADER1_DURATION = 300        // 先导音 1900Hz
     const BREAK_DURATION = 10           // 短暂脉冲 1200Hz
     const LEADER2_DURATION = 300        // 再次先导音 1900Hz
@@ -107,11 +102,7 @@ class Robot36 extends SSTVMode {
     this.audioBuffer = new Float32Array(totalSamples)
     this.bufferIndex = 0
 
-    // ---------- 0. Preamble ----------
-    this.addTone(1200, PREAMBLE_LOW_DURATION)   // 1200Hz 300ms
-    this.addTone(1900, PREAMBLE_HIGH_DURATION)  // 1900Hz 3000ms
-
-    // ---------- 1. VIS 头部 ----------
+    // ---------- 0. 标准校准头 ----------
     this.addTone(1900, LEADER1_DURATION)        // Leader1: 1900Hz 300ms
     this.addTone(1200, BREAK_DURATION)          // Break: 1200Hz 10ms
     this.addTone(1900, LEADER2_DURATION)       // Leader2: 1900Hz 300ms
