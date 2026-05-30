@@ -50,8 +50,9 @@ Page({
   },
 
   onShow() {
-    // 清理 contactLogs 缓存，确保获取最新数据
+    // 清理缓存，确保获取最新数据（mine页可能已更新主题/用户信息）
     this._cache.contactLogs = null
+    this._cache.appTheme = null
     this.loadTheme()
     this.loadUserInfo()
     this.loadStats()
