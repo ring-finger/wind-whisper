@@ -34,7 +34,6 @@ Page({
   },
 
   onLoad() {
-    // 初始化内存缓存 - 避免在 Page 对象中定义非简单值
     this._cache = {
       appTheme: null,
       myCallSign: null,
@@ -50,8 +49,8 @@ Page({
   },
 
   onShow() {
-    // 清理 contactLogs 缓存，确保获取最新数据
     this._cache.contactLogs = null
+    this._cache.appTheme = null
     this.loadTheme()
     this.loadUserInfo()
     this.loadStats()
@@ -60,13 +59,11 @@ Page({
 
   loadTheme() {
     try {
-      // 使用缓存，避免重复同步读取
       if (this._cache.appTheme === null) {
         this._cache.appTheme = wx.getStorageSync('appTheme') || 'radio'
       }
       const savedTheme = this._cache.appTheme
       this.setData({ currentTheme: savedTheme })
-      // 根据主题动态设置导航栏颜色
       const themeConfig = app.THEMES[savedTheme] || app.THEMES.radio
       wx.setNavigationBarColor({
         frontColor: themeConfig.navText,
@@ -83,7 +80,6 @@ Page({
 
   loadUserInfo() {
     try {
-      // 使用缓存，避免重复同步读取
       if (this._cache.myCallSign === null) {
         this._cache.myCallSign = wx.getStorageSync('myCallSign') || ''
       }

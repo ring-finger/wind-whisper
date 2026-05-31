@@ -1,4 +1,4 @@
-<view class="theme-wrapper {{currentTheme === 'morandi' ? 'theme-morandi' : ''}}">
+<view class="theme-wrapper {{currentTheme === 'morandi' ? 'theme-morandi' : (currentTheme === 'dark' ? 'theme-dark' : '')}}">
   <view class="page-home">
   <!-- 顶部：个人资料卡片 -->
   <view class="profile-card" hover-class="button-hover" bindtap="goToMine">

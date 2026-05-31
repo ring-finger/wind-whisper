@@ -21,15 +21,13 @@ App({
     }
   },
 
-  // 云数据库日志配置
   CLOUD_LOGS_CONFIG: {
-    collectionName: 'contactLogs',  // 云数据库集合名称
-    maxLocalCount: 100,            // 默认最大本地条数
-    maxCloudCount: 100,            // 默认最大云端条数
-    syncEnabledKey: 'cloudSyncEnabled'  // 存储键
+    collectionName: 'contactLogs',
+    maxLocalCount: 100,
+    maxCloudCount: 100,
+    syncEnabledKey: 'cloudSyncEnabled'
   },
 
-  // 内存缓存 - 避免启动阶段重复同步读取
   _cache: {
     appTheme: null,
     maxCloudLogCount: null,
@@ -42,10 +40,8 @@ App({
       env: "wind-d9gv5b4ca9c4129ba"
     });
 
-    // 延迟非关键同步调用，避免阻塞启动线程
-    // 使用 setTimeout 将同步 API 推迟到启动完成后执行
+    // 延迟同步操作到启动完成后，避免阻塞
     setTimeout(() => {
-      // 初始化最大云端条数（如果未设置则默认为100）
       if (this._cache.maxCloudLogCount === null) {
         this._cache.maxCloudLogCount = wx.getStorageSync('maxCloudLogCount')
       }
@@ -56,7 +52,6 @@ App({
       this.initTheme()
     }, 0)
 
-    // getDeviceInfo 使用异步 API，不阻塞启动
     this.getDeviceInfo()
   },
   globalData: {
@@ -65,7 +60,6 @@ App({
     platform: ''
   },
 
-  // 获取云同步开关状态（使用缓存）
   isCloudSyncEnabled() {
     try {
       if (this._cache.cloudSyncEnabled === null) {
@@ -77,7 +71,6 @@ App({
     }
   },
 
-  // 设置云同步开关（同步更新缓存）
   setCloudSyncEnabled(enabled) {
     try {
       this._cache.cloudSyncEnabled = enabled
@@ -87,7 +80,6 @@ App({
     }
   },
 
-  // 获取最大云端条数配置（使用缓存）
   getMaxCloudCount() {
     try {
       if (this._cache.maxCloudLogCount === null) {
@@ -99,7 +91,6 @@ App({
     }
   },
 
-  // 设置最大云端条数（同步更新缓存）
   setMaxCloudCount(count) {
     try {
       this._cache.maxCloudLogCount = count
@@ -111,68 +102,52 @@ App({
 
   initTheme() {
     try {
-      // 使用缓存，避免重复同步读取
       if (this._cache.appTheme === null) {
         this._cache.appTheme = wx.getStorageSync(this.STORAGE_THEME) || 'radio'
       }
-      const savedTheme = this._cache.appTheme
-      const themeConfig = this.THEMES[savedTheme] || this.THEMES.radio
-      
+      const theme = this._cache.appTheme
+      const themeConfig = this.THEMES[theme] || this.THEMES.radio
+
       wx.setNavigationBarColor({
         frontColor: themeConfig.navText,
         backgroundColor: themeConfig.navBg,
-        animation: {
-          duration: 0,
-          timingFunc: 'linear'
+        animation: { duration: 0, timingFunc: 'linear' }
+      })
+
+      const pages = getCurrentPages()
+      pages.forEach(page => {
+        if (!page || !page.setData) return
+        try {
+          page.setData({ currentTheme: theme })
+        } catch (e) {
+          // WebView 已销毁或跨独立分包，忽略
         }
       })
-      
-      // 使用缓存，避免重复同步读取
-      if (this._cache.appTheme === null) {
-        this._cache.appTheme = wx.getStorageSync(this.STORAGE_THEME) || 'radio'
-      }
-      const cachedTheme = this._cache.appTheme
-      // 触发页面重新渲染以应用主题CSS类
-      const pages = getCurrentPages()
-      if (pages.length > 0) {
-        const currentPage = pages[pages.length - 1]
-        if (currentPage && currentPage.setData) {
-          currentPage.setData({ currentTheme: cachedTheme })
-        }
-      }
     } catch (e) {
       console.error('初始化主题失败', e)
     }
   },
   getDeviceInfo() {
     try {
-      // 优先使用异步 API，避免阻塞 JS 线程
       if (wx.getDeviceInfo) {
         wx.getDeviceInfo({
           success: (res) => {
             this.globalData.deviceInfo = res
             this.globalData.platform = res.platform || ''
-            console.log('设备信息:', res)
-            console.log('平台信息:', res.platform)
           },
-          fail: (err) => {
-            console.error('获取设备信息失败:', err)
+          fail: () => {
             this.globalData.platform = ''
-            // 失败时降级到异步 getSystemInfo
             this._getSystemInfoAsync()
           }
         })
       } else {
-        // 降级到异步 getSystemInfo
         this._getSystemInfoAsync()
       }
     } catch (e) {
-      console.error('获取设备信息失败:', e)
       this.globalData.platform = ''
     }
   },
 
-  // 异步获取系统信息（降级方案）
   _getSystemInfoAsync() {
     if (wx.getSystemInfo) {
       wx.getSystemInfo({
@@ -194,7 +169,6 @@ App({
   },
   loadCallHistory() {
     try {
-      // 使用缓存，避免重复同步读取
       if (this._cache.callHistory === null) {
         this._cache.callHistory = wx.getStorageSync('callHistory') || []
       }
@@ -207,15 +181,10 @@ App({
     if (!callSign) return
     const history = this.globalData.callHistory
     const index = history.indexOf(callSign)
-    if (index > -1) {
-      history.splice(index, 1)
-    }
+    if (index > -1) history.splice(index, 1)
     history.unshift(callSign)
-    if (history.length > 50) {
-      history.pop()
-    }
+    if (history.length > 50) history.pop()
     this.globalData.callHistory = history
-    // 同步更新缓存和 storage
     try {
       this._cache.callHistory = history
       wx.setStorageSync('callHistory', history)

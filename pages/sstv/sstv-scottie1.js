@@ -1,21 +1,13 @@
-/**
- * Scottie1 模式实现（预留）
- * 继承 SSTVMode 基类
- * 参考 Java 的 Scottie1.java
- */
+/** Scottie1 模式实现（预留） */
 const SSTVMode = require('./sstv-mode')
 
 class Scottie1 extends SSTVMode {
   constructor(sampleRate = 48000) {
     super(sampleRate)
     this.modeName = 'Scottie1'
-    this.visCode = 60  // Scottie1 的 VIS 码
+    this.visCode = 60
   }
 
-  /**
-   * 计算所需的总采样数
-   * 对应 Java 的 getTransmissionSamples 方法
-   */
   calculateTotalSamples(width, height) {
     // Scottie1 时序参数（单位：ms）
     // TODO: 根据实际 Scottie1 规范调整参数
@@ -52,10 +44,6 @@ class Scottie1 extends SSTVMode {
     return Math.floor(totalSamples * 1.1)
   }
 
-  /**
-   * 从 ImageData 生成 PCM 音频（Scottie1 标准）
-   * TODO: 根据实际 Scottie1 规范实现编码逻辑
-   */
   encodeFromImageData(imageData) {
     let { width, height, data } = imageData
     if (!ArrayBuffer.isView(data) && !Array.isArray(data)) {

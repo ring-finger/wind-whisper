@@ -13,9 +13,7 @@
  * 支持模式：Robot 36/72、Martin 1/2、Scottie 1/2/DX，共 7 种 (VIS 自动识别)
  */
 
-// ============================================================================
-// 1. FFT 类（移植自 fft.js，适配 CommonJS）
-// ============================================================================
+// 1. FFT 类
 
 class FFT {
   constructor(bufferSize, sampleRate) {
@@ -121,9 +119,7 @@ class FFT {
   }
 }
 
-// ============================================================================
-// 2. 工具函数（移植自 utils.js）
-// ============================================================================
+// 2. 工具函数
 
 /** Hann 窗函数 */
 function hannWindow(length) {
@@ -184,9 +180,7 @@ function fft(data, sampleRate, fftSizeHint) {
   return spectrum
 }
 
-// ============================================================================
-// 3. SSTV 模式参数（移植自 spec.js，支持全部 7 种模式）
-// ============================================================================
+// 3. SSTV 模式参数（支持全部 7 种模式）
 
 const COL_FMT = { RGB: 'RGB', GBR: 'GBR', YUV: 'YUV', BW: 'BW' }
 
@@ -324,9 +318,7 @@ SDX.LINE_TIME = SDX.SYNC_PULSE + 3 * SDX.CHAN_TIME
 SDX.PIXEL_TIME = SDX.SCAN_TIME / SDX.LINE_WIDTH
 SDX.WINDOW_FACTOR = 0.98
 
-// ============================================================================
 // 4. 头部检测全局参数 + VIS 映射表
-// ============================================================================
 
 const BREAK_OFFSET = 0.3
 const LEADER_OFFSET = 0.01 + BREAK_OFFSET   // = 0.31
@@ -346,9 +338,7 @@ const VIS_MAP = {
   76: SDX,
 }
 
-// ============================================================================
 // 5. SSTV 全量 FFT 解码器
-// ============================================================================
 
 class SSTVFFTDecoder {
   /**
@@ -366,7 +356,7 @@ class SSTVFFTDecoder {
     this.mode = null
   }
 
-  // ========== 主入口 ==========
+  // 主入口
 
   /**
    * 执行完整解码流程
@@ -401,7 +391,7 @@ class SSTVFFTDecoder {
     }
   }
 
-  // ========== 频率测量 ==========
+  // 频率测量
 
   /**
    * 对一段音频数据做 Hann 窗 + FFT + barycentric 插值，返回峰值频率 (Hz)
@@ -431,7 +421,7 @@ class SSTVFFTDecoder {
     return (interpBin * this.sampleRate) / (2 * spectrum.length)
   }
 
-  // ========== 头部检测 ==========
+  // 头部检测
 
   /**
    * 滑动窗口 FFT 检测 SSTV 校准头
@@ -494,7 +484,7 @@ class SSTVFFTDecoder {
     return -1
   }
 
-  // ========== VIS 解码 ==========
+  // VIS 解码
 
   /**
    * 从指定位置解码 VIS 码（8 位：7 数据 + 1 偶校验）
@@ -539,7 +529,7 @@ class SSTVFFTDecoder {
     return mode
   }
 
-  // ========== 同步对齐 ==========
+  // 同步对齐
 
   /**
    * 从 alignStart 开始搜索同步脉冲 (1200Hz)
@@ -569,7 +559,7 @@ class SSTVFFTDecoder {
     return null
   }
 
-  // ========== 图像数据解码 ==========
+  // 图像数据解码
 
   /**
    * 逐行逐像素解码图像数据
@@ -652,7 +642,7 @@ class SSTVFFTDecoder {
     return imageData
   }
 
-  // ========== RGBA 缓冲区生成 ==========
+  // RGBA 缓冲区生成
 
   /**
    * 将 3D 图像数据转为 RGBA Uint8ClampedArray

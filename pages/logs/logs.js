@@ -150,13 +150,11 @@ Page({
     shareDetailData: {},
     // 分享来源
     shareOwnerCallSign: '',
-    // 分享引导闪烁效果
-    showShareGuide: false,  // 是否显示分享按钮闪烁引导
-    _shareGuideShown: false  // 内部标记：本次会话是否已展示过闪烁
+    showShareGuide: false,
+    _shareGuideShown: false
   },
 
   onLoad(options) {
-    // 初始化内存缓存 - 避免在 Page 对象中定义非简单值
     this._cache = {
       appTheme: null,
       contactLogs: null,
@@ -167,16 +165,13 @@ Page({
     this.initDateTime()
     
     if (options && options.tab === 'add') {
-      // 保存需要切换到添加页的标志
       this._switchToAddOnShow = true
     }
-    
-    // 处理筛选参数（从首页统计卡片跳转）
+
     if (options && options.filter) {
       this._pendingFilter = options.filter
     }
-    
-    // 处理分享链接
+
     if (options && options.shareId) {
       this.loadSharedLogs(options.shareId)
     }
@@ -188,10 +183,8 @@ Page({
     wx.pageScrollTo({ scrollTop: 0, duration: 0 })
   },
   
-  // 初始化分享引导闪烁效果
   initShareGuide() {
     try {
-      // 优先使用内存缓存
       if (this._cache.hasShownShareGuide === null) {
         this._cache.hasShownShareGuide = wx.getStorageSync('hasShownShareGuide')
       }
@@ -210,8 +203,8 @@ Page({
   },
 
   onShow() {
-    // 清理 contactLogs 缓存，确保获取最新数据
     this._cache.contactLogs = null
+    this._cache.appTheme = null
     this.loadTheme()
 
     // 检查是否需要切换到添加页
@@ -252,7 +245,6 @@ Page({
   // 检查并显示分享引导闪烁效果
   checkShareGuide() {
     try {
-      // 优先使用内存缓存
       if (this._cache.hasShownShareGuide === null) {
         this._cache.hasShownShareGuide = wx.getStorageSync('hasShownShareGuide')
       }
@@ -269,7 +261,6 @@ Page({
 
   loadTheme() {
     try {
-      // 优先使用内存缓存
       if (this._cache.appTheme === null) {
         this._cache.appTheme = wx.getStorageSync('appTheme') || 'radio'
       }
@@ -484,7 +475,6 @@ Page({
     }
   },
 
-  // ========== 分享功能 ==========
   enterShareMode() {
     wx.vibrateShort({ type: VIBRATE_TYPE })
     
@@ -960,8 +950,6 @@ Page({
     })
   },
 
-  // ========== 分享功能结束 ==========
-
   applyFilter(sourceLogs) {
     const logs = sourceLogs || this.data._allLogs || []
     let q = (this.data.searchQuery || '').trim().toUpperCase()
@@ -1247,9 +1235,6 @@ Page({
     wx.vibrateShort({ type: VIBRATE_TYPE })
   },
 
-  // ========== RST验证码式输入组件 ==========
-
-  // 封装聚焦方法 - 使用rstFocus数据控制焦点
   focusRstInput(type, field) {
     const { isVHF, isUHF } = this.data
     
@@ -1449,9 +1434,6 @@ Page({
     return `${rst.r || ''}${rst.s || ''}${rst.t || ''}`
   },
 
-  // ========== RST组件结束 ==========
-
-  // 选择功率快捷值
   selectPower(e) {
     const power = e.currentTarget.dataset.power
     this.setData({ 'formData.power': power })

@@ -1,5 +1,4 @@
 const VIBRATE_TYPE = 'medium'
-// 导入拆分后的模块 (对应 Java SSTVEncoder2 项目结构)
 const Robot36 = require('./sstv-robot36')
 const Scottie1 = require('./sstv-scottie1')
 const SSTVFFTDecoder = require('./sstv-fft-decoder')
@@ -27,8 +26,8 @@ Page({
     uploadImage: '',
     imageWidth: 0,
     imageHeight: 0,
-    quality: 80,  // 对应 app.wxss 中的默认质量
-    sensitivity: 50,  // 对应 app.wxss 中的默认灵敏度
+    quality: 80,
+    sensitivity: 50,
     isEncoding: false,
     isDecoding: false,
     audioFilePath: '',
@@ -39,7 +38,7 @@ Page({
     audioDurationStr: '0:00',
     audioCurrentTimeStr: '0:00',
     audioFileSize: '',
-    audioFormat: 'WAV',  // 对应 app.wxss 中的音频格式
+    audioFormat: 'WAV',
     decodedImage: '',
     decodeProgress: 0,
     scanLine: 0,
@@ -48,8 +47,8 @@ Page({
     callsign: '',
     showCallsign: false,
     showCallsignInput: false,
-    callsignX: 20,  // 默认左下角内侧 (距离左边20px)
-    callsignY: 200,  // 默认左下角内侧 (距离底部40px = 240-40)
+    callsignX: 20,
+    callsignY: 200,
     callsignTouchStartX: 0,
     callsignTouchStartY: 0
   },
@@ -65,11 +64,9 @@ Page({
   },
 
   onShow() {
-    // 页面显示时无需加载主题
   },
 
   onHide() {
-    // 停止音频播放
     if (this.audioContext) {
       this.audioContext.stop()
       this.audioContext.destroy()
@@ -86,12 +83,9 @@ Page({
   },
 
   onUnload() {
-    // 清理定时器
     if (this.updateTimer) {
       clearTimeout(this.updateTimer)
     }
-    
-    // 关闭音频上下文
     if (this.audioContext) {
       this.audioContext.stop()
       this.audioContext.destroy()
@@ -102,7 +96,6 @@ Page({
   },
 
   initSSTV() {
-    // 使用工厂方法创建编码器实例 (对应 Java 的 ModeFactory)
     this.encoder = createMode('Robot36')
   },
 
@@ -134,7 +127,6 @@ Page({
     const wave = this._bytesToStr(arrayBuffer, 8, 4)
     if (wave !== 'WAVE') throw new Error('不是有效的 WAV 文件: 缺少 WAVE 标识')
 
-    // 查找 fmt 和 data chunk
     let offset = 12
     let sampleRate = 0
     let channels = 1
@@ -160,13 +152,11 @@ Page({
       }
 
       offset += 8 + chunkSize
-      // chunk 对齐到偶数字节
       if (chunkSize % 2 !== 0) offset++
     }
 
     if (dataOffset < 0) throw new Error('WAV 文件缺少 data chunk')
 
-    // 提取 PCM 数据
     const bytesPerSample = bitDepth / 8
     const totalSamples = Math.floor(dataSize / bytesPerSample)
     const samples = new Float32Array(totalSamples)
@@ -189,7 +179,6 @@ Page({
       ' 位深=' + bitDepth + ' 样本数=' + totalSamples +
       ' 时长=' + (totalSamples / sampleRate).toFixed(1) + 's')
 
-    // 如果是立体声，只取第一通道
     if (channels > 1) {
       const monoSamples = new Float32Array(Math.floor(totalSamples / channels))
       for (let i = 0; i < monoSamples.length; i++) {
@@ -245,12 +234,10 @@ Page({
         wx.hideLoading()
 
         try {
-          // 解析 WAV
           const { sampleRate, samples } = this.parseWavHeader(res.data)
 
           wx.showLoading({ title: '正在解码 SSTV...' })
 
-          // 使用 setTimeout 让 UI 有机会更新
           setTimeout(() => {
             try {
               const decoder = new SSTVFFTDecoder(samples, sampleRate, {
@@ -268,7 +255,6 @@ Page({
 
               wx.hideLoading()
 
-              // 渲染结果
               this.renderDecodedImage(buffer, width, height).then((imagePath) => {
                 this.setData({
                   isDecoding: false,
@@ -402,7 +388,6 @@ Page({
     this.setData({ isEncoding: true, audioFilePath: '' })
     wx.showLoading({ title: '正在生成...' })
 
-    // 正常编码模式：从图片生成 SSTV 音频
     try {
       const query = wx.createSelectorQuery()
       query.select('#encodeCanvas')
@@ -412,13 +397,10 @@ Page({
           canvas.height = 240
           const ctx = canvas.getContext('2d')
           
-          // 使用 createImage 加载图片
           const img = canvas.createImage()
           img.onload = () => {
-            // 先绘制图片到 canvas
             ctx.drawImage(img, 0, 0, 320, 240)
             
-            // 如果显示呼号，绘制呼号文字到 canvas
             if (this.data.showCallsign && this.data.callsign) {
               ctx.save()
               ctx.font = 'bold 24px monospace'
@@ -427,18 +409,15 @@ Page({
               ctx.lineWidth = 3
               ctx.textBaseline = 'top'
               
-              // 绘制描边文字（提高可读性）
               ctx.strokeText(this.data.callsign, this.data.callsignX, this.data.callsignY)
               ctx.fillText(this.data.callsign, this.data.callsignX, this.data.callsignY)
               ctx.restore()
             }
-            
-            // 等待一小段时间确保绘制完成
+
             setTimeout(() => {
               try {
-                // 使用 ImageData API 获取像素数据
                 const imageData = ctx.getImageData(0, 0, 320, 240)
-                
+
                 const encoder = this.encoder
                 if (!encoder) {
                   wx.hideLoading()
@@ -446,20 +425,16 @@ Page({
                   wx.showToast({ title: '编码器初始化失败', icon: 'none' })
                   return
                 }
-                
-                // 使用新的 encodeFromImageData 方法
+
                 const samples = encoder.encodeFromImageData(imageData)
-                
-                // 调试：打印音频缓冲区信息
+
                 console.log('[SSTV] 编码完成，采样点数:', samples.length)
                 console.log('[SSTV] 采样率:', encoder.sampleRate)
                 console.log('[SSTV] 理论音频时长(秒):', samples.length / encoder.sampleRate)
-                
-                // 计算音频时长（秒）
+
                 const audioDuration = Math.round(samples.length / encoder.sampleRate)
                 console.log('[SSTV] 音频时长(取整):', audioDuration, '秒')
-                
-                // 计算预期文件大小
+
                 const expectedFileSize = 44 + samples.length * 2
                 console.log('[SSTV] 预期WAV文件大小:', expectedFileSize, '字节')
                 
@@ -473,33 +448,29 @@ Page({
                   filePath,
                   data: arrayBuffer,
                   success: () => {
-                    // 获取文件大小
-                    const fileManager = wx.getFileSystemManager()
                     try {
                       const fileStats = fileManager.statSync(filePath)
                       const fileSize = fileStats.size
                       const fileSizeKB = (fileSize / 1024).toFixed(1)
                       const fileSizeMB = (fileSize / (1024 * 1024)).toFixed(2)
-                      const displaySize = fileSize > 1024 * 1024 
-                        ? fileSizeMB + ' MB' 
+                      const displaySize = fileSize > 1024 * 1024
+                        ? fileSizeMB + ' MB'
                         : fileSizeKB + ' KB'
-                      
-                      // 调试：对比预期和实际文件大小
+
                       console.log('[SSTV] 实际文件大小:', fileSize, '字节')
                       console.log('[SSTV] 预期文件大小:', expectedFileSize, '字节')
                       console.log('[SSTV] 文件大小是否匹配:', fileSize === expectedFileSize)
-                      
-                      // 根据实际文件大小计算真实时长
+
                       const actualSamples = (fileSize - 44) / 2
                       const actualDuration = Math.round(actualSamples / encoder.sampleRate)
                       console.log('[SSTV] 实际音频采样数:', actualSamples)
                       console.log('[SSTV] 实际音频时长:', actualDuration, '秒')
-                      
-                      this.setData({ 
+
+                      this.setData({
                         audioFilePath: filePath,
                         isEncoding: false,
                         audioFileSize: displaySize,
-                        audioDuration: actualDuration,  // 使用实际计算的时长
+                        audioDuration: actualDuration,
                         audioDurationStr: this.formatTime(actualDuration)
                       })
                       console.log('[SSTV] 音频文件已保存，时长设置为:', actualDuration, '秒')
