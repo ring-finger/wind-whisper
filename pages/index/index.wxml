@@ -59,6 +59,17 @@
           <text class="feature-desc">慢扫描电视编码解码</text>
         </view>
       </view>
+
+      <!-- 梅登黑德定位卡片 -->
+      <view class="feature-card feature-maidenhead" hover-class="button-hover" bindtap="goToMaidenhead">
+        <view class="feature-icon-wrap">
+          <text class="feature-icon">🗺️</text>
+        </view>
+        <view class="feature-content">
+          <text class="feature-title">梅登黑德定位</text>
+          <text class="feature-desc">梅登黑德定位网格位置</text>
+        </view>
+      </view>
     </view>
   </view>
 

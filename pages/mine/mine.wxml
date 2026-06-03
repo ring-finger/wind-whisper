@@ -120,11 +120,6 @@
         <text class="cell-chevron">›</text>
         <button class="contact-overlay" open-type="contact"></button>
       </view>
-      <view class="cell cell-tap" hover-class="cell-hover" bindtap="showUpdateLogModal">
-        <text class="cell-label cell-label-full">更新日志</text>
-        <text class="cell-version">v{{currentVersion}}</text>
-        <text class="cell-chevron">›</text>
-      </view>
       <view class="cell cell-tap" hover-class="cell-hover" bindtap="toggleAuthorInfo">
         <text class="cell-label cell-label-full">联系作者</text>
         <text class="cell-chevron">›</text>

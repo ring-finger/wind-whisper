@@ -12,7 +12,7 @@
       data-tab="add"
     >
       <text class="tab-icon">✏️</text>
-      <text class="tab-text">添加</text>
+      <text class="tab-text">{{editingLogId ? '编辑' : '添加'}}</text>
     </view>
     <view 
       class="page-tab {{currentTab === 'list' ? 'active' : ''}}"
@@ -29,7 +29,8 @@
   <view class="tab-panel {{currentTab === 'add' ? 'tab-panel-show' : ''}}" wx:if="{{currentTab === 'add'}}">
     <view class="add-form-body">
     <view class="float-card header-card">
-      <view class="header-strip">
+      <!-- 新增模式：完整时间控件 -->
+      <view class="header-strip" wx:if="{{!editingLogId}}">
         <view class="header-tz-btns font-mono">
           <view
             class="header-tz-btn {{currentTimeType === 'BJT' ? 'header-tz-btn-active' : ''}}"
@@ -53,6 +54,14 @@
           </picker>
         </view>
         <view class="refresh-btn font-mono" hover-class="button-hover" bindtap="refreshTime">↻</view>
+      </view>
+      <!-- 编辑/详情模式：只读时间 -->
+      <view class="header-strip" wx:else>
+        <view class="header-datetime-row" style="justify-content:flex-start;">
+          <view class="header-date font-mono">{{formData.date}}</view>
+          <text style="margin:0 12rpx;color:var(--text-secondary);font-size:24rpx;">BJT</text>
+          <view class="header-time font-mono">{{formData.bjcTime}}</view>
+        </view>
       </view>
     </view>
 
@@ -220,7 +229,7 @@
   </view>
 
     <view class="submit-actions" wx:if="{{currentTab === 'add'}}">
-      <button class="submit-btn" hover-class="button-hover" bindtap="submitLog">保存</button>
+      <button class="submit-btn" hover-class="button-hover" bindtap="submitLog">{{editingLogId ? '更新' : '保存'}}</button>
     </view>
   </view>
 
@@ -334,6 +343,10 @@
         <text class="log-row-line2 font-mono">BJT {{item.date}} {{item.btcTime || item.bjcTime}}</text>
       </view>
       <view class="log-row-rst font-mono">{{item.rstSummary}}</view>
+      <!-- 编辑图标 - 仅本地记录显示 -->
+      <view class="log-row-edit" wx:if="{{!shareMode && !currentShareId}}" catchtap="editLog" data-id="{{item.id}}">
+        <text>✏️</text>
+      </view>
     </view>
   </view>
   </view>

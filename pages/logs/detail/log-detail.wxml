@@ -6,7 +6,7 @@
       <text class="copy-toast-text">{{copyToastMsg}}</text>
     </view>
 
-    <view class="log-detail-card">
+    <view class="detail-card">
     <!-- 卡片头部：点击复制完整日志 -->
     <view class="copyable-header" hover-class="copyable-header-hover" bindtap="copyFullLog">
       <view class="card-header">

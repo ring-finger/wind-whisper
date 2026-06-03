@@ -26,9 +26,23 @@
       "root": "pages/logs",
       "pages": [
         "logs",
-        "log-detail/log-detail"
+        "detail/log-detail"
+      ]
+    },
+    {
+      "root": "pages/maidenhead",
+      "pages": [
+        "maidenhead"
       ]
     }
+  ],
+  "permission": {
+    "scope.userLocation": {
+      "desc": "用于获取您当前位置，自动换算业余无线电梅登黑德网格编号"
+    }
+  },
+  "requiredPrivateInfos": [
+    "getLocation"
   ],
   "preloadRule": {
     "pages/index/index": {

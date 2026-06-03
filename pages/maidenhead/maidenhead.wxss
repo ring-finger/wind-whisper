@@ -1,0 +1,188 @@
+/* ==================== 梅登黑德定位 - 全屏地图 ==================== */
+
+.maidenhead-page {
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ==================== 全屏地图容器 ==================== */
+.map-container {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+}
+
+.maidenhead-map {
+  width: 100%;
+  height: 100%;
+}
+
+/* ==================== 未定位遮罩 ==================== */
+.map-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.15);
+  backdrop-filter: blur(4rpx);
+  z-index: 10;
+}
+
+.overlay-card {
+  background: var(--card-bg);
+  border-radius: 20rpx;
+  padding: 48rpx 40rpx;
+  text-align: center;
+  box-shadow: 0 8rpx 32rpx rgba(0,0,0,0.12);
+  max-width: 520rpx;
+  margin: 0 32rpx;
+}
+
+.overlay-icon {
+  font-size: 56rpx;
+  display: block;
+  margin-bottom: 16rpx;
+}
+
+.overlay-title {
+  display: block;
+  font-size: 30rpx;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 8rpx;
+}
+
+.overlay-desc {
+  display: block;
+  font-size: 24rpx;
+  color: var(--text-secondary);
+  margin-bottom: 24rpx;
+  line-height: 1.6;
+}
+
+.overlay-btn {
+  margin-top: 8rpx;
+}
+
+/* ==================== 底部网格信息卡 ==================== */
+.grid-info-card {
+  position: absolute;
+  bottom: 40rpx;
+  left: 24rpx;
+  right: 24rpx;
+  background: var(--card-bg);
+  border-radius: 20rpx;
+  padding: 28rpx;
+  box-shadow: 0 4rpx 24rpx rgba(0,0,0,0.12);
+  z-index: 10;
+}
+
+.grid-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 20rpx;
+  border-bottom: 1rpx solid rgba(0,0,0,0.06);
+}
+
+.grid-code-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 12rpx;
+}
+
+.grid-code {
+  font-size: 48rpx;
+  font-weight: 800;
+  color: #2C5C97;
+  letter-spacing: 4rpx;
+  font-family: 'Courier New', monospace;
+}
+
+.grid-precision-tag {
+  font-size: 20rpx;
+  color: var(--text-secondary);
+  background: rgba(44,92,151,0.1);
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
+}
+
+.grid-copy-hint {
+  font-size: 22rpx;
+  color: var(--text-secondary);
+  background: rgba(0,0,0,0.03);
+  padding: 8rpx 18rpx;
+  border-radius: 20rpx;
+}
+
+.grid-coords {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid rgba(0,0,0,0.04);
+}
+
+.coord-text {
+  font-size: 26rpx;
+  color: var(--text-primary);
+  font-family: 'Courier New', monospace;
+}
+
+.coord-action {
+  font-size: 24rpx;
+  color: #2C5C97;
+  padding: 8rpx 16rpx;
+}
+
+.grid-tip {
+  padding-top: 16rpx;
+  text-align: center;
+  font-size: 22rpx;
+  color: var(--text-secondary);
+  opacity: 0.7;
+}
+
+/* ==================== 按钮 ==================== */
+.btn {
+  height: 80rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.btn-hover {
+  opacity: 0.8;
+  transform: scale(0.97);
+}
+
+.btn-primary {
+  background: #2C5C97;
+  color: #fff;
+}
+
+.button-hover {
+  opacity: 0.7;
+}
+
+/* ==================== 主题适配：莫兰迪 ==================== */
+.theme-morandi .btn-primary {
+  background: #C4643E;
+}
+
+.theme-morandi .grid-code {
+  color: #C4643E;
+}
+
+.theme-morandi .grid-precision-tag {
+  background: rgba(196,100,62,0.1);
+}
+
+.theme-morandi .coord-action {
+  color: #C4643E;
+}

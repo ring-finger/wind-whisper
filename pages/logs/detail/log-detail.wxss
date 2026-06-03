@@ -13,7 +13,7 @@
   background: var(--bg-primary);
 }
 
-.log-detail-card {
+.detail-card {
   background: var(--card-bg);
   border-radius: 16rpx;
   box-shadow: 0 4rpx 24rpx var(--shadow-color);

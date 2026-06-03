@@ -133,6 +133,8 @@ Page({
       myRst: 'r'
     },
     currentTheme: 'radio',
+    // 编辑功能
+    editingLogId: null,
     // 分享功能
     shareMode: false,
     selectedLogs: {},  // 对象存储选中的ID {id: true}
@@ -175,7 +177,11 @@ Page({
     if (options && options.shareId) {
       this.loadSharedLogs(options.shareId)
     }
-    
+
+    if (options && options.edit) {
+      this._pendingEditLogId = options.edit
+    }
+
     // 检查是否需要显示分享引导闪烁效果（首次进入）
     this.initShareGuide()
     
@@ -216,6 +222,13 @@ Page({
       }, () => {
         setTimeout(() => { wx.pageScrollTo({ scrollTop: 0, duration: 0 }) }, 100)
       })
+    }
+
+    // 检查是否需要加载编辑记录
+    if (this._pendingEditLogId) {
+      const editId = this._pendingEditLogId
+      this._pendingEditLogId = null
+      this._loadLogForEdit(editId)
     }
 
     // 应用待处理的筛选（从首页统计卡片跳转）
@@ -374,6 +387,7 @@ Page({
     
     this.setData({ 
       currentTab: tab,
+      editingLogId: null,
       rstFocus: {
         theirRst: 'r',
         myRst: 'r'
@@ -1076,12 +1090,12 @@ Page({
       if (log) {
         const logData = encodeURIComponent(JSON.stringify(log))
         wx.navigateTo({
-          url: `/pages/logs/log-detail/log-detail?shareId=${shareId}&logId=${id}&logData=${logData}`
+          url: `/pages/logs/detail/log-detail?shareId=${shareId}&logId=${id}&logData=${logData}`
         })
       }
     } else {
       wx.navigateTo({
-        url: '/pages/logs/log-detail/log-detail?id=' + id
+        url: '/pages/logs/detail/log-detail?id=' + id
       })
     }
   },
@@ -1180,7 +1194,8 @@ Page({
           if (recent.length >= 3) break
         }
       }
-      this.setData({ frequencySuggestions: recent, isUHF: false, isVHF: false })
+      this.setData({ frequencySuggestions: recent })
+      this.updateFrequencyRangeStatus(this.data.formData.frequency)
     } catch (e) {
       console.error('加载频率历史失败', e)
     }
@@ -1465,6 +1480,52 @@ Page({
     wx.vibrateShort({ type: VIBRATE_TYPE })
   },
 
+  editLog(e) {
+    const id = e.currentTarget.dataset.id
+    wx.vibrateShort({ type: VIBRATE_TYPE })
+    this._loadLogForEdit(id)
+  },
+
+  _loadLogForEdit(id) {
+    // URL query params are strings, but log IDs are numbers (Date.now())
+    id = Number(id)
+    const logs = this._getLogsFromCache()
+    const log = logs.find(l => l.id === id)
+    if (!log) {
+      wx.showToast({ title: '记录不存在', icon: 'none' })
+      return
+    }
+
+    // 预填表单数据
+    const rst = log.rst || { myRst: {}, theirRst: {} }
+    const formUpdate = {
+      editingLogId: id,
+      currentTab: 'add',
+      currentTimeType: 'BJT',
+      'formData.date': log.date || '',
+      'formData.utcDate': log.utcDate || '',
+      'formData.bjcTime': log.bjcTime || log.btcTime || '',
+      'formData.utcTime': log.utcTime || '',
+      'formData.callSign': log.callSign || '',
+      'formData.weather': log.weather || '',
+      'formData.frequency': log.frequency || '',
+      'formData.mode': log.mode || '',
+      'formData.rst': rst,
+      'formData.qth': log.qth || '',
+      'formData.power': log.power || '',
+      'formData.equipment': log.equipment || '',
+      'formData.antenna': log.antenna || '',
+      'formData.notes': log.notes || '',
+      rstFocus: { theirRst: 'r', myRst: 'r' }
+    }
+
+    // 根据现有频率计算波段
+    this.setData(formUpdate, () => {
+      wx.pageScrollTo({ scrollTop: 0, duration: 0 })
+      this.updateFrequencyRangeStatus(log.frequency || '')
+    })
+  },
+
   submitLog() {
     const ms = this.data.contactInstantMs || Date.now()
     const timeSnap = buildTimeFields(ms)
@@ -1501,20 +1562,32 @@ Page({
       return
     }
 
+    const isEditing = !!this.data.editingLogId
+
     var log = {}
     for (var key in formData) {
       if (key === 'utcDate') continue
       log[key] = formData[key]
     }
     log.btcTime = formData.bjcTime
-    log.id = Date.now()
-    log.createdAt = new Date().toISOString()
 
-    this.saveLog(log)
+    if (isEditing) {
+      log.id = this.data.editingLogId
+      log.date = this.data.formData.date
+      log.utcDate = this.data.formData.utcDate
+      log.bjcTime = this.data.formData.bjcTime
+      log.utcTime = this.data.formData.utcTime
+      this.updateLog(log)
+    } else {
+      log.id = Date.now()
+      log.createdAt = new Date().toISOString()
+      this.saveLog(log)
+    }
+
     app.saveCallHistory(formData.callSign)
 
     wx.vibrateShort({ type: VIBRATE_TYPE })
-    wx.showToast({ title: '保存成功', icon: 'success' })
+    wx.showToast({ title: isEditing ? '更新成功' : '保存成功', icon: 'success' })
 
     this.resetForm()
     this.switchTab({ currentTarget: { dataset: { tab: 'list' } } })
@@ -1541,6 +1614,28 @@ Page({
     } catch (e) {
       console.error('保存日志失败', e)
       wx.showToast({ title: '保存失败', icon: 'none' })
+    }
+  },
+
+  updateLog(log) {
+    try {
+      let logs = this._getLogsFromCache()
+      const idx = logs.findIndex(l => l.id === log.id)
+      if (idx === -1) {
+        wx.showToast({ title: '记录不存在', icon: 'none' })
+        return
+      }
+      // 保留原有的 id、createdAt、myCallSign
+      log.id = logs[idx].id
+      log.createdAt = logs[idx].createdAt || log.createdAt
+      log.myCallSign = logs[idx].myCallSign || log.myCallSign
+      logs[idx] = log
+      this._updateLogsCache(logs)
+      // 同步到云数据库
+      this.syncLogToCloud(log)
+    } catch (e) {
+      console.error('更新日志失败', e)
+      wx.showToast({ title: '更新失败', icon: 'none' })
     }
   },
 
@@ -1754,6 +1849,7 @@ Page({
   resetForm() {
     this.initDateTime()
     this.setData({
+      editingLogId: null,
       currentTimeType: 'BJT',
       'formData.callSign': '',
       'formData.weather': '',
