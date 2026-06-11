@@ -1,0 +1,9 @@
+{
+  "name": "rebuildRankings",
+  "version": "1.0.0",
+  "description": "Rebuild platform rankings from contactStats",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

@@ -170,19 +170,4 @@
   opacity: 0.7;
 }
 
-/* ==================== 主题适配：莫兰迪 ==================== */
-.theme-morandi .btn-primary {
-  background: #C4643E;
-}
 
-.theme-morandi .grid-code {
-  color: #C4643E;
-}
-
-.theme-morandi .grid-precision-tag {
-  background: rgba(196,100,62,0.1);
-}
-
-.theme-morandi .coord-action {
-  color: #C4643E;
-}

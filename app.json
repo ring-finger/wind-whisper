@@ -42,7 +42,7 @@
     }
   },
   "requiredPrivateInfos": [
-    "getLocation"
+    "getFuzzyLocation"
   ],
   "preloadRule": {
     "pages/index/index": {

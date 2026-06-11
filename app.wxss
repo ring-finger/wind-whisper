@@ -16,9 +16,6 @@ page {
   --color-decode: #E8F5E9;
   --color-qso: #FFF3E0;
   --color-profile: #E8EAF6;
-  --color-maidenhead: #E3F2FD;
-  --accent-maidenhead: #1E88E5;
-  --accent-maidenhead2: #26A69A;
   --accent-primary: #2C5C97;
   --primary-color: #2C5C97;
   --primary-soft: rgba(44, 92, 151, 0.12);
@@ -48,6 +45,9 @@ page {
   --nav-text: #443D33;         /* 中性文字色 */
   --nav-text-active: #2C5C97;  /* 激活色 */
   --nav-border: #EAE5DD;       /* 浅边框 */
+  /* 柱状图填充色 - 浅色系 */
+  --bar-gradient-start: #A8D5EF;
+  --bar-gradient-end: #CCE5FF;
 
   background-color: var(--bg-primary);
   color: var(--text-primary);
@@ -78,9 +78,6 @@ page {
   --color-decode: #DDE8D2;
   --color-qso: #F0D8C8;
   --color-profile: #E8DDCC;
-  --color-maidenhead: #E8D8C8;
-  --accent-maidenhead: #5A7D9A;
-  --accent-maidenhead2: #6B9A7E;
   --accent-primary: #C4643E;
   --primary-color: #C4643E;
   --primary-soft: rgba(196, 100, 62, 0.12);
@@ -106,64 +103,15 @@ page {
   --action-red-rgb: 187, 100, 100;
   --info-soft: rgba(147, 142, 130, 0.1);
   /* 导航栏背景色 - 统一使用浅色系，不随主题变化 */
+  /* 柱状图填充色 - 暖浅色系 */
+  --bar-gradient-start: #E8C8A0;
+  --bar-gradient-end: #F0DCC0;
 
   background-color: var(--bg-primary);
   color: var(--text-primary);
 }
 
-/* 深色主题 - Dark Theme */
-.theme-wrapper.theme-dark {
-  --bg-primary: #1A1A2E;
-  --bg-main: #1A1A2E;
-  --card-bg: #2A2A3E;
-  --border-color: #3A3A4E;
-  --shadow-color: rgba(0, 0, 0, 0.35);
-  --text-primary: #D0D0D0;
-  --text-main: #D0D0D0;
-  --text-secondary: #888888;
-  --text-sec: #888888;
-  --text-placeholder: #555555;
-  --text-inverse: #1A1A2E;
-  --color-log: #1E2A1E;
-  --color-decode: #1E2A1E;
-  --color-qso: #2A1E1E;
-  --color-profile: #1E1E2A;
-  --color-maidenhead: #1E232A;
-  --accent-maidenhead: #4A90D9;
-  --accent-maidenhead2: #4DB6AC;
-  --accent-primary: #5B9BD5;
-  --primary-color: #5B9BD5;
-  --primary-soft: rgba(91, 155, 213, 0.15);
-  --accent-active: #5A9A5F;
-  --accent-secondary: #D84315;
-  --accent-orange: #D84315;
-  --lcd-bg: #2A2A3E;
-  --success: #5A9A5F;
-  --warning: #D4A373;
-  --error: #D32F2F;
-  --info: #5B9BD5;
-  /* RGB 格式变量（用于半透明叠加层） */
-  --text-primary-rgb: 208, 208, 208;
-  --text-inverse-rgb: 26, 26, 46;
-  --accent-primary-rgb: 91, 155, 213;
-  --error-rgb: 211, 47, 47;
-  /* 渐变辅助色 - 深色主题 */
-  --gradient-accent1: #A55555;
-  --gradient-accent2: #5A9A5F;
-  --gradient-accent3: #D84315;
-  /* 操作按钮颜色（用于半透明叠加层） */
-  --action-blue-rgb: 91, 155, 213;
-  --action-red-rgb: 211, 47, 47;
-  --info-soft: rgba(91, 155, 213, 0.12);
-  /* 导航栏背景色 - 深色 */
-  --nav-bg: #1A1A2E;
-  --nav-text: #D0D0D0;
-  --nav-text-active: #5B9BD5;
-  --nav-border: #3A3A4E;
 
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
-}
 
 /* ============================================
    全局基础样式

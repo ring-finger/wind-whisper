@@ -1,4 +1,5 @@
 const app = getApp()
+const db = require('../../../utils/db')
 const SHARE_TITLE_PREFIX = '风语纪: '
 const VIBRATE_TYPE = 'medium'
 
@@ -486,8 +487,16 @@ Page({
           const deleteLocalLog = () => {
             try {
               let logs = this._getLogsFromCache()
+              const deletedLog = logs.find(item => item.id === logId)
               logs = logs.filter(item => item.id !== logId)
               this._updateLogsCache(logs)
+              
+              // 同步对应月份统计
+              if (deletedLog) {
+                db.recomputeMonthForLog(deletedLog, logs)
+              }
+              // 同步 userProfiles 中的 totalLogCount
+              db.syncLogCountToCloud(logs.length)
               
               wx.hideLoading()
               wx.showToast({

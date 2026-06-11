@@ -1,0 +1,9 @@
+{
+  "name": "getPlatformStats",
+  "version": "1.0.0",
+  "description": "跨用户聚合通联排行（当月/当年 TOP5）",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

@@ -372,7 +372,7 @@ Page({
     return {
       title,
       path: '/pages/maidenhead/maidenhead',
-      imageUrl: '/images/cover.jpg'
+      imageUrl: '/images/local.jpg'
     }
   },
 

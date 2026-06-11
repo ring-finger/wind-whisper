@@ -1,4 +1,5 @@
 const app = getApp()
+const db = require('../../utils/db')
 const VIBRATE_TYPE = 'medium'
 
 const BJT_OFFSET_MS = 8 * 60 * 60 * 1000
@@ -1527,14 +1528,23 @@ Page({
   },
 
   submitLog() {
-    const ms = this.data.contactInstantMs || Date.now()
-    const timeSnap = buildTimeFields(ms)
-    const formData = {
-      ...this.data.formData,
-      date: timeSnap.date,
-      utcDate: timeSnap.utcDate,
-      bjcTime: timeSnap.bjcTime,
-      utcTime: timeSnap.utcTime
+    const isEditing = !!this.data.editingLogId
+    let formData
+
+    if (isEditing) {
+      // 编辑模式严禁修改时间，直接使用原始 formData
+      formData = Object.assign({}, this.data.formData)
+    } else {
+      // 新增模式用当前时间生成时间字段
+      const ms = this.data.contactInstantMs || Date.now()
+      const timeSnap = buildTimeFields(ms)
+      formData = {
+        ...this.data.formData,
+        date: timeSnap.date,
+        utcDate: timeSnap.utcDate,
+        bjcTime: timeSnap.bjcTime,
+        utcTime: timeSnap.utcTime
+      }
     }
 
     if (!formData.callSign) {
@@ -1562,8 +1572,6 @@ Page({
       return
     }
 
-    const isEditing = !!this.data.editingLogId
-
     var log = {}
     for (var key in formData) {
       if (key === 'utcDate') continue
@@ -1573,10 +1581,6 @@ Page({
 
     if (isEditing) {
       log.id = this.data.editingLogId
-      log.date = this.data.formData.date
-      log.utcDate = this.data.formData.utcDate
-      log.bjcTime = this.data.formData.bjcTime
-      log.utcTime = this.data.formData.utcTime
       this.updateLog(log)
     } else {
       log.id = Date.now()
@@ -1611,6 +1615,11 @@ Page({
       
       // 同步到云数据库
       this.syncLogToCloud(log)
+      
+      // 同步对应月份统计
+      db.recomputeMonthForLog(log, logs)
+      // 同步 userProfiles 中的 totalLogCount
+      db.syncLogCountToCloud(logs.length)
     } catch (e) {
       console.error('保存日志失败', e)
       wx.showToast({ title: '保存失败', icon: 'none' })
@@ -1625,7 +1634,7 @@ Page({
         wx.showToast({ title: '记录不存在', icon: 'none' })
         return
       }
-      // 保留原有的 id、createdAt、myCallSign
+      // 保留原有的 id、createdAt、myCallSign，严禁修改日期/时间
       log.id = logs[idx].id
       log.createdAt = logs[idx].createdAt || log.createdAt
       log.myCallSign = logs[idx].myCallSign || log.myCallSign
@@ -1633,6 +1642,8 @@ Page({
       this._updateLogsCache(logs)
       // 同步到云数据库
       this.syncLogToCloud(log)
+      // 同步 userProfiles 中的 totalLogCount
+      db.syncLogCountToCloud(logs.length)
     } catch (e) {
       console.error('更新日志失败', e)
       wx.showToast({ title: '更新失败', icon: 'none' })

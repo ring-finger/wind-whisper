@@ -1,4 +1,5 @@
 const app = getApp()
+const db = require('../../utils/db')
 const AUTHOR_CALL_SIGN = 'BA4IWA'
 const VIBRATE_TYPE = 'medium'
 
@@ -11,27 +12,31 @@ const STORAGE_NICK = 'wxMineNickName'
 const STORAGE_THEME = 'appTheme'
 
 // 当前版本号 - 每次发布新版本时更新
-const CURRENT_VERSION = '1.3.1'
+const CURRENT_VERSION = '1.4.1'
 
 // 更新日志内容
 const UPDATE_LOGS = [
   {
     version: CURRENT_VERSION,
-    date: '2026-05-12',
+    date: '2026-06-10',
     title: '功能优化',
     content: [
-      '添加SSTV编解码功能',
-      '添加日志编辑功能'
+      '梅登黑德定位功能',
+      '通联统计功能'
     ]
   }
 ]
 
 const THEMES = {
   radio: {
-    name: '无线电'
+    name: '无线电',
+    navText: '#000000',
+    navBg: '#F9F7F4'
   },
   morandi: {
-    name: '奶油莫兰迪'
+    name: '奶油莫兰迪',
+    navText: '#000000',
+    navBg: '#F9F7F4'
   }
 }
 
@@ -166,6 +171,7 @@ Page({
               cloudSyncEnabled: false,
               cloudSyncTips: '未开启 · 日志仅保存在本地'
             })
+            this._syncProfileToCloud()
             wx.showToast({
               title: '已关闭云同步',
               icon: 'success'
@@ -200,6 +206,7 @@ Page({
           cloudSyncEnabled: true,
           cloudSyncTips: '已开启 · 云端最多保存 100 条'
         })
+        this._syncProfileToCloud()
         wx.showToast({
           title: '已开启云同步',
           icon: 'success'
@@ -359,6 +366,9 @@ Page({
       // 保存到本地
       wx.setStorageSync('contactLogs', cleanLogs)
       
+      // 同步统计到云端
+      db.syncStatsFromLocalLogs(cleanLogs)
+      
       // 更新显示
       this.setData({
         contactCount: cloudLogs.length
@@ -428,6 +438,7 @@ Page({
       // 清除 app 缓存，通知其他页面重新加载主题
       app._cache.appTheme = null
       app.initTheme()
+      this._syncProfileToCloud()
     } catch (e) {
       console.error('保存主题失败', e)
     }
@@ -441,7 +452,16 @@ Page({
 
   loadUserProfile() {
     try {
-      const userAvatarUrl = wx.getStorageSync(STORAGE_AVATAR) || ''
+      let userAvatarUrl = wx.getStorageSync(STORAGE_AVATAR) || ''
+      // 校验头像文件是否存在，避免引用已删除的旧路径
+      if (userAvatarUrl) {
+        try {
+          wx.getFileSystemManager().accessSync(userAvatarUrl)
+        } catch (e) {
+          wx.removeStorageSync(STORAGE_AVATAR)
+          userAvatarUrl = ''
+        }
+      }
       const userNickName = wx.getStorageSync(STORAGE_NICK) || ''
       this.setData({ userAvatarUrl, userNickName })
     } catch (e) {
@@ -449,12 +469,39 @@ Page({
     }
   },
 
+  /**
+   * 将当前用户资料同步到云数据库 userProfiles 集合
+   */
+  _syncProfileToCloud() {
+    try {
+      const logs = wx.getStorageSync('contactLogs') || []
+      db.syncUserProfile({
+        nickName: wx.getStorageSync(STORAGE_NICK) || '',
+        callSign: wx.getStorageSync('myCallSign') || '',
+        cloudSyncEnabled: app.isCloudSyncEnabled(),
+        currentTheme: wx.getStorageSync('appTheme') || 'radio',
+        avatarUrl: wx.getStorageSync(STORAGE_AVATAR) || '',
+        totalLogCount: logs.length
+      })
+    } catch (e) {
+      console.error('同步用户资料到云端失败', e)
+    }
+  },
+
   onChooseAvatar(e) {
     wx.vibrateShort({ type: VIBRATE_TYPE })
     const avatarUrl = e.detail.avatarUrl
     if (!avatarUrl) return
+    const fs = wx.getFileSystemManager()
+    // 每次使用唯一文件名，避免 image 组件因路径不变而使用缓存旧图
+    const dest = `${wx.env.USER_DATA_PATH}/wx_mine_avatar_${Date.now()}.jpg`
     const persist = (path) => {
       try {
+        // 清理旧头像文件，避免积累
+        const oldPath = wx.getStorageSync(STORAGE_AVATAR)
+        if (oldPath && oldPath !== path) {
+          try { fs.unlinkSync(oldPath) } catch (e) { /* 忽略 */ }
+        }
         wx.setStorageSync(STORAGE_AVATAR, path)
         this.setData({ userAvatarUrl: path })
         const userInfo = wx.getStorageSync('userInfo') || {}
@@ -463,17 +510,15 @@ Page({
         // 清除首页缓存，确保返回首页时显示最新用户信息
         app._cache.wxMineAvatarUrl = null
         app._cache.wxMineNickName = null
+        this._syncProfileToCloud()
       } catch (err) {
         console.error('保存头像路径失败', err)
       }
     }
-    const fs = wx.getFileSystemManager()
-    const dest = `${wx.env.USER_DATA_PATH}/wx_mine_avatar.jpg`
+    // 兼容清理旧版固定路径文件
     try {
-      fs.unlinkSync(dest)
-    } catch (e) {
-      /* 不存在则忽略 */
-    }
+      fs.unlinkSync(`${wx.env.USER_DATA_PATH}/wx_mine_avatar.jpg`)
+    } catch (e) { /* 不存在则忽略 */ }
     fs.copyFile({
       srcPath: avatarUrl,
       destPath: dest,
@@ -494,6 +539,7 @@ Page({
       // 清除首页缓存，确保返回首页时显示最新用户信息
       app._cache.wxMineNickName = null
       app._cache.wxMineAvatarUrl = null
+      this._syncProfileToCloud()
     } catch (err) {
       console.error('保存昵称失败', err)
     }
@@ -544,6 +590,7 @@ Page({
               app._cache.myCallSign = null
               app._cache.wxMineAvatarUrl = null
               app._cache.wxMineNickName = null
+              this._syncProfileToCloud()
               wx.showToast({
                 title: '设置成功',
                 icon: 'success'
@@ -724,6 +771,7 @@ Page({
             this.setData({
               contactCount: 0
             })
+            db.clearAllStats()
             wx.showToast({
               title: '清空成功',
               icon: 'success'

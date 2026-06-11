@@ -1,3 +1,5 @@
+const db = require('./utils/db')
+
 App({
   STORAGE_THEME: 'appTheme',
   THEMES: {
@@ -12,20 +14,20 @@ App({
       navBg: '#F8F2E9',
       navText: '#000000',
       bgPrimary: '#F5F0E6'
-    },
-    dark: {
-      name: '深色',
-      navBg: '#1A1A2E',
-      navText: '#FFFFFF',
-      bgPrimary: '#1A1A2E'
     }
   },
 
   CLOUD_LOGS_CONFIG: {
     collectionName: 'contactLogs',
-    maxLocalCount: 100,
+    maxLocalCount: 200,
     maxCloudCount: 100,
     syncEnabledKey: 'cloudSyncEnabled'
+  },
+
+  // 云数据库集合名称
+  DB_COLLECTIONS: {
+    userProfiles: 'userProfiles',
+    contactStats: 'contactStats'
   },
 
   _cache: {
@@ -50,6 +52,7 @@ App({
       }
       this.loadCallHistory()
       this.initTheme()
+      this._syncUserProfileFromCloud()
     }, 0)
 
     this.getDeviceInfo()
@@ -145,6 +148,48 @@ App({
       }
     } catch (e) {
       this.globalData.platform = ''
+    }
+  },
+
+  /**
+   * 若无本地缓存，从云端 userProfiles 同步用户数据到本地
+   */
+  _syncUserProfileFromCloud() {
+    try {
+      // 已有本地呼号 → 不是首次使用，跳过
+      const localCallSign = wx.getStorageSync('myCallSign')
+      if (localCallSign) return
+
+      const localNick = wx.getStorageSync('wxMineNickName')
+      if (localNick) return
+
+      db.loadUserProfile().then(profile => {
+        if (!profile) return
+
+        if (profile.callSign) {
+          wx.setStorageSync('myCallSign', profile.callSign)
+        }
+        if (profile.nickName) {
+          wx.setStorageSync('wxMineNickName', profile.nickName)
+        }
+        if (profile.avatarUrl) {
+          wx.setStorageSync('wxMineAvatarUrl', profile.avatarUrl)
+        }
+        if (profile.currentTheme) {
+          wx.setStorageSync('appTheme', profile.currentTheme)
+        }
+        if (profile.cloudSyncEnabled !== undefined) {
+          wx.setStorageSync('cloudSyncEnabled', profile.cloudSyncEnabled)
+        }
+
+        // 主题可能变了，重新应用
+        this._cache.appTheme = null
+        this.initTheme()
+      }).catch(err => {
+        console.error('从云端同步用户资料失败', err)
+      })
+    } catch (e) {
+      console.error('同步用户资料异常', e)
     }
   },
 

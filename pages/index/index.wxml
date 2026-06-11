@@ -1,4 +1,4 @@
-<view class="theme-wrapper {{currentTheme === 'morandi' ? 'theme-morandi' : (currentTheme === 'dark' ? 'theme-dark' : '')}}">
+<view class="theme-wrapper {{currentTheme === 'morandi' ? 'theme-morandi' : ''}}">
   <view class="page-home">
   <!-- 顶部：个人资料卡片 -->
   <view class="profile-card" hover-class="button-hover" bindtap="goToMine">
@@ -73,33 +73,69 @@
     </view>
   </view>
 
-  <!-- 快速操作区域 -->
-  <view class="quick-section">
-    <view class="section-title">最近通联</view>
-    <view class="recent-list" wx:if="{{recentLogs.length > 0}}">
-      <view 
-        wx:for="{{recentLogs}}" 
-        wx:key="id"
-        class="recent-item"
-        hover-class="button-hover"
-        bindtap="viewLogDetail"
-        data-id="{{item.id}}"
-      >
-        <view class="recent-left">
-          <text class="recent-callsign">{{item.callSign}}</text>
-          <text class="recent-mode">{{item.mode}}</text>
-        </view>
-        <view class="recent-right">
-          <text class="recent-freq font-mono">{{item.frequency}}</text>
-          <text class="recent-time font-mono">{{item.btcTime || item.bjcTime}}</text>
+  <!-- 通联统计区域 -->
+  <view class="contact-stats-section">
+    <view class="section-title">通联统计</view>
+
+    <!-- 维度切换 -->
+    <view class="dimension-tabs">
+      <text class="dim-label">通联足迹</text>
+      <!-- <view class="dim-tab {{statsTab === 'platform' ? 'active' : ''}}" bindtap="switchStatsTab" data-tab="platform">风云榜单</view> -->
+    </view>
+
+    <!-- 个人维度：近6个月柱状图 -->
+    <view class="stats-panel" wx:if="{{statsTab === 'personal'}}">
+      <!-- 汇总统计 -->
+      <view class="personal-summary">
+        <text class="summary-text">近6个月：<text class="summary-num">{{personalTotal6 || 0}}</text></text>
+        <text class="summary-text">今年通联：<text class="summary-num">{{totalThisYear || 0}}</text></text>
+        <text class="summary-text">总共通联：<text class="summary-num">{{totalAll || 0}}</text></text>
+      </view>
+      <view class="bar-panel" wx:if="{{personalTotal6 > 0}}">
+        <view class="bar-title">近6个月通联趋势</view>
+        <view class="bar-chart">
+          <view wx:for="{{personalMonths}}" wx:key="monthKey" class="bar-col" bindtap="onBarTap" data-year="{{item.year}}" data-month="{{item.month}}" data-count="{{item.count}}">
+            <view class="bar-fill" style="height: {{item.percent}}%;">
+              <text class="bar-val" wx:if="{{item.count > 0}}">{{item.count}}</text>
+            </view>
+            <text class="bar-label">{{item.label}}</text>
+          </view>
         </view>
       </view>
+      <view class="stats-empty" wx:else>
+        <text class="empty-icon">📡</text>
+        <text class="empty-title">还没有通联记录</text>
+        <text class="empty-sub">快去添加你的第一条通联吧~</text>
+      </view>
     </view>
-    <view class="empty-recent" wx:else>
-      <text class="empty-icon">📭</text>
-      <text class="empty-text">暂无通联记录</text>
-      <text class="empty-hint">点击上方"通联日志"开始记录</text>
+
+    <!-- 平台维度：排行榜（暂时隐藏）
+    <view class="stats-panel" wx:if="{{statsTab === 'platform'}}">
+      <view class="rank-period-tabs">
+        <view class="rp-tab {{rankPeriod === 'month' ? 'active' : ''}}" bindtap="switchRankPeriod" data-period="month">🌙 本月榜单</view>
+        <view class="rp-tab {{rankPeriod === 'year' ? 'active' : ''}}" bindtap="switchRankPeriod" data-period="year">🏆 年度榜单</view>
+      </view>
+      <view class="rank-list" wx:if="{{rankList.length > 0}}">
+        <view wx:for="{{rankList}}" wx:key="callSign" class="rank-item">
+          <text wx:if="{{index === 0}}" class="rank-num rank-num-1">🥇</text>
+          <text wx:elif="{{index === 1}}" class="rank-num rank-num-2">🥈</text>
+          <text wx:elif="{{index === 2}}" class="rank-num rank-num-3">🥉</text>
+          <text wx:else class="rank-num">{{index + 1}}</text>
+          <view class="rank-user">
+            <text class="rank-callsign">{{item.callSign}}</text>
+            <text class="rank-nickname" wx:if="{{item.nickName}}">{{item.nickName}}</text>
+          </view>
+          <text class="rank-count">{{item.count}}次</text>
+        </view>
+      </view>
+      <view class="stats-empty" wx:if="{{rankList.length === 0 && !rankLoading}}">
+        <text>暂无排行数据</text>
+      </view>
+      <view class="stats-empty" wx:if="{{rankLoading}}">
+        <text>加载中...</text>
+      </view>
     </view>
+    -->
   </view>
 
   <!-- 底部安全区 -->
