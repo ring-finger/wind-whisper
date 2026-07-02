@@ -154,7 +154,9 @@ Page({
     // 分享来源
     shareOwnerCallSign: '',
     showShareGuide: false,
-    _shareGuideShown: false
+    _shareGuideShown: false,
+    // 更多菜单
+    showMoreMenu: false
   },
 
   onLoad(options) {
@@ -1962,5 +1964,389 @@ Page({
       query: '',
       imageUrl: '/images/cover.jpg'
     }
-  }
+  },
+
+  /** 导出日志为 Excel/CSV 文件 */
+  onExportExcel() {
+    this.setData({ showMoreMenu: false })
+    wx.vibrateShort({ type: VIBRATE_TYPE })
+    try {
+      const myCallSign = wx.getStorageSync('myCallSign') || ''
+      if (!myCallSign) {
+        wx.showModal({
+          title: '提示',
+          content: '请先在"我的"页面设置个人呼号',
+          confirmText: '去设置',
+          success: (res) => {
+            if (res.confirm) {
+              wx.switchTab({ url: '/pages/mine/mine' })
+            }
+          }
+        })
+        return
+      }
+
+      const logs = wx.getStorageSync('contactLogs') || []
+      if (logs.length === 0) {
+        wx.showToast({ title: '暂无日志可导出', icon: 'none' })
+        return
+      }
+
+      // 构建 CSV 格式（UTF-8 BOM 兼容 Excel）
+      const today = formatDate(new Date())
+      const headers = ['日期', '时间(BJT)', '呼号', '频率(MHz)', '模式', '己方RST', '对方RST', '天气', '位置', '功率', '设备', '天线', '备注']
+      let csv = '\uFEFF' + headers.join(',') + '\n'
+
+      logs.forEach(log => {
+        let myRst = ''
+        if (log.rst.myRst) {
+          myRst = `${log.rst.myRst.r || ''}${log.rst.myRst.s || ''}${log.rst.myRst.t || ''}`
+        } else if (log.rst.r || log.rst.s || log.rst.t) {
+          myRst = `${log.rst.r || ''}${log.rst.s || ''}${log.rst.t || ''}`
+        }
+        const theirRst = log.rst.theirRst ? `${log.rst.theirRst.r || ''}${log.rst.theirRst.s || ''}${log.rst.theirRst.t || ''}` : ''
+
+        const row = [
+          log.date || '',
+          log.btcTime || log.bjcTime || '',
+          log.callSign || '',
+          log.frequency || '',
+          log.mode || '',
+          myRst,
+          theirRst,
+          getWeatherText(log.weather),
+          log.qth || '',
+          log.power != null ? String(log.power) : '',
+          log.equipment || '',
+          log.antenna || '',
+          log.notes || ''
+        ]
+        // CSV 转义：包含逗号或引号的字段用双引号包裹
+        const escapedRow = row.map(field => {
+          const s = String(field)
+          if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+            return '"' + s.replace(/"/g, '""') + '"'
+          }
+          return s
+        })
+        csv += escapedRow.join(',') + '\n'
+      })
+
+      const fileName = '通联日志_' + today + '.csv'
+      const filePath = wx.env.USER_DATA_PATH + '/' + fileName
+
+      wx.showLoading({ title: '正在导出...' })
+
+      try {
+        if (wx.getFileSystemManager) {
+          wx.getFileSystemManager().writeFile({
+            filePath: filePath,
+            data: csv,
+            encoding: 'utf-8',
+            success: () => {
+              wx.hideLoading()
+              wx.showModal({
+                title: '导出成功',
+                content: `共导出 ${logs.length} 条日志\n\nExcel 可直接打开 CSV 文件`,
+                confirmText: '转发',
+                cancelText: '完成',
+                success: (res) => {
+                  if (res.confirm) {
+                    if (wx.shareFileMessage) {
+                      wx.shareFileMessage({
+                        filePath: filePath,
+                        fileName: fileName,
+                        success: () => { console.log('分享成功') },
+                        fail: (err) => {
+                          console.error('分享失败', err)
+                          if (err.errMsg && err.errMsg.includes('not supported')) {
+                            wx.showToast({ title: '当前平台不支持文件分享', icon: 'none' })
+                          } else {
+                            wx.showToast({ title: '分享失败', icon: 'none' })
+                          }
+                        }
+                      })
+                    } else {
+                      wx.showModal({
+                        title: '提示',
+                        content: '当前版本不支持直接分享文件，文件已保存到本地',
+                        showCancel: false
+                      })
+                    }
+                  }
+                }
+              })
+            },
+            fail: (err) => {
+              wx.hideLoading()
+              console.error('写入文件失败', err)
+              if (err.errMsg && err.errMsg.includes('permission')) {
+                wx.showToast({ title: '文件系统权限不足', icon: 'none' })
+              } else {
+                wx.showToast({ title: '导出失败', icon: 'none' })
+              }
+            }
+          })
+        } else {
+          wx.hideLoading()
+          wx.showModal({
+            title: '提示',
+            content: '当前版本不支持文件导出功能',
+            showCancel: false
+          })
+        }
+      } catch (e) {
+        wx.hideLoading()
+        console.error('导出过程出错', e)
+        wx.showToast({ title: '导出失败', icon: 'none' })
+      }
+    } catch (e) {
+      console.error('导出 Excel 失败', e)
+      wx.hideLoading()
+      wx.showToast({ title: '导出失败', icon: 'none' })
+    }
+  },
+
+  /** 导出日志为 ADIF 文件 */
+  onExportAdif() {
+    this.setData({ showMoreMenu: false })
+    wx.vibrateShort({ type: VIBRATE_TYPE })
+    try {
+      const myCallSign = wx.getStorageSync('myCallSign') || ''
+      if (!myCallSign) {
+        wx.showModal({
+          title: '提示',
+          content: '请先在"我的"页面设置个人呼号',
+          confirmText: '去设置',
+          success: (res) => {
+            if (res.confirm) {
+              wx.switchTab({ url: '/pages/mine/mine' })
+            }
+          }
+        })
+        return
+      }
+
+      const logs = wx.getStorageSync('contactLogs') || []
+      if (logs.length === 0) {
+        wx.showToast({ title: '暂无日志可导出', icon: 'none' })
+        return
+      }
+
+      // 构建 ADIF 格式（ADIF 3.1.4 标准）
+      const today = formatDate(new Date())
+      let adif = `ADIF Export from HamLog Mini Program\n`
+      adif += `<ADIF_VER:5>3.1.4\n`
+      adif += `<PROGRAMID:11>Wind-Whispe\n`
+      adif += `<PROGRAMVERSION:5>1.0.0\n`
+      adif += `<EOH>\n\n`
+
+      logs.forEach(log => {
+        let myRst = ''
+        if (log.rst.myRst) {
+          myRst = `${log.rst.myRst.r || ''}${log.rst.myRst.s || ''}${log.rst.myRst.t || ''}`
+        } else if (log.rst.r || log.rst.s || log.rst.t) {
+          myRst = `${log.rst.r || ''}${log.rst.s || ''}${log.rst.t || ''}`
+        }
+        const theirRst = log.rst.theirRst ? `${log.rst.theirRst.r || ''}${log.rst.theirRst.s || ''}${log.rst.theirRst.t || ''}` : ''
+
+        // 日期转 ADIF 格式 YYYYMMDD
+        const qsoDate = (log.date || '').replace(/-/g, '')
+        // 时间转 ADIF 格式 HHMM（取冒号分隔后的前4位）
+        const rawTime = (log.utcTime || log.btcTime || '').replace(/:/g, '')
+        const timeOn = rawTime.length >= 4 ? rawTime.substring(0, 4) : rawTime
+
+        // 频段推断
+        const freq = parseFloat(log.frequency)
+        let band = ''
+        if (freq >= 0.136 && freq < 0.138) band = '2190m'
+        else if (freq >= 0.472 && freq < 0.479) band = '630m'
+        else if (freq >= 1.8 && freq < 2.0) band = '160m'
+        else if (freq >= 3.5 && freq < 4.0) band = '80m'
+        else if (freq >= 5.2 && freq < 5.5) band = '60m'
+        else if (freq >= 7.0 && freq < 7.3) band = '40m'
+        else if (freq >= 10.1 && freq < 10.15) band = '30m'
+        else if (freq >= 14.0 && freq < 14.35) band = '20m'
+        else if (freq >= 18.068 && freq < 18.168) band = '17m'
+        else if (freq >= 21.0 && freq < 21.45) band = '15m'
+        else if (freq >= 24.89 && freq < 24.99) band = '12m'
+        else if (freq >= 28.0 && freq < 29.7) band = '10m'
+        else if (freq >= 50 && freq < 54) band = '6m'
+        else if (freq >= 144 && freq < 148) band = '2m'
+        else if (freq >= 430 && freq < 450) band = '70cm'
+
+        adif += `<STATION_CALLSIGN:${myCallSign.length}>${myCallSign} `
+        adif += `<CALL:${log.callSign.length}>${log.callSign} `
+        if (band) adif += `<BAND:${band.length}>${band} `
+        adif += `<MODE:${log.mode.length}>${log.mode} `
+        if (qsoDate) adif += `<QSO_DATE:${qsoDate.length}>${qsoDate} `
+        if (timeOn) adif += `<TIME_ON:${timeOn.length}>${timeOn} `
+        if (myRst) adif += `<RST_SENT:${myRst.length}>${myRst} `
+        if (theirRst) adif += `<RST_RCVD:${theirRst.length}>${theirRst} `
+        if (log.frequency) {
+          const freqStr = String(log.frequency)
+          adif += `<FREQ:${freqStr.length}>${freqStr} `
+        }
+        if (log.equipment) adif += `<RIG:${log.equipment.length}>${log.equipment} `
+        if (log.antenna) adif += `<ANT_AZ:${log.antenna.length}>${log.antenna} `
+        if (log.qth) adif += `<QTH:${log.qth.length}>${log.qth} `
+        if (log.power !== '' && log.power != null) {
+          const pwStr = String(log.power)
+          adif += `<TX_PWR:${pwStr.length}>${pwStr} `
+        }
+        if (log.notes) adif += `<COMMENT:${log.notes.length}>${log.notes} `
+        if (log.weather) {
+          const wText = getWeatherText(log.weather)
+          if (wText) adif += `<NOTES:${wText.length}>${wText} `
+        }
+        adif += `<EOR>\n`
+      })
+
+      adif += `<EOF>\n`
+
+      const fileName = '通联日志_' + today + '.adi'
+      const filePath = wx.env.USER_DATA_PATH + '/' + fileName
+
+      wx.showLoading({ title: '正在导出...' })
+
+      try {
+        if (wx.getFileSystemManager) {
+          wx.getFileSystemManager().writeFile({
+            filePath: filePath,
+            data: adif,
+            encoding: 'utf-8',
+            success: () => {
+              wx.hideLoading()
+              wx.showModal({
+                title: '导出成功',
+                content: `共导出 ${logs.length} 条日志\n\nADIF 格式可用于导入其他业余无线电日志软件`,
+                confirmText: '转发',
+                cancelText: '完成',
+                success: (res) => {
+                  if (res.confirm) {
+                    if (wx.shareFileMessage) {
+                      wx.shareFileMessage({
+                        filePath: filePath,
+                        fileName: fileName,
+                        success: () => { console.log('分享成功') },
+                        fail: (err) => {
+                          console.error('分享失败', err)
+                          if (err.errMsg && err.errMsg.includes('not supported')) {
+                            wx.showToast({ title: '当前平台不支持文件分享', icon: 'none' })
+                          } else {
+                            wx.showToast({ title: '分享失败', icon: 'none' })
+                          }
+                        }
+                      })
+                    } else {
+                      wx.showModal({
+                        title: '提示',
+                        content: '当前版本不支持直接分享文件，文件已保存到本地',
+                        showCancel: false
+                      })
+                    }
+                  }
+                }
+              })
+            },
+            fail: (err) => {
+              wx.hideLoading()
+              console.error('写入文件失败', err)
+              if (err.errMsg && err.errMsg.includes('permission')) {
+                wx.showToast({ title: '文件系统权限不足', icon: 'none' })
+              } else {
+                wx.showToast({ title: '导出失败', icon: 'none' })
+              }
+            }
+          })
+        } else {
+          wx.hideLoading()
+          wx.showModal({
+            title: '提示',
+            content: '当前版本不支持文件导出功能',
+            showCancel: false
+          })
+        }
+      } catch (e) {
+        wx.hideLoading()
+        console.error('导出过程出错', e)
+        wx.showToast({ title: '导出失败', icon: 'none' })
+      }
+    } catch (e) {
+      console.error('导出 ADIF 失败', e)
+      wx.hideLoading()
+      wx.showToast({ title: '导出失败', icon: 'none' })
+    }
+  },
+
+  /** 清空所有通联日志 */
+  onClearLogs() {
+    this.setData({ showMoreMenu: false })
+    wx.vibrateShort({ type: VIBRATE_TYPE })
+    wx.showModal({
+      title: '确认清空',
+      content: '确定要清空所有通联日志吗？此操作不可恢复。',
+      confirmText: '确定',
+      confirmColor: '#ff4d4f',
+      success: (res) => {
+        if (res.confirm) {
+          try {
+            wx.setStorageSync('contactLogs', [])
+            this._cache.contactLogs = []
+            const app = getApp()
+            if (app._cache) {
+              app._cache.wxMineAvatarUrl = null
+              app._cache.wxMineNickName = null
+            }
+            db.clearAllStats()
+            db.syncLogCountToCloud(0)
+            this.loadLogs()
+            wx.showToast({ title: '清空成功', icon: 'success' })
+          } catch (e) {
+            console.error('清空日志失败', e)
+            wx.showToast({ title: '清空失败', icon: 'none' })
+          }
+        }
+      }
+    })
+  },
+
+  /** 切换更多菜单 - 打开居中弹窗 */
+  toggleMoreMenu() {
+    wx.vibrateShort({ type: VIBRATE_TYPE })
+    this.setData({ showMoreMenu: !this.data.showMoreMenu })
+  },
+
+  /** 关闭更多菜单弹窗 */
+  closeMoreModal() {
+    this.setData({ showMoreMenu: false })
+  },
+
+  /** 空白事件，阻止遮罩层滚动穿透 */
+  noop() {}
 })
+
+/** 天气枚举转中文 */
+function getWeatherText(value) {
+  const texts = {
+    'sunny': '晴天',
+    'cloudy': '多云',
+    'rainy': '雨天',
+    'stormy': '雷雨',
+    'snowy': '雪天',
+    'foggy': '雾天',
+    'windy': '大风',
+    'night': '夜晚'
+  }
+  return texts[value] || ''
+}
+
+/** 日期格式化 YYYY-MM-DD */
+function formatDate(dateString) {
+  if (!dateString) return ''
+  const date = new Date(dateString)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}

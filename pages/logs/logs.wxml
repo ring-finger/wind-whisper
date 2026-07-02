@@ -3,7 +3,7 @@
   <!-- 隐藏的画布用于生成分享卡片 -->
   <canvas type="2d" id="shareCardCanvas" class="share-canvas" style="width:520px;height:416px;"></canvas>
 
-  <!-- 顶部Tab切换 -->
+  <!-- 顶部Tab切换 + 更多菜单 -->
   <view class="page-tabs">
     <view 
       class="page-tab {{currentTab === 'add' ? 'active' : ''}}"
@@ -22,6 +22,59 @@
     >
       <text class="tab-icon">📋</text>
       <text class="tab-text">列表</text>
+    </view>
+    <!-- 更多菜单按钮 -->
+    <view class="more-menu-btn {{showMoreMenu ? 'more-menu-btn-active' : ''}}" hover-class="button-hover" bindtap="toggleMoreMenu">
+      <text class="more-menu-icon">⚙️</text>
+      <text class="more-menu-label">设置</text>
+    </view>
+  </view>
+
+  <!-- 更多设置居中弹窗 -->
+  <view class="more-modal-mask {{showMoreMenu ? 'more-modal-mask-show' : ''}}" bindtap="closeMoreModal" catchtouchmove="noop"></view>
+  <view class="more-modal {{showMoreMenu ? 'more-modal-show' : ''}}">
+    <view class="more-modal-header">
+      <text class="more-modal-title">更多设置</text>
+      <view class="more-modal-close" bindtap="closeMoreModal">✕</view>
+    </view>
+    <view class="more-modal-body">
+      <!-- 导出数据 -->
+      <view class="more-modal-group">
+        <text class="more-modal-group-title">导出数据</text>
+        <view class="more-modal-group-card">
+          <view class="more-modal-item" hover-class="more-modal-item-hover" bindtap="onExportExcel">
+            <view class="more-modal-item-icon more-modal-item-icon--green">📊</view>
+            <view class="more-modal-item-content">
+              <text class="more-modal-item-text">导出 EXCEL 日志</text>
+              <text class="more-modal-item-hint">本地表格备份查看</text>
+            </view>
+            <text class="more-modal-item-arrow">›</text>
+          </view>
+          <view class="more-modal-item" hover-class="more-modal-item-hover" bindtap="onExportAdif">
+            <view class="more-modal-item-icon more-modal-item-icon--blue">📄</view>
+            <view class="more-modal-item-content">
+              <text class="more-modal-item-text">导出 ADIF 日志</text>
+              <text class="more-modal-item-hint">兼容 QRZ / Log4OM / Wavelog 通用通联格式</text>
+            </view>
+            <text class="more-modal-item-arrow">›</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 危险数据操作 -->
+      <view class="more-modal-group">
+        <text class="more-modal-group-title">数据管理</text>
+        <view class="more-modal-group-card">
+          <view class="more-modal-item more-modal-item--danger" hover-class="more-modal-item-hover" bindtap="onClearLogs">
+            <view class="more-modal-item-icon more-modal-item-icon--red">🗑️</view>
+            <view class="more-modal-item-content">
+              <text class="more-modal-item-text">清空通联日志</text>
+              <text class="more-modal-item-hint">此操作不可撤销，请谨慎使用</text>
+            </view>
+            <text class="more-modal-item-arrow">›</text>
+          </view>
+        </view>
+      </view>
     </view>
   </view>
 

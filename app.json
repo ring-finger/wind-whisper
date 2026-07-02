@@ -30,6 +30,12 @@
       ]
     },
     {
+      "root": "pages/qsl",
+      "pages": [
+        "qsl"
+      ]
+    },
+    {
       "root": "pages/maidenhead",
       "pages": [
         "maidenhead"
@@ -42,7 +48,7 @@
     }
   },
   "requiredPrivateInfos": [
-    "getFuzzyLocation"
+    "getLocation"
   ],
   "preloadRule": {
     "pages/index/index": {

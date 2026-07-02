@@ -38,18 +38,11 @@
         <text class="cell-value cell-value-count">{{contactCount}} 次</text>
         <text class="cell-chevron cell-chevron-placeholder" aria-hidden="true">›</text>
       </view>
+
     </view>
 
-    <view class="mine-card mine-group">
-      <view class="cell cell-tap" hover-class="cell-hover" bindtap="exportLogs">
-        <text class="cell-label cell-label-full">导出日志</text>
-        <text class="cell-chevron">›</text>
-      </view>
-      <view class="cell cell-tap" hover-class="cell-hover" bindtap="clearLogs">
-        <text class="cell-label cell-label-full">清空日志</text>
-        <text class="cell-chevron">›</text>
-      </view>
-    </view>
+
+
 
     <!-- 云同步配置 -->
     <view class="mine-card mine-group">

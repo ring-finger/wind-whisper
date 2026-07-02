@@ -157,6 +157,13 @@ Page({
     })
   },
 
+  goToQSL() {
+    wx.vibrateShort({ type: VIBRATE_TYPE })
+    wx.navigateTo({
+      url: '/pages/qsl/qsl'
+    })
+  },
+
   goToAllLogs() {
     wx.vibrateShort({ type: VIBRATE_TYPE })
     wx.switchTab({

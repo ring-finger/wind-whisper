@@ -1106,3 +1106,248 @@
   color: #999;
 }
 
+/* 更多菜单按钮 */
+.more-menu-btn {
+  height: 72rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6rpx;
+  padding: 0 20rpx;
+  border-radius: 12rpx;
+  background: transparent;
+  transition: all 0.15s ease;
+  margin-left: auto;
+}
+
+.more-menu-btn-active {
+  background: var(--accent-primary);
+}
+
+.more-menu-icon {
+  font-size: 28rpx;
+  line-height: 1;
+}
+
+.more-menu-label {
+  font-size: 22rpx;
+  color: var(--text-secondary);
+  line-height: 1;
+}
+
+.more-menu-btn-active .more-menu-label {
+  color: #fff;
+}
+
+/* 更多设置居中弹窗遮罩 */
+.more-modal-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 900;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.28s ease, visibility 0.28s ease;
+  backdrop-filter: blur(4rpx);
+  -webkit-backdrop-filter: blur(4rpx);
+}
+
+.more-modal-mask-show {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* 更多设置居中弹窗面板 */
+.more-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.92);
+  width: 88vw;
+  max-width: 600rpx;
+  max-height: 78vh;
+  background: var(--card-bg);
+  border-radius: 28rpx;
+  box-shadow: 0 20rpx 80rpx rgba(0, 0, 0, 0.18), 0 0 0 1rpx rgba(0, 0, 0, 0.04);
+  z-index: 950;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.28s ease, visibility 0.28s ease, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.more-modal-show {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.more-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 36rpx 32rpx 28rpx;
+  flex-shrink: 0;
+  border-bottom: 1rpx solid var(--border-color);
+}
+
+.more-modal-title {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: 0.5rpx;
+}
+
+.more-modal-close {
+  width: 60rpx;
+  height: 60rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28rpx;
+  color: var(--text-secondary);
+  background: var(--bg-primary);
+  border-radius: 50%;
+  transition: all 0.15s ease;
+}
+
+.more-modal-close:active {
+  background: var(--border-color);
+  transform: scale(0.92);
+}
+
+.more-modal-body {
+  padding: 20rpx 24rpx 32rpx;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ========== 分组容器 ========== */
+.more-modal-group {
+  margin-bottom: 24rpx;
+}
+
+.more-modal-group:last-child {
+  margin-bottom: 0;
+}
+
+.more-modal-group-title {
+  display: block;
+  padding: 0 8rpx 12rpx;
+  font-size: 24rpx;
+  color: var(--text-secondary);
+  font-weight: 600;
+  letter-spacing: 0.5rpx;
+}
+
+/* ========== 分组卡片（圆角容器） ========== */
+.more-modal-group-card {
+  background: var(--bg-primary);
+  border-radius: 20rpx;
+  overflow: hidden;
+  box-shadow: 0 2rpx 12rpx var(--shadow-color);
+}
+
+/* ========== 列表项 ========== */
+.more-modal-item {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  padding: 28rpx 28rpx;
+  transition: background 0.12s ease;
+  position: relative;
+}
+
+.more-modal-item + .more-modal-item {
+  border-top: 1rpx solid var(--border-color);
+}
+
+.more-modal-item-hover {
+  background: rgba(var(--accent-primary-rgb), 0.04);
+}
+
+/* 图标 */
+.more-modal-item-icon {
+  width: 64rpx;
+  height: 64rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32rpx;
+  border-radius: 16rpx;
+  flex-shrink: 0;
+  background: var(--primary-soft);
+}
+
+.more-modal-item-icon--green {
+  background: rgba(56, 142, 60, 0.1);
+}
+
+.more-modal-item-icon--blue {
+  background: rgba(44, 92, 151, 0.1);
+}
+
+.more-modal-item-icon--red {
+  background: rgba(211, 47, 47, 0.08);
+}
+
+/* 内容区 */
+.more-modal-item-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+  min-width: 0;
+}
+
+.more-modal-item-text {
+  font-size: 28rpx;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.more-modal-item-hint {
+  font-size: 22rpx;
+  color: var(--text-placeholder);
+  line-height: 1.4;
+}
+
+/* 箭头 */
+.more-modal-item-arrow {
+  font-size: 36rpx;
+  color: var(--text-placeholder);
+  flex-shrink: 0;
+  font-weight: 300;
+  margin-right: -4rpx;
+  opacity: 0.65;
+}
+
+/* ========== 危险操作项特殊样式 ========== */
+.more-modal-item--danger {
+  background: rgba(211, 47, 47, 0.03);
+}
+
+.more-modal-item--danger .more-modal-item-text {
+  color: var(--error);
+  font-weight: 600;
+}
+
+.more-modal-item--danger .more-modal-item-hint {
+  color: var(--error);
+  opacity: 0.65;
+}
+
+.more-modal-item--danger .more-modal-item-arrow {
+  color: var(--error);
+  opacity: 0.5;
+}
+
+.more-modal-item--danger.more-modal-item-hover {
+  background: rgba(211, 47, 47, 0.07);
+}
+

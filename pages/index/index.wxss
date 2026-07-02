@@ -151,6 +151,10 @@
   background: linear-gradient(145deg, #E3F2FD 0%, var(--card-bg) 100%);
 }
 
+.feature-qsl {
+  background: linear-gradient(145deg, #FFF3E0 0%, var(--card-bg) 100%);
+}
+
 .feature-icon-wrap {
   width: 72rpx;
   height: 72rpx;
@@ -171,6 +175,10 @@
 
 .feature-maidenhead .feature-icon-wrap {
   background: linear-gradient(135deg, #1E88E5, #26A69A);
+}
+
+.feature-qsl .feature-icon-wrap {
+  background: linear-gradient(135deg, #FF9800, #FFC107);
 }
 
 .feature-icon {
@@ -471,6 +479,12 @@
 .fab-hover {
   opacity: 0.85;
   transform: scale(0.95);
+}
+
+/* 通用卡片按压反馈 */
+.button-hover {
+  opacity: 0.75;
+  transition: opacity 0.15s ease;
 }
 
 .fab-icon {

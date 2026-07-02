@@ -1,0 +1,442 @@
+<view class="theme-wrapper {{currentTheme === 'morandi' ? 'theme-morandi' : ''}}">
+<view class="qsl-page">
+
+  <!-- 顶部控制栏 -->
+  <view class="top-bar">
+    <view class="layout-switch">
+      <view class="layout-btn {{layout === 'horizontal' ? 'active' : ''}}" bindtap="switchLayout" data-layout="horizontal">横版</view>
+      <view class="layout-btn {{layout === 'vertical' ? 'active' : ''}}" bindtap="switchLayout" data-layout="vertical">竖版</view>
+    </view>
+    <view class="top-bar-label">QSL 卡片设计</view>
+    <view class="export-entry" bindtap="openExportModal">
+      <text class="export-icon">📤</text>
+      <text class="export-text">导出</text>
+    </view>
+  </view>
+
+  <!-- 印刷提示 -->
+  <view class="top-hint">若需印刷可在"我的"联系客服咨询</view>
+
+  <!-- 友台设计 悬浮按钮 -->
+  <view class="friend-float-btn" bindtap="copyFriendLink">
+    <text class="friend-float-text">友</text>
+  </view>
+
+  <!-- 主体： 竖屏上下布局 -->
+  <view class="main-body">
+    <!-- 设计区域 -->
+    <view class="design-wrapper">
+      <view class="design-scaler" style="transform: scale({{stageScale}}); transform-origin: center center;">
+        <view
+          class="design-stage"
+          style="width: {{stageWidth}}px; height: {{stageHeight}}px;"
+        >
+          <!-- 出血线 -->
+          <view class="bleed-line" style="left: 0; top: 0; right: 0; bottom: 0; border-color: #ff6b6b;"></view>
+          <!-- 裁切线 -->
+          <view class="trim-line" style="left: {{bleed}}px; top: {{bleed}}px; right: {{bleed}}px; bottom: {{bleed}}px;"></view>
+
+          <!-- 背景图层：模板使用 aspectFill 完全填充，普通背景使用 aspectFit 保持比例 -->
+          <image
+            wx:if="{{currentBg}}"
+            class="bg-layer {{bgAdjustMode ? 'bg-adjusting' : ''}}"
+            src="{{currentBg}}"
+            mode="{{currentBgIsTemplate ? 'aspectFill' : 'aspectFit'}}"
+            style="width: {{stageWidth}}px; height: {{stageHeight}}px; left: 0; top: 0; transform: translate({{currentBgOffsetX}}px, {{currentBgOffsetY}}px) scale({{currentBgScale}}) rotate({{currentBgRotation}}deg);"
+          />
+
+          <!-- 辅助线层（仅拖拽时显示） -->
+          <view wx:if="{{showGuidelines}}" wx:for="{{guideLines.h}}" wx:key="key" class="guide-line guide-line-h {{item.type === 'trim' ? 'guide-trim' : ''}} {{item.type === 'element' ? 'guide-element' : ''}} {{item.isCenter ? 'guide-center-h' : ''}}" style="top: {{item.pos}}px;"></view>
+          <view wx:if="{{showGuidelines}}" wx:for="{{guideLines.v}}" wx:key="key" class="guide-line guide-line-v {{item.type === 'trim' ? 'guide-trim' : ''}} {{item.type === 'element' ? 'guide-element' : ''}} {{item.isCenter ? 'guide-center-v' : ''}}" style="left: {{item.pos}}px;"></view>
+
+          <!-- 元素层 -->
+          <view class="elements-layer">
+            <!-- 拖拽元素层（控件内嵌，相对定位） -->
+            <view
+              class="elements-drag-layer {{bgAdjustMode ? 'bg-drag-active' : ''}}"
+              bindtouchstart="onBgTouchStart"
+              bindtouchmove="onBgTouchMove"
+              bindtouchend="onBgTouchEnd"
+            >
+              <view
+                wx:for="{{currentElements}}"
+                wx:key="id"
+                class="drag-element {{selectedId === item.id ? 'selected' : ''}} {{item.type === 'text' ? 'drag-element-text' : ''}}"
+                style="left: {{item.x}}px; top: {{item.y}}px; {{item.type !== 'text' ? 'width:' + (item.width || 80) + 'px;height:' + (item.height || 80) + 'px;' : ''}} transform: rotate({{item.rotation || 0}}deg);"
+                catchtap="selectElement"
+                data-id="{{item.id}}"
+                data-drag="1"
+                bindtouchstart="onTouchStart"
+                bindtouchmove="onTouchMove"
+                bindtouchend="onTouchEnd"
+              >
+                <!-- 文字元素 -->
+                <text
+                  wx:if="{{item.type === 'text'}}"
+                  class="drag-text"
+                  style="font-size: {{item.fontSize || 14}}px; color: {{item.color || '#333'}}; font-family: {{item.fontFamily || 'serif'}}; font-weight: {{item.fontWeight || 'normal'}};"
+                >{{item.text}}</text>
+
+                <!-- 图片元素 -->
+                <image
+                  wx:if="{{item.type === 'image'}}"
+                  class="drag-image"
+                  src="{{item.src}}"
+                  mode="aspectFit"
+                  style="width: 100%; height: 100%;"
+                />
+
+                <!-- 删除按钮（内嵌，相对定位，右上角） -->
+                <view
+                  wx:if="{{selectedId === item.id}}"
+                  class="element-delete-btn"
+                  catchtap="deleteElement"
+                  data-delete="1"
+                  data-id="{{item.id}}"
+                >×</view>
+
+                <!-- 缩放手柄（内嵌，相对定位，仅图片元素显示） -->
+                <view
+                  wx:if="{{selectedId === item.id && item.type === 'image'}}"
+                  class="resize-handle"
+                  data-resize="1"
+                  catchtouchstart="onResizeStart"
+                  catchtouchmove="onResizeMove"
+                  catchtouchend="onResizeEnd"
+                >↘</view>
+              </view>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 侧边/底部面板：缩略图 + 工具栏 -->
+    <view class="side-panel">
+      <!-- 提示 -->
+      <view class="design-hint">
+        <text>拖拽元素调整位置 · 选中后编辑/删除</text>
+        <text class="bleed-note">当前尺寸：140×90mm · 红色虚线至裁切线之间为出血区域（2mm）</text>
+      </view>
+
+      <!-- 正反面缩略图 -->
+      <view class="thumb-strip">
+        <view
+          class="thumb-card {{currentSide === 'front' ? 'thumb-active' : ''}}"
+          bindtap="switchSide"
+          data-side="front"
+        >
+          <view class="thumb-mini thumb-mini-front" wx:if="{{layout === 'horizontal'}}" />
+          <view class="thumb-mini thumb-mini-front thumb-mini-v" wx:else />
+          <text class="thumb-label">正面</text>
+          <text class="thumb-count">{{elements.front.length}} 元素</text>
+        </view>
+        <view
+          class="thumb-card {{currentSide === 'back' ? 'thumb-active' : ''}}"
+          bindtap="switchSide"
+          data-side="back"
+        >
+          <view class="thumb-mini thumb-mini-back" wx:if="{{layout === 'horizontal'}}" />
+          <view class="thumb-mini thumb-mini-back thumb-mini-v" wx:else />
+          <text class="thumb-label">反面</text>
+          <text class="thumb-count">{{elements.back.length}} 元素</text>
+        </view>
+      </view>
+
+      <!-- 工具栏 -->
+      <view class="bottom-toolbar">
+        <!-- 第一行：主要添加工具 -->
+        <view class="tool-row">
+          <view class="tool-btn tool-btn-accent" bindtap="openTextPicker">
+            <text class="tool-icon">Aa</text>
+            <text>文字</text>
+          </view>
+          <view class="tool-btn" bindtap="openIconPicker">
+            <text class="tool-icon">🖼️</text>
+            <text>图标</text>
+          </view>
+          <view class="tool-btn" bindtap="openBgPicker">
+            <text class="tool-icon">🏞️</text>
+            <text>背景</text>
+          </view>
+          <view class="tool-btn" bindtap="openTemplatePicker" wx:if="{{currentSide === 'back'}}">
+            <text class="tool-icon">📐</text>
+            <text>模板</text>
+          </view>
+          <view class="tool-btn adjust-btn" bindtap="enterBgAdjustMode" wx:if="{{currentBg && !bgAdjustMode}}">
+            <text class="tool-icon">↔️</text>
+            <text>调整</text>
+          </view>
+        </view>
+        <!-- 第二行：选中元素的操作 + 预览 -->
+        <view class="tool-row">
+          <view class="tool-btn {{selectedId ? '' : 'tool-btn-disabled'}}" bindtap="editElement">
+            <text class="tool-icon">✏️</text>
+            <text>编辑</text>
+          </view>
+          <view class="tool-btn {{selectedId ? '' : 'tool-btn-disabled'}}" bindtap="rotateElement">
+            <text class="tool-icon">↻</text>
+            <text>旋转</text>
+          </view>
+          <view class="tool-btn {{selectedId ? 'tool-btn-danger' : 'tool-btn-disabled'}}" bindtap="deleteCurrentElement">
+            <text class="tool-icon">🗑️</text>
+            <text>删除</text>
+          </view>
+          <view class="tool-btn primary" bindtap="previewDesign">
+            <text class="tool-icon">👁️</text>
+            <text>预览</text>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 背景调整模式工具栏 -->
+  <view wx:if="{{bgAdjustMode}}" class="bg-adjust-bar">
+    <view class="bg-adjust-info">
+      <text class="bg-adjust-hint">拖拽移动 · 双指缩放 · 旋转</text>
+      <text class="bg-adjust-scale">缩放: {{currentBgScale}}x | 旋转: {{currentBgRotation}}°</text>
+    </view>
+    <view class="bg-adjust-actions">
+      <view class="bg-adjust-reset" bindtap="rotateBackground">
+        <text>↻ 旋转</text>
+      </view>
+      <view class="bg-adjust-reset" bindtap="resetBgOffset">
+        <text>重置</text>
+      </view>
+      <view class="bg-adjust-done" bindtap="exitBgAdjustMode">
+        <text>完成</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 添加文字弹窗（预设优先 + 自定义） -->
+  <view wx:if="{{showTextPicker}}" class="text-picker-mask" catchtap="closeTextPicker">
+    <view class="text-picker" catchtap="stopPropagation">
+      <view class="picker-title">文字</view>
+
+      <!-- 快捷预设（优先展示，与图标选择器逻辑一致） -->
+      <view class="preset-tags">
+        <view
+          wx:for="{{presetTexts}}"
+          wx:key="key"
+          class="preset-tag"
+          catchtap="selectPresetText"
+          data-index="{{index}}"
+        >
+          <text class="preset-tag-label">{{item.label}}</text>
+          <text class="preset-tag-preview">{{item.text}}</text>
+        </view>
+
+      </view>
+
+      <!-- 自定义文字（与图标选择器的 + 按钮逻辑一致） -->
+      <view class="text-picker-custom">
+        <text class="text-picker-subtitle">自定义文字</text>
+        <view class="edit-field">
+          <input class="edit-input text-picker-input" value="{{textPickerForm.text}}" bindinput="onTextPickerFieldChange" data-field="text" placeholder="输入文字内容" />
+        </view>
+
+      </view>
+
+      <view class="edit-actions">
+        <view class="btn btn-cancel" catchtap="closeTextPicker">取消</view>
+        <view class="btn btn-confirm" catchtap="addCustomText">添加</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 图标选择器弹窗 -->
+  <view wx:if="{{showIconPicker}}" class="icon-picker-mask" catchtap="closeIconPicker">
+    <view class="icon-picker" catchtap="stopPropagation">
+      <view class="picker-title">{{iconPickerMode === 'background' ? '选择背景图' : '选择图标'}}</view>
+      <view class="icon-grid">
+        <view
+          wx:for="{{iconList}}"
+          wx:key="name"
+          class="icon-item"
+          bindtap="selectIcon"
+          data-path="{{item.path}}"
+          data-naturalw="{{item.naturalW}}"
+          data-naturalh="{{item.naturalH}}"
+        >
+          <image class="icon-thumb" src="{{item.path}}" mode="aspectFit" />
+          <text class="icon-name">{{item.name}}</text>
+        </view>
+        <!-- 自定义图片 + 按钮 -->
+        <view class="icon-item icon-item-add" bindtap="selectCustomImage">
+          <view class="icon-add-box">
+            <text class="icon-add-sign">+</text>
+          </view>
+          <text class="icon-name">自定义</text>
+        </view>
+
+      </view>
+      <view class="picker-hint">将图标文件放入 images/icons/ 目录并更新 icons.js 即可扩充</view>
+      <view class="edit-actions">
+        <view class="btn btn-cancel" catchtap="closeIconPicker">取消</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 模板选择器弹窗（仅反面可用，完全填充卡片） -->
+  <view wx:if="{{showTemplatePicker}}" class="template-picker-mask" catchtap="closeTemplatePicker">
+    <view class="template-picker" catchtap="stopPropagation">
+      <view class="picker-title">选择模板</view>
+      <view class="template-grid">
+        <view
+          wx:for="{{templateList}}"
+          wx:key="name"
+          class="template-item {{item.layout === layout ? '' : 'template-item-disabled'}}"
+          catchtap="selectTemplate"
+          data-path="{{item.path}}"
+          data-name="{{item.name}}"
+          data-layout="{{item.layout}}"
+        >
+          <image class="template-thumb" src="{{item.path}}" mode="aspectFit" />
+          <view class="template-info">
+            <text class="template-name">{{item.name}}</text>
+            <text wx:if="{{item.note}}" class="template-note">{{item.note}}</text>
+          </view>
+          <text class="template-layout">{{item.layout === 'horizontal' ? '横版' : '竖版'}}</text>
+        </view>
+        <!-- 清除模板 -->
+        <view class="template-item template-item-clear" catchtap="clearTemplate">
+          <view class="template-thumb template-thumb-clear">
+            <text class="template-clear-icon">✕</text>
+          </view>
+          <text class="template-name">不使用模板</text>
+        </view>
+
+      </view>
+      <view class="picker-hint">模板将完全填充卡片，替换当前背景。欢迎后台提供合适模板（应用后会署名）</view>
+      <view class="edit-actions">
+        <view class="btn btn-cancel" catchtap="closeTemplatePicker">取消</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 文字编辑弹窗 -->
+  <view wx:if="{{showEditModal}}" class="edit-modal-mask" catchtap="closeEditModal">
+    <view class="edit-modal" catchtap="stopPropagation">
+      <view class="edit-modal-title">编辑文字</view>
+
+      <view class="edit-field">
+        <text class="edit-label">文字内容</text>
+        <input class="edit-input edit-text-input" value="{{editForm.text}}" bindinput="onEditFieldChange" data-field="text" placeholder="请输入文字" style="font-size:{{editForm.fontSize}}px; line-height:1.5;" />
+      </view>
+
+      <view class="edit-row">
+        <view class="edit-field">
+          <text class="edit-label">字号 (px)</text>
+          <input class="edit-input" type="number" value="{{editForm.fontSize}}" bindinput="onEditFieldChange" data-field="fontSize" />
+        </view>
+        <view class="edit-field">
+          <text class="edit-label">粗细</text>
+          <view class="side-switch" style="margin-top:6rpx;">
+            <view class="side-btn {{editForm.fontWeight === 'normal' ? 'active' : ''}}" catchtap="onEditFieldChange" data-field="fontWeight" data-value="normal">常规</view>
+            <view class="side-btn {{editForm.fontWeight === 'bold' ? 'active' : ''}}" catchtap="onEditFieldChange" data-field="fontWeight" data-value="bold">加粗</view>
+          </view>
+        </view>
+
+      </view>
+
+      <view class="edit-field">
+        <text class="edit-label">字体</text>
+        <view class="font-options">
+          <view
+            wx:for="{{fontOptions}}"
+            wx:key="value"
+            class="font-opt {{editForm.fontFamily === item.value ? 'active' : ''}}"
+            catchtap="onEditFieldChange"
+            data-field="fontFamily"
+            data-value="{{item.value}}"
+          >{{item.label}}</view>
+        </view>
+
+      </view>
+
+      <view class="edit-field">
+        <text class="edit-label">颜色</text>
+        <view class="color-presets">
+          <view wx:for="{{colorPresets}}" wx:key="*this" class="color-dot {{editForm.color === item ? 'selected' : ''}}" style="background: {{item}};" catchtap="onEditFieldChange" data-field="color" data-value="{{item}}"></view>
+        </view>
+
+      </view>
+
+      <view class="edit-actions">
+        <view class="btn btn-cancel" catchtap="closeEditModal">取消</view>
+        <view class="btn btn-confirm" catchtap="confirmEdit">确定</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 导出弹窗 -->
+  <view wx:if="{{showExportModal}}" class="export-modal-mask" catchtap="closeExportModal">
+    <view class="export-modal" catchtap="stopPropagation">
+      <view class="picker-title">导出卡片</view>
+
+      <!-- 格式选择 -->
+      <view class="export-section">
+        <text class="export-label">导出格式</text>
+        <view class="export-row">
+          <view class="export-opt {{exportFormat === 'image' ? 'opt-active' : ''}}" bindtap="setExportFormat" data-format="image">
+            <text class="opt-icon">🖼️</text>
+            <text class="opt-name">图片</text>
+            <text class="opt-desc">PNG 格式</text>
+          </view>
+          <view class="export-opt {{exportFormat === 'pdf' ? 'opt-active' : ''}}" bindtap="setExportFormat" data-format="pdf">
+            <text class="opt-icon">📄</text>
+            <text class="opt-name">PDF</text>
+            <text class="opt-desc">文档格式</text>
+          </view>
+        </view>
+
+      </view>
+
+      <!-- 范围选择 -->
+      <view class="export-section">
+        <text class="export-label">导出范围</text>
+        <view class="export-row">
+          <view class="export-opt {{exportRange === 'current' ? 'opt-active' : ''}}" bindtap="setExportRange" data-range="current">
+            <text class="opt-icon">📄</text>
+            <text class="opt-name">当前页</text>
+            <text class="opt-desc">{{currentSide === 'front' ? '正面' : '反面'}}</text>
+          </view>
+          <view class="export-opt {{exportRange === 'all' ? 'opt-active' : ''}}" bindtap="setExportRange" data-range="all">
+            <text class="opt-icon">📑</text>
+            <text class="opt-name">全部</text>
+            <text class="opt-desc">正面 + 反面</text>
+          </view>
+        </view>
+
+      </view>
+
+      <!-- 分辨率选择 -->
+      <view class="export-section">
+        <text class="export-label">分辨率倍率</text>
+        <view class="export-row">
+          <view class="export-opt small {{exportScale === 2 ? 'opt-active' : ''}}" bindtap="setExportScale" data-scale="2">
+            <text class="opt-name">2x</text>
+          </view>
+          <view class="export-opt small {{exportScale === 3 ? 'opt-active' : ''}}" bindtap="setExportScale" data-scale="3">
+            <text class="opt-name">3x</text>
+          </view>
+          <view class="export-opt small {{exportScale === 4 ? 'opt-active' : ''}}" bindtap="setExportScale" data-scale="4">
+            <text class="opt-name">4x</text>
+          </view>
+        </view>
+
+      </view>
+
+      <view class="export-actions">
+        <view class="btn btn-cancel" catchtap="closeExportModal">取消</view>
+        <view class="btn btn-confirm" catchtap="doExport">导出</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 导出渲染用隐藏canvas -->
+  <canvas type="2d" id="exportCanvas" class="export-canvas" style="width:{{stageWidth * exportScale}}px;height:{{stageHeight * exportScale}}px;"></canvas>
+</view>
+</view>

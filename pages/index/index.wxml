@@ -70,6 +70,17 @@
           <text class="feature-desc">梅登黑德定位网格位置</text>
         </view>
       </view>
+
+      <!-- QSL卡卡片 -->
+      <view class="feature-card feature-qsl" hover-class="button-hover" bindtap="goToQSL">
+        <view class="feature-icon-wrap">
+          <text class="feature-icon">📬</text>
+        </view>
+        <view class="feature-content">
+          <text class="feature-title">QSL卡</text>
+          <text class="feature-desc">QSL卡片简洁设计</text>
+        </view>
+      </view>
     </view>
   </view>
 
@@ -77,14 +88,8 @@
   <view class="contact-stats-section">
     <view class="section-title">通联统计</view>
 
-    <!-- 维度切换 -->
-    <view class="dimension-tabs">
-      <text class="dim-label">通联足迹</text>
-      <!-- <view class="dim-tab {{statsTab === 'platform' ? 'active' : ''}}" bindtap="switchStatsTab" data-tab="platform">风云榜单</view> -->
-    </view>
-
     <!-- 个人维度：近6个月柱状图 -->
-    <view class="stats-panel" wx:if="{{statsTab === 'personal'}}">
+    <view class="stats-panel">
       <!-- 汇总统计 -->
       <view class="personal-summary">
         <text class="summary-text">近6个月：<text class="summary-num">{{personalTotal6 || 0}}</text></text>
@@ -108,34 +113,6 @@
         <text class="empty-sub">快去添加你的第一条通联吧~</text>
       </view>
     </view>
-
-    <!-- 平台维度：排行榜（暂时隐藏）
-    <view class="stats-panel" wx:if="{{statsTab === 'platform'}}">
-      <view class="rank-period-tabs">
-        <view class="rp-tab {{rankPeriod === 'month' ? 'active' : ''}}" bindtap="switchRankPeriod" data-period="month">🌙 本月榜单</view>
-        <view class="rp-tab {{rankPeriod === 'year' ? 'active' : ''}}" bindtap="switchRankPeriod" data-period="year">🏆 年度榜单</view>
-      </view>
-      <view class="rank-list" wx:if="{{rankList.length > 0}}">
-        <view wx:for="{{rankList}}" wx:key="callSign" class="rank-item">
-          <text wx:if="{{index === 0}}" class="rank-num rank-num-1">🥇</text>
-          <text wx:elif="{{index === 1}}" class="rank-num rank-num-2">🥈</text>
-          <text wx:elif="{{index === 2}}" class="rank-num rank-num-3">🥉</text>
-          <text wx:else class="rank-num">{{index + 1}}</text>
-          <view class="rank-user">
-            <text class="rank-callsign">{{item.callSign}}</text>
-            <text class="rank-nickname" wx:if="{{item.nickName}}">{{item.nickName}}</text>
-          </view>
-          <text class="rank-count">{{item.count}}次</text>
-        </view>
-      </view>
-      <view class="stats-empty" wx:if="{{rankList.length === 0 && !rankLoading}}">
-        <text>暂无排行数据</text>
-      </view>
-      <view class="stats-empty" wx:if="{{rankLoading}}">
-        <text>加载中...</text>
-      </view>
-    </view>
-    -->
   </view>
 
   <!-- 底部安全区 -->
