@@ -415,14 +415,14 @@
       <view wx:if="{{myShareList.length === 0}}" class="my-shares-empty">
         <text>暂无分享记录</text>
       </view>
-      <view wx:for="{{myShareList}}" wx:key="id" class="share-record-item">
+      <view wx:for="{{myShareList}}" wx:key="id" class="share-record-item" bindtap="viewShareDetail" data-id="{{item.id}}">
         <view class="share-record-info">
           <text class="share-record-title">{{item.shareTitle || '通联记录分享'}}</text>
           <text class="share-record-meta">剩余 {{item.expireDaysLeft}} 天有效期</text>
+          <text class="share-record-views">👁️ {{item.viewCount || 0}} 人查看</text>
         </view>
         <view class="share-record-actions">
-          <view class="share-record-share" bindtap="viewShareDetail" data-id="{{item.id}}">查看详情</view>
-          <view class="share-record-delete" bindtap="deleteShareRecord" data-id="{{item.id}}">删除</view>
+          <view class="share-record-delete" catchtap="deleteShareRecord" data-id="{{item.id}}">删除</view>
         </view>
       </view>
     </view>
@@ -467,6 +467,12 @@
           </view>
         </view>
       </view>
+    </view>
+    <!-- 底部再次分享按钮 -->
+    <view class="share-detail-footer" wx:if="{{shareDetailLogs.length > 0}}">
+      <button class="share-detail-reshare-btn" open-type="share" hover-class="button-hover">
+        📤 再次分享
+      </button>
     </view>
   </view>
 </view>

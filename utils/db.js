@@ -5,9 +5,7 @@
 
 const DB_CONFIG = {
   userProfiles: 'userProfiles',     // 用户基本信息
-  contactStats: 'contactStats',     // 通联数量统计（按月）
-  monthRankings: 'monthRankings',  // 月度排行榜（预计算）
-  yearRankings: 'yearRankings'     // 年度排行榜（预计算）
+  contactStats: 'contactStats'      // 通联数量统计（按月）
 }
 
 // ==================== 用户基本信息 ====================
@@ -407,51 +405,6 @@ function loadAllStats() {
   })
 }
 
-/**
- * 获取平台通联排行榜（直读预计算集合，无实时聚合）
- * @param {number} year  - 年份
- * @param {number} [month] - 月份（可选，不传则当年排行）
- * @returns {Promise<Array>} [{ rank, callSign, nickName, avatarUrl, count }]
- */
-function getPlatformStats(year, month) {
-  return new Promise((resolve) => {
-    try {
-      const db = wx.cloud.database()
-      const collectionName = month != null ? DB_CONFIG.monthRankings : DB_CONFIG.yearRankings
-      const query = month != null ? { year, month } : { year }
-
-      db.collection(collectionName)
-        .where(query)
-        .orderBy('updatedAt', 'desc')
-        .limit(1)
-        .get()
-        .then(res => {
-          resolve(res.data.length > 0 ? (res.data[0].rankings || []) : [])
-        })
-        .catch(err => {
-          console.error('getPlatformStats 查询失败', err)
-          resolve([])
-        })
-    } catch (e) {
-      console.error('getPlatformStats 异常', e)
-      resolve([])
-    }
-  })
-}
-
-/**
- * 触发云端排行榜重建（fire-and-forget）
- * 在通联数据变更后调用，后台异步更新 monthRankings / yearRankings
- */
-function triggerRebuildRankings() {
-  wx.cloud.callFunction({
-    name: 'rebuildRankings',
-    data: {}
-  }).then(() => {}).catch(err => {
-    console.error('triggerRebuildRankings 失败', err)
-  })
-}
-
 module.exports = {
   DB_CONFIG,
   syncUserProfile,
@@ -463,7 +416,5 @@ module.exports = {
   recomputeMonthForLog,
   loadYearStats,
   syncStatsFromLocalLogs,
-  loadAllStats,
-  getPlatformStats,
-  triggerRebuildRankings
+  loadAllStats
 }

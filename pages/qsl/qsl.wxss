@@ -906,6 +906,15 @@
   top: -9999px;
 }
 
+/* 隐藏分享用canvas */
+.share-canvas {
+  position: fixed;
+  left: -9999px;
+  top: -9999px;
+  width: 500px;
+  height: 400px;
+}
+
 /* ========== 旧弹窗类名兼容 ========== */
 .icon-picker-mask,
 .edit-modal-mask,

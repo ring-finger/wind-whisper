@@ -164,10 +164,17 @@ Page({
 
   onLoad() {
     this._elemId = 0
-    this._dpr = wx.getSystemInfoSync().pixelRatio || 2
+    this._dpr = wx.getDeviceInfo().pixelRatio || 2
     this.loadTheme()
     this._loadDesign()
     this._initStage()
+
+    // 初始化分享缓存
+    this._cache = this._cache || {}
+    this._cache.shareImagePath = ''
+
+    // 预生成分享图片
+    setTimeout(() => this._generateShareCard(), 1000)
   },
 
   onShow() {
@@ -1790,4 +1797,141 @@ Page({
 
   stopPropagation() {},
 
+  // ==================== 分享功能 ====================
+
+  /** 生成QSL卡分享卡片 */
+  _generateShareCard() {
+    const ctx = wx.createCanvasContext('shareCanvas', this)
+
+    // Canvas 尺寸
+    const W = 500
+    const H = 400
+    const pad = 30
+    const cardW = W - pad * 2
+    const cardH = 240
+    const cardX = pad
+    const cardY = 80
+
+    // 1. 页面背景色
+    ctx.setFillStyle('#F4F7FA')
+    ctx.fillRect(0, 0, W, H)
+
+    // 2. 标题区域
+    ctx.setFillStyle('#1A2B42')
+    ctx.setFontSize(24)
+    ctx.font = 'normal bold 24px sans-serif'
+    ctx.setTextAlign('center')
+    ctx.setTextBaseline('middle')
+    ctx.fillText('QSL 卡片设计器', W / 2, 40)
+
+    // 3. 绘制QSL卡片预览
+    // 卡片阴影
+    ctx.setShadow(0, 4, 20, 'rgba(58, 85, 130, 0.15)')
+
+    // 卡片背景（渐变）
+    const cardGrad = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY + cardH)
+    cardGrad.addColorStop(0, '#FFFFFF')
+    cardGrad.addColorStop(1, '#F8F9FA')
+    ctx.setFillStyle(cardGrad)
+
+    // 圆角矩形
+    const r = 12
+    ctx.beginPath()
+    ctx.moveTo(cardX + r, cardY)
+    ctx.lineTo(cardX + cardW - r, cardY)
+    ctx.arcTo(cardX + cardW, cardY, cardX + cardW, cardY + r, r)
+    ctx.lineTo(cardX + cardW, cardY + cardH - r)
+    ctx.arcTo(cardX + cardW, cardY + cardH, cardX + cardW - r, cardY + cardH, r)
+    ctx.lineTo(cardX + r, cardY + cardH)
+    ctx.arcTo(cardX, cardY + cardH, cardX, cardY + cardH - r, r)
+    ctx.lineTo(cardX, cardY + r)
+    ctx.arcTo(cardX, cardY, cardX + r, cardY, r)
+    ctx.closePath()
+    ctx.fill()
+    ctx.setShadow(0, 0, 0, 'transparent')
+
+    // 4. 绘制卡片内容（模拟QSL卡片）
+    // 顶部彩色条
+    const barGrad = ctx.createLinearGradient(cardX + 20, 0, cardX + cardW - 20, 0)
+    barGrad.addColorStop(0, '#2C5C97')
+    barGrad.addColorStop(1, '#D84315')
+    ctx.setFillStyle(barGrad)
+    ctx.fillRect(cardX + 20, cardY + 20, cardW - 40, 6)
+
+    // 标题
+    ctx.setFillStyle('#1A2B42')
+    ctx.setFontSize(18)
+    ctx.font = 'normal bold 18px sans-serif'
+    ctx.setTextAlign('left')
+    ctx.fillText('QSL CARD', cardX + 25, cardY + 55)
+
+    // 分割线
+    ctx.setStrokeStyle('#E8ECF0')
+    ctx.setLineWidth(1)
+    ctx.beginPath()
+    ctx.moveTo(cardX + 25, cardY + 70)
+    ctx.lineTo(cardX + cardW - 25, cardY + 70)
+    ctx.stroke()
+
+    // 模拟文字行
+    ctx.setFillStyle('#5B697F')
+    ctx.setFontSize(12)
+    ctx.font = 'normal normal 12px sans-serif'
+    const lines = ['呼号: B____', '日期: ____-__-__', '时间: __:__', '频率: _____MHz', '模式: _____']
+    lines.forEach((line, i) => {
+      ctx.fillText(line, cardX + 30, cardY + 95 + i * 22)
+    })
+
+    // 右侧模拟图标区域
+    ctx.setFillStyle('#E3F2FD')
+    ctx.fillRect(cardX + cardW - 100, cardY + 90, 70, 70)
+    ctx.setFillStyle('#1E88E5')
+    ctx.setFontSize(32)
+    ctx.setTextAlign('center')
+    ctx.fillText('📻', cardX + cardW - 65, cardY + 125)
+
+    // 底部提示
+    ctx.setFillStyle('#8E99A8')
+    ctx.setFontSize(13)
+    ctx.setTextAlign('center')
+    ctx.fillText('设计专属QSL卡片 · 记录每一次通联', W / 2, H - 40)
+
+    // 提交绘制并导出图片
+    ctx.draw(false, () => {
+      setTimeout(() => {
+        wx.canvasToTempFilePath({
+          canvasId: 'shareCanvas',
+          fileType: 'png',
+          quality: 1,
+          destWidth: 1000,
+          destHeight: 800,
+          success: (res) => {
+            this._cache.shareImagePath = res.tempFilePath
+            console.log('QSL分享卡片生成成功:', res.tempFilePath)
+          },
+          fail: (err) => {
+            console.error('生成QSL分享卡片失败', err)
+          }
+        }, this)
+      }, 300)
+    })
+  },
+
+  onShareAppMessage() {
+    const shareImagePath = this._cache.shareImagePath || ''
+    return {
+      title: 'QSL 卡片设计器 - 风语纪',
+      path: '/pages/qsl/qsl',
+      imageUrl: shareImagePath || '/images/cover.jpg'
+    }
+  },
+
+  onShareTimeline() {
+    const shareImagePath = this._cache.shareImagePath || ''
+    return {
+      title: 'QSL 卡片设计器 - 风语纪',
+      query: '',
+      imageUrl: shareImagePath || '/images/cover.jpg'
+    }
+  }
 })

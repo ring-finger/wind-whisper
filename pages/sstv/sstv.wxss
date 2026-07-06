@@ -18,6 +18,15 @@ page {
   left: -1000rpx;
 }
 
+/* 分享用canvas */
+.share-canvas {
+  position: fixed;
+  left: -9999px;
+  top: -9999px;
+  width: 500px;
+  height: 400px;
+}
+
 /* 标签栏 */
 .tab-bar {
   display: flex;

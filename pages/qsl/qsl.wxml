@@ -438,5 +438,8 @@
 
   <!-- 导出渲染用隐藏canvas -->
   <canvas type="2d" id="exportCanvas" class="export-canvas" style="width:{{stageWidth * exportScale}}px;height:{{stageHeight * exportScale}}px;"></canvas>
+
+  <!-- 分享图片生成用隐藏canvas -->
+  <canvas canvas-id="shareCanvas" class="share-canvas"></canvas>
 </view>
 </view>

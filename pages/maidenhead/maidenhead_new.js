@@ -172,10 +172,19 @@ Page({
     this.loadTheme()
     this.requestLocation()
     this.mapCtx = wx.createMapContext('maidenheadMap', this)
+    // 延迟初始化分享 canvas
+    setTimeout(() => this._initShareCanvas(), 500)
   },
 
   onShow() {
     this.loadTheme()
+  },
+
+  onReady() {
+    // 确保 canvas 初始化
+    if (!this._shareCanvas) {
+      this._initShareCanvas()
+    }
   },
 
   // ==================== 主题 ====================
@@ -312,120 +321,171 @@ Page({
   },
 
   onReady() {
-    // 页面渲染完成后，如果已经定位成功，生成分享卡片
-    if (this.data.locationReady && this.data.currGrid) {
-      setTimeout(() => this._generateShareCard(), 500)
-    }
+    // 页面渲染完成后初始化分享 canvas
+    this._initShareCanvas()
   },
 
-  /** 生成梅登黑德分享卡片（使用旧版Canvas API） */
-  _generateShareCard(callback) {
+  /** 初始化分享 canvas */
+  _initShareCanvas() {
+    const query = wx.createSelectorQuery().in(this)
+    query.select('#shareCanvas')
+      .fields({ node: true, size: true })
+      .exec((res) => {
+        if (res && res[0] && res[0].node) {
+          this._shareCanvas = res[0].node
+          this._shareCtx = this._shareCanvas.getContext('2d')
+          // 初始生成一次分享卡片
+          if (this.data.locationReady && this.data.currGrid) {
+            this._generateShareCard()
+          }
+        } else {
+          // 重试
+          setTimeout(() => this._initShareCanvas(), 300)
+        }
+      })
+  },
+
+  /** 生成梅登黑德分享卡片（使用首页梅登黑德卡片样式） */
+  _generateShareCard() {
     const { locationReady, currGrid, currLat, currLng, currPrecisionName } = this.data
-    if (!locationReady || !currGrid) {
-      callback && callback(false)
+    if (!locationReady || !currGrid) return
+    if (!this._shareCanvas || !this._shareCtx) {
+      this._initShareCanvas()
       return
     }
 
-    const ctx = wx.createCanvasContext('shareCanvas', this)
-    const width = 500
-    const height = 400
+    const canvas = this._shareCanvas
+    const ctx = this._shareCtx
+    const dpr = wx.getDeviceInfo().pixelRatio
+    const width = 1000
+    const height = 800
     
-    // 清空画布 - 使用浅灰色背景
-    ctx.setFillStyle('#F5F7FA')
+    // 设置 canvas 尺寸
+    canvas.width = width * dpr
+    canvas.height = height * dpr
+    ctx.scale(dpr, dpr)
+    
+    // 清空画布 - 使用浅灰色背景（模拟页面背景）
+    ctx.fillStyle = '#F5F7FA'
     ctx.fillRect(0, 0, width, height)
     
-    // 绘制卡片背景（白色圆角卡片）
-    const cardX = 25
-    const cardY = 25
-    const cardW = width - 50
-    const cardH = height - 50
+    // 绘制圆角卡片（模仿首页梅登黑德卡片）
+    const cardX = 60
+    const cardY = 60
+    const cardW = width - 120
+    const cardH = height - 120
+    const cardRadius = 40
     
-    ctx.setFillStyle('#FFFFFF')
-    ctx.setShadow(0, 4, 20, 'rgba(0, 0, 0, 0.08)')
-    ctx.fillRect(cardX, cardY, cardW, cardH)
-    ctx.setShadow(0, 0, 0, 'transparent')
+    // 卡片渐变背景（#E3F2FD 到白色）
+    const cardGradient = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY + cardH)
+    cardGradient.addColorStop(0, '#E3F2FD')
+    cardGradient.addColorStop(1, '#FFFFFF')
     
-    // 绘制顶部蓝色条
-    ctx.setFillStyle('#1E88E5')
-    ctx.fillRect(cardX, cardY, cardW, 8)
-    
-    // 绘制圆形图标背景（纯色）
-    const iconCenterX = width / 2
-    const iconCenterY = 100
-    const iconRadius = 35
-    
+    // 绘制圆角矩形
     ctx.beginPath()
-    ctx.arc(iconCenterX, iconCenterY, iconRadius, 0, 2 * Math.PI)
-    ctx.setFillStyle('#1E88E5')
+    ctx.moveTo(cardX + cardRadius, cardY)
+    ctx.lineTo(cardX + cardW - cardRadius, cardY)
+    ctx.arcTo(cardX + cardW, cardY, cardX + cardW, cardY + cardRadius, cardRadius)
+    ctx.lineTo(cardX + cardW, cardY + cardH - cardRadius)
+    ctx.arcTo(cardX + cardW, cardY + cardH, cardX + cardW - cardRadius, cardY + cardH, cardRadius)
+    ctx.lineTo(cardX + cardRadius, cardY + cardH)
+    ctx.arcTo(cardX, cardY + cardH, cardX, cardY + cardH - cardRadius, cardRadius)
+    ctx.lineTo(cardX, cardY + cardRadius)
+    ctx.arcTo(cardX, cardY, cardX + cardRadius, cardY, cardRadius)
+    ctx.closePath()
+    
+    // 填充卡片背景
+    ctx.fillStyle = cardGradient
     ctx.fill()
     
+    // 添加阴影效果
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.08)'
+    ctx.shadowBlur = 30
+    ctx.shadowOffsetX = 0
+    ctx.shadowOffsetY = 8
+    
+    // 绘制圆形图标背景（蓝色到青色渐变）
+    const iconCenterX = width / 2
+    const iconCenterY = 200
+    const iconRadius = 80
+    
+    ctx.beginPath()
+    ctx.arc(iconCenterX, iconCenterY, iconRadius, 0, Math.PI * 2)
+    const iconGradient = ctx.createLinearGradient(
+      iconCenterX - iconRadius,
+      iconCenterY - iconRadius,
+      iconCenterX + iconRadius,
+      iconCenterY + iconRadius
+    )
+    iconGradient.addColorStop(0, '#1E88E5')
+    iconGradient.addColorStop(1, '#26A69A')
+    ctx.fillStyle = iconGradient
+    ctx.fill()
+    
+    // 重置阴影
+    ctx.shadowColor = 'transparent'
+    ctx.shadowBlur = 0
+    ctx.shadowOffsetX = 0
+    ctx.shadowOffsetY = 0
+    
     // 绘制地图图标
-    ctx.setFontSize(35)
-    ctx.setTextAlign('center')
-    ctx.setTextBaseline('middle')
-    ctx.setFillStyle('#FFFFFF')
+    ctx.font = '80px sans-serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
     ctx.fillText('🗺️', iconCenterX, iconCenterY)
     
     // 绘制标题 "梅登黑德定位"
-    ctx.setFillStyle('#333333')
-    ctx.setFontSize(22)
-    ctx.setTextAlign('center')
-    ctx.fillText('梅登黑德定位', iconCenterX, 160)
+    ctx.textBaseline = 'alphabetic'
+    ctx.fillStyle = '#333333'
+    ctx.font = 'bold 48px sans-serif'
+    ctx.textAlign = 'center'
+    ctx.fillText('梅登黑德定位', iconCenterX, 340)
     
-    // 绘制描述
-    ctx.setFillStyle('#666666')
-    ctx.setFontSize(13)
-    ctx.fillText('梅登黑德定位网格位置', iconCenterX, 185)
+    // 绘制描述 "梅登黑德定位网格位置"
+    ctx.fillStyle = '#666666'
+    ctx.font = '28px sans-serif'
+    ctx.fillText('梅登黑德定位网格位置', iconCenterX, 385)
     
     // 分隔线
+    const lineY = 430
     ctx.beginPath()
-    ctx.moveTo(width / 2 - 80, 210)
-    ctx.lineTo(width / 2 + 80, 210)
-    ctx.setStrokeStyle('#E0E0E0')
-    ctx.setLineWidth(0.5)
+    ctx.moveTo(width / 2 - 150, lineY)
+    ctx.lineTo(width / 2 + 150, lineY)
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.06)'
+    ctx.lineWidth = 1
     ctx.stroke()
     
     // 网格代码（大字体，使用主题色）
-    ctx.setFillStyle('#1E88E5')
-    ctx.setFontSize(48)
-    ctx.setTextAlign('center')
-    ctx.fillText(currGrid, iconCenterX, 260)
+    ctx.fillStyle = '#1E88E5'
+    ctx.font = 'bold 100px monospace'
+    ctx.textAlign = 'center'
+    ctx.fillText(currGrid, iconCenterX, 530)
     
     // 精度信息
-    ctx.setFillStyle('#999999')
-    ctx.setFontSize(12)
-    ctx.fillText(currPrecisionName, iconCenterX, 285)
+    ctx.fillStyle = '#999999'
+    ctx.font = '26px sans-serif'
+    ctx.fillText(currPrecisionName, iconCenterX, 580)
     
     // 坐标信息
-    ctx.setFillStyle('#666666')
-    ctx.setFontSize(15)
-    ctx.fillText(`${currLat}°, ${currLng}°`, iconCenterX, 315)
+    ctx.fillStyle = '#666666'
+    ctx.font = '32px monospace'
+    ctx.fillText(`${currLat}°, ${currLng}°`, iconCenterX, 640)
     
     // 底部应用名称
-    ctx.setFillStyle('#999999')
-    ctx.setFontSize(11)
-    ctx.fillText('风语纪 · 业余无线电工具', iconCenterX, height - 40)
+    ctx.fillStyle = '#999999'
+    ctx.font = '24px sans-serif'
+    ctx.fillText('风语纪 · 业余无线电工具', iconCenterX, height - 90)
     
-    // 提交绘制并导出图片
-    ctx.draw(false, () => {
-      setTimeout(() => {
-        wx.canvasToTempFilePath({
-          canvasId: 'shareCanvas',
-          fileType: 'png',
-          quality: 1,
-          destWidth: 1000,  // 导出图片的目标宽度（像素）
-          destHeight: 800,  // 导出图片的目标高度（像素）
-          success: (res) => {
-            this.setData({ shareImagePath: res.tempFilePath })
-            console.log('分享卡片生成成功:', res.tempFilePath)
-            callback && callback(true, res.tempFilePath)
-          },
-          fail: (err) => {
-            console.error('生成分享卡片失败', err)
-            callback && callback(false)
-          }
-        }, this)
-      }, 300)
+    // 导出为临时图片
+    wx.canvasToTempFilePath({
+      canvas: canvas,
+      success: (res) => {
+        this.setData({ shareImagePath: res.tempFilePath })
+        console.log('分享卡片生成成功:', res.tempFilePath)
+      },
+      fail: (err) => {
+        console.error('生成分享卡片失败', err)
+      }
     })
   },
 
@@ -487,20 +547,15 @@ Page({
   // ==================== 分享 ====================
 
   onShareAppMessage() {
-    const { locationReady, currGrid, shareImagePath } = this.data
-    
-    // 如果还没有生成分享图，尝试生成
-    if (!shareImagePath && locationReady && currGrid) {
-      console.log('分享时检测到无分享图，开始生成...')
+    // 确保分享卡片已生成
+    if (!this.data.shareImagePath && this.data.locationReady) {
       this._generateShareCard()
     }
     
+    const { locationReady, currGrid, shareImagePath } = this.data
     const title = locationReady && currGrid
       ? `我的梅登黑德网格: ${currGrid}`
       : '梅登黑德定位 - 地图定位与网格编码'
-    
-    console.log('onShareAppMessage, 使用图片:', shareImagePath || '默认图片')
-    
     return {
       title,
       path: '/pages/maidenhead/maidenhead',
@@ -509,20 +564,15 @@ Page({
   },
 
   onShareTimeline() {
-    const { locationReady, currGrid, currLat, currLng, shareImagePath } = this.data
-    
-    // 如果还没有生成分享图，尝试生成
-    if (!shareImagePath && locationReady && currGrid) {
-      console.log('分享时检测到无分享图，开始生成...')
+    // 确保分享卡片已生成
+    if (!this.data.shareImagePath && this.data.locationReady) {
       this._generateShareCard()
     }
     
+    const { locationReady, currGrid, currLat, currLng, shareImagePath } = this.data
     const title = locationReady && currGrid
       ? `梅登黑德网格 ${currGrid} (${currLat}, ${currLng})`
       : '梅登黑德定位 - 地图定位与网格编码'
-    
-    console.log('onShareTimeline, 使用图片:', shareImagePath || '默认图片')
-    
     return {
       title,
       query: 'page=maidenhead',

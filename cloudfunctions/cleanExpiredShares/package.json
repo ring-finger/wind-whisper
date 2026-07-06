@@ -1,7 +1,7 @@
 {
-  "name": "rebuildRankings",
+  "name": "cleanExpiredShares",
   "version": "1.0.0",
-  "description": "Rebuild platform rankings from contactStats",
+  "description": "每天凌晨清理过期的分享记录",
   "main": "index.js",
   "dependencies": {
     "wx-server-sdk": "~2.6.3"

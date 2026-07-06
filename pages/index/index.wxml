@@ -124,5 +124,8 @@
       <text class="fab-icon">+</text>
     </view>
   </view>
+
+  <!-- 分享卡片 canvas（隐藏） -->
+  <canvas type="2d" id="shareCanvas" class="share-canvas"></canvas>
   </view>
 </view>

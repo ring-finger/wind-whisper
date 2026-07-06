@@ -61,6 +61,9 @@ Page({
       animation: { duration: 0, timingFunc: 'linear' }
     })
     this.initSSTV()
+
+    // 预生成分享图片
+    setTimeout(() => this._generateShareCard(), 1000)
   },
 
   onShow() {
@@ -892,5 +895,131 @@ Page({
         wx.showToast({ title: '链接已复制', icon: 'success' })
       }
     })
+  },
+
+  // ==================== 分享功能 ====================
+
+  /** 生成SSTV分享卡片 */
+  _generateShareCard() {
+    const ctx = wx.createCanvasContext('shareCanvas', this)
+
+    // Canvas 尺寸
+    const W = 500
+    const H = 400
+    const pad = 30
+    const cardW = W - pad * 2
+    const cardH = 200
+    const cardX = pad
+    const cardY = 100
+
+    // 1. 页面背景色
+    ctx.setFillStyle('#F5F6FA')
+    ctx.fillRect(0, 0, W, H)
+
+    // 2. 标题区域
+    ctx.setFillStyle('#1A2B42')
+    ctx.setFontSize(24)
+    ctx.font = 'normal bold 24px sans-serif'
+    ctx.setTextAlign('center')
+    ctx.setTextBaseline('middle')
+    ctx.fillText('SSTV 图像传输', W / 2, 40)
+
+    // 3. 绘制SSTV卡片预览
+    // 卡片阴影
+    ctx.setShadow(0, 4, 20, 'rgba(58, 85, 130, 0.15)')
+
+    // 卡片背景（渐变）
+    const cardGrad = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY + cardH)
+    cardGrad.addColorStop(0, '#E8F5E9')
+    cardGrad.addColorStop(1, '#FFFFFF')
+    ctx.setFillStyle(cardGrad)
+
+    // 圆角矩形
+    const r = 12
+    ctx.beginPath()
+    ctx.moveTo(cardX + r, cardY)
+    ctx.lineTo(cardX + cardW - r, cardY)
+    ctx.arcTo(cardX + cardW, cardY, cardX + cardW, cardY + r, r)
+    ctx.lineTo(cardX + cardW, cardY + cardH - r)
+    ctx.arcTo(cardX + cardW, cardY + cardH, cardX + cardW - r, cardY + cardH, r)
+    ctx.lineTo(cardX + r, cardY + cardH)
+    ctx.arcTo(cardX, cardY + cardH, cardX, cardY + cardH - r, r)
+    ctx.lineTo(cardX, cardY + r)
+    ctx.arcTo(cardX, cardY, cardX + r, cardY, r)
+    ctx.closePath()
+    ctx.fill()
+    ctx.setShadow(0, 0, 0, 'transparent')
+
+    // 4. 绘制SSTV图标和文字
+    // 左侧图标
+    const iconGrad = ctx.createLinearGradient(cardX + 40, cardY + 60, cardX + 100, cardY + 120)
+    iconGrad.addColorStop(0, '#388E3C')
+    iconGrad.addColorStop(1, '#D84315')
+    ctx.setFillStyle(iconGrad)
+    ctx.fillRect(cardX + 40, cardY + 60, 60, 60)
+
+    ctx.setFillStyle('#FFFFFF')
+    ctx.setFontSize(32)
+    ctx.setTextAlign('center')
+    ctx.setTextBaseline('middle')
+    ctx.fillText('🖼️', cardX + 70, cardY + 90)
+
+    // 右侧文字
+    ctx.setFillStyle('#1A2B42')
+    ctx.setFontSize(18)
+    ctx.font = 'normal bold 18px sans-serif'
+    ctx.setTextAlign('left')
+    ctx.fillText('慢扫描电视', cardX + 130, cardY + 75)
+
+    ctx.setFillStyle('#5B697F')
+    ctx.setFontSize(13)
+    ctx.font = 'normal normal 13px sans-serif'
+    ctx.fillText('支持 Robot36 / Scottie1 模式', cardX + 130, cardY + 105)
+    ctx.fillText('编码图片为音频信号', cardX + 130, cardY + 130)
+    ctx.fillText('解码音频为图片', cardX + 130, cardY + 155)
+
+    // 底部提示
+    ctx.setFillStyle('#8E99A8')
+    ctx.setFontSize(13)
+    ctx.setTextAlign('center')
+    ctx.fillText('图片与声音的转换 · SSTV编码解码', W / 2, H - 40)
+
+    // 提交绘制并导出图片
+    ctx.draw(false, () => {
+      setTimeout(() => {
+        wx.canvasToTempFilePath({
+          canvasId: 'shareCanvas',
+          fileType: 'png',
+          quality: 1,
+          destWidth: 1000,
+          destHeight: 800,
+          success: (res) => {
+            this._shareImagePath = res.tempFilePath
+            console.log('SSTV分享卡片生成成功:', res.tempFilePath)
+          },
+          fail: (err) => {
+            console.error('生成SSTV分享卡片失败', err)
+          }
+        }, this)
+      }, 300)
+    })
+  },
+
+  onShareAppMessage() {
+    const shareImagePath = this._shareImagePath || ''
+    return {
+      title: 'SSTV图像传输 - 风语纪',
+      path: '/pages/sstv/sstv',
+      imageUrl: shareImagePath || '/images/cover.jpg'
+    }
+  },
+
+  onShareTimeline() {
+    const shareImagePath = this._shareImagePath || ''
+    return {
+      title: 'SSTV图像传输 - 风语纪',
+      query: '',
+      imageUrl: shareImagePath || '/images/cover.jpg'
+    }
   }
 })

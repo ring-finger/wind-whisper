@@ -10,6 +10,18 @@ function pad2(n) {
   return String(n).padStart(2, '0')
 }
 
+// 格式化过期时间为"xx月xx号"格式
+function formatExpireDate(expireTime) {
+  try {
+    const date = new Date(expireTime)
+    const month = date.getMonth() + 1
+    const day = date.getDate()
+    return `${month}月${day}号`
+  } catch (e) {
+    return `${SHARE_EXPIRE_DAYS}天`
+  }
+}
+
 function ymdFromParts(y, m, day) {
   return `${y}-${pad2(m)}-${pad2(day)}`
 }
@@ -153,6 +165,7 @@ Page({
     shareDetailData: {},
     // 分享来源
     shareOwnerCallSign: '',
+    currentShareExpireTime: null,  // 当前查看的分享的过期时间
     showShareGuide: false,
     _shareGuideShown: false,
     // 更多菜单
@@ -178,6 +191,7 @@ Page({
     }
 
     if (options && options.shareId) {
+      console.log('[onLoad] 检测到分享链接，shareId:', options.shareId)
       this.loadSharedLogs(options.shareId)
     }
 
@@ -297,6 +311,7 @@ Page({
   },
 
   loadSharedLogs(shareId) {
+    console.log('[loadSharedLogs] 开始加载分享，shareId:', shareId)
     // 显示加载提示
     wx.showLoading({ title: '加载分享...' })
     
@@ -307,6 +322,13 @@ Page({
     db.collection('shareLogs').doc(shareId).get().then(res => {
       wx.hideLoading()
       if (res.data) {
+        // 存储过期时间，用于分享时显示
+        this.setData({
+          currentShareExpireTime: res.data.expireTime
+        })
+        
+        // 记录查看统计
+        this.recordShareView(shareId)
         this._displaySharedLogs(res.data)
       } else {
         wx.showToast({ title: '分享记录不存在', icon: 'none' })
@@ -315,6 +337,30 @@ Page({
       wx.hideLoading()
       console.error('加载分享记录失败', err)
       wx.showToast({ title: '加载分享失败', icon: 'none' })
+    })
+  },
+
+  // 记录分享查看统计
+  recordShareView(shareId) {
+    if (!shareId) {
+      console.error('[recordShareView] shareId为空，跳过')
+      return
+    }
+    console.log('[recordShareView] 开始记录查看统计，shareId:', shareId)
+    // 调用云函数记录查看统计
+    wx.cloud.callFunction({
+      name: 'recordShareView',
+      data: { shareId }
+    }).then(res => {
+      if (res.result.success) {
+        console.log('查看统计已更新，查看人数：', res.result.viewCount)
+      } else {
+        console.error('记录查看统计失败，错误：', res.result.error)
+        wx.showToast({ title: '统计更新失败', icon: 'none', duration: 1500 })
+      }
+    }).catch(err => {
+      console.error('调用云函数recordShareView失败，请确认云函数已部署：', err)
+      wx.showToast({ title: '云函数未部署', icon: 'none', duration: 2000 })
     })
   },
 
@@ -632,16 +678,26 @@ Page({
         logs: selectedLogsData,
         myCallSign: myCallSign,
         createTime: db.serverDate(),
-        expireTime: db.serverDate({ offset: SHARE_EXPIRE_MS })
+        expireTime: db.serverDate({ offset: SHARE_EXPIRE_MS }),
+        viewers: [],  // 初始化查看者数组
+        viewCount: 0    // 初始化查看次数
       }
 
       return shareCollection.add({
         data: shareData
       }).then(res => {
+        // 计算过期时间（用于分享标题）
+        const now = new Date()
+        const expireDate = new Date(now.getTime() + SHARE_EXPIRE_MS)
+        
         // 保存到全局，供 onShareAppMessage 使用
         const app = getApp()
         app.globalData.currentShareId = res._id
-        app.globalData.currentShareData = { myCallSign, logs: selectedLogsData }
+        app.globalData.currentShareData = { 
+          myCallSign, 
+          logs: selectedLogsData,
+          expireTime: expireDate.toISOString()  // 保存过期时间
+        }
         app.globalData.currentShareImage = imagePath
         
         // 保存到我的分享列表
@@ -699,21 +755,105 @@ Page({
       let myShares = wx.getStorageSync('myShares') || []
       const now = Date.now()
       
-      // 过滤并计算剩余天数
+      // 过滤并计算剩余天数，同时初始化 viewCount 为 0
       myShares = myShares.filter(share => {
         const expireTime = new Date(share.createTime).getTime() + SHARE_EXPIRE_MS
         share.expireDaysLeft = Math.max(0, Math.ceil((expireTime - now) / (24 * 60 * 60 * 1000)))
+        // 确保 viewCount 字段存在
+        if (share.viewCount === undefined) {
+          share.viewCount = 0
+        }
         return share.expireDaysLeft > 0
       })
       
       wx.setStorageSync('myShares', myShares)
+      
+      // 从云端获取查看统计
+      if (myShares.length > 0) {
+        this.loadShareViewStats(myShares)
+      } else {
+        this.setData({
+          myShareList: myShares,
+          myShareCount: myShares.length
+        })
+      }
+    } catch (e) {
+      console.error('加载分享记录失败', e)
+    }
+  },
+
+  // 从云端加载分享查看统计
+  loadShareViewStats(myShares) {
+    const db = wx.cloud.database()
+    const shareIds = myShares.map(share => share.id)
+    
+    if (shareIds.length === 0) {
       this.setData({
         myShareList: myShares,
         myShareCount: myShares.length
       })
-    } catch (e) {
-      console.error('加载分享记录失败', e)
+      return
     }
+    
+    console.log('[loadShareViewStats] 开始加载分享统计，本地shareIds:', shareIds)
+    
+    // 逐个查询分享的查看统计（避免 .where().in() 在某些情况下的兼容性问题）
+    const promises = shareIds.map(shareId => {
+      return db.collection('shareLogs').doc(shareId).get().then(res => {
+        return { id: shareId, data: res.data || null }
+      }).catch(err => {
+        console.warn('[loadShareViewStats] 查询分享失败，id:', shareId, '错误:', err)
+        return { id: shareId, data: null }
+      })
+    })
+    
+    Promise.all(promises).then(results => {
+      const shareStats = {}
+      let foundCount = 0
+      results.forEach(({ id, data }) => {
+        if (data) {
+          foundCount++
+          const viewers = data.viewers || []
+          const viewCount = data.viewCount || viewers.length
+          shareStats[id] = {
+            viewCount: viewCount,
+            viewers: viewers
+          }
+        }
+      })
+      
+      console.log(`[loadShareViewStats] 查询完成，共 ${shareIds.length} 条分享，找到 ${foundCount} 条云端数据，详细数据:`, shareStats)
+      
+      // 更新分享列表中的查看统计
+      const updatedShares = myShares.map(share => {
+        const stats = shareStats[share.id]
+        return {
+          ...share,
+          viewCount: stats ? stats.viewCount : 0
+        }
+      })
+      
+      console.log('[loadShareViewStats] 更新后的分享列表:', updatedShares.map(s => ({ id: s.id, viewCount: s.viewCount, title: s.shareTitle })))
+      
+      // 缓存更新后的分享列表
+      try {
+        wx.setStorageSync('myShares', updatedShares)
+      } catch (e) {
+        console.error('缓存分享列表失败', e)
+      }
+      
+      this.setData({
+        myShareList: updatedShares,
+        myShareCount: updatedShares.length
+      })
+    }).catch(err => {
+      console.error('[loadShareViewStats] 加载分享统计失败', err)
+      // 即使加载统计失败，也显示分享列表
+      this.setData({
+        myShareList: myShares,
+        myShareCount: myShares.length
+      })
+    })
   },
 
   // 显示我的分享弹窗
@@ -767,7 +907,9 @@ Page({
         shareDetailLogs: logs,
         shareDetailData: {
           myCallSign: shareData.myCallSign,
-          logCount: logs.length
+          logCount: logs.length,
+          shareId: shareId,  // 存储shareId用于再次分享
+          expireTime: shareData.expireTime  // 存储过期时间
         }
       })
     }).catch(err => {
@@ -779,7 +921,11 @@ Page({
 
   // 隐藏分享详情弹窗
   hideShareDetail() {
-    this.setData({ showShareDetailModal: false })
+    this.setData({ 
+      showShareDetailModal: false,
+      // 清除shareId避免影响其他分享场景
+      'shareDetailData.shareId': ''
+    })
   },
 
   // 删除分享记录
@@ -1896,6 +2042,41 @@ Page({
   },
 
   onShareAppMessage(res) {
+    // 场景1：从分享详情弹窗再次分享（使用相同的shareId）
+    if (this.data.shareDetailData && this.data.shareDetailData.shareId) {
+      const shareId = this.data.shareDetailData.shareId
+      const myCallSign = this.data.shareDetailData.myCallSign
+      const logCount = this.data.shareDetailData.logCount
+      const expireTime = this.data.shareDetailData.expireTime
+      const expireText = expireTime ? formatExpireDate(expireTime) + '前有效' : `${SHARE_EXPIRE_DAYS}天有效`
+      
+      return {
+        title: `${myCallSign}分享了${logCount}条通联记录（${expireText}）`,
+        path: `/pages/logs/logs?shareId=${shareId}`,
+        imageUrl: '/images/cover.jpg'
+      }
+    }
+    
+    // 场景2：正在查看他人的分享，再次分享（使用相同的shareId）
+    if (this.data.currentShareId) {
+      const shareId = this.data.currentShareId
+      const myCallSign = this.data.shareOwnerCallSign || 'BA4IWA'
+      
+      // 获取当前显示的日志数量
+      const logCount = this.data.filteredLogs.length
+      
+      // 尝试从云端获取分享的过期时间
+      const expireTime = this.data.currentShareExpireTime
+      const expireText = expireTime ? formatExpireDate(expireTime) + '前有效' : `${SHARE_EXPIRE_DAYS}天有效`
+      
+      return {
+        title: `${myCallSign}分享了${logCount}条通联记录（${expireText}）`,
+        path: `/pages/logs/logs?shareId=${shareId}`,
+        imageUrl: '/images/cover.jpg'
+      }
+    }
+    
+    // 场景3：分享自己的日志（原有逻辑）
     const app = getApp()
     const currentShareId = app.globalData.currentShareId
     const currentShareData = app.globalData.currentShareData
@@ -1904,6 +2085,10 @@ Page({
     if (currentShareId) {
       const myCallSign = currentShareData.myCallSign
       const logCount = currentShareData.logs.length
+      
+      // 使用保存的过期时间
+      const expireTime = currentShareData.expireTime
+      const expireText = expireTime ? formatExpireDate(expireTime) + '前有效' : `${SHARE_EXPIRE_DAYS}天有效`
       
       // 清理当前分享数据
       app.globalData.currentShareId = null
@@ -1920,7 +2105,7 @@ Page({
       })
       
       return {
-        title: `${myCallSign}分享了${logCount}条通联记录（${SHARE_EXPIRE_DAYS}天有效）`,
+        title: `${myCallSign}分享了${logCount}条通联记录（${expireText}）`,
         path: `/pages/logs/logs?shareId=${currentShareId}`,
         imageUrl: currentShareImage || '/images/cover.jpg'
       }
@@ -1934,6 +2119,39 @@ Page({
   },
 
   onShareTimeline() {
+    // 场景1：从分享详情弹窗再次分享（使用相同的shareId）
+    if (this.data.shareDetailData && this.data.shareDetailData.shareId) {
+      const shareId = this.data.shareDetailData.shareId
+      const myCallSign = this.data.shareDetailData.myCallSign
+      const logCount = this.data.shareDetailData.logCount
+      const expireTime = this.data.shareDetailData.expireTime
+      const expireText = expireTime ? formatExpireDate(expireTime) + '前有效' : `${SHARE_EXPIRE_DAYS}天有效`
+      
+      return {
+        title: `${myCallSign}分享了${logCount}条通联记录（${expireText}）`,
+        query: `shareId=${shareId}`,
+        imageUrl: '/images/cover.jpg'
+      }
+    }
+    
+    // 场景2：正在查看他人的分享，再次分享（使用相同的shareId）
+    if (this.data.currentShareId) {
+      const shareId = this.data.currentShareId
+      const myCallSign = this.data.shareOwnerCallSign || 'BA4IWA'
+      const logCount = this.data.filteredLogs.length
+      
+      // 尝试从云端获取分享的过期时间
+      const expireTime = this.data.currentShareExpireTime
+      const expireText = expireTime ? formatExpireDate(expireTime) + '前有效' : `${SHARE_EXPIRE_DAYS}天有效`
+      
+      return {
+        title: `${myCallSign}分享了${logCount}条通联记录（${expireText}）`,
+        query: `shareId=${shareId}`,
+        imageUrl: '/images/cover.jpg'
+      }
+    }
+    
+    // 场景3：分享自己的日志（原有逻辑）
     const app = getApp()
     const currentShareId = app.globalData.currentShareId
     const currentShareData = app.globalData.currentShareData
@@ -1942,6 +2160,10 @@ Page({
     if (currentShareId) {
       const myCallSign = currentShareData.myCallSign
       const logCount = currentShareData.logs.length
+      
+      // 使用保存的过期时间
+      const expireTime = currentShareData.expireTime
+      const expireText = expireTime ? formatExpireDate(expireTime) + '前有效' : `${SHARE_EXPIRE_DAYS}天有效`
       
       // 重置分享状态
       this.setData({
@@ -1953,7 +2175,7 @@ Page({
       })
       
       return {
-        title: `${myCallSign}分享了${logCount}条通联记录（${SHARE_EXPIRE_DAYS}天有效）`,
+        title: `${myCallSign}分享了${logCount}条通联记录（${expireText}）`,
         query: `shareId=${currentShareId}`,
         imageUrl: currentShareImage || '/images/cover.jpg'
       }

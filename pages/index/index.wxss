@@ -543,6 +543,15 @@
   }
 }
 
+/* ==================== 分享卡片 canvas ==================== */
+.share-canvas {
+  position: fixed;
+  left: -9999px;
+  top: -9999px;
+  width: 500px;
+  height: 420px;
+}
+
 @media (min-width: 1024px) {
   .page-home {
     max-width: 960rpx;
