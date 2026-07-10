@@ -15,6 +15,7 @@
 
 const iconList = require('./icons-list')
 const modeList = require('./modes-list')
+const app = getApp()
 
 const VIBRATE_TYPE = 'light'
 
@@ -861,31 +862,41 @@ Page({
       sizeType: ['compressed'],
       sourceType: ['album'],
       success: (res) => {
-        if (this.data.iconPickerMode === 'background') {
-          const side = this.data.currentSide
-          this.setData({
-            [`bgImages.${side}`]: res.tempFilePaths[0],
-            currentBg: res.tempFilePaths[0],
-            [`bgIsTemplate.${side}`]: false,
-            currentBgIsTemplate: false,
-            [`bgOffsets.${side}.x`]: 0,
-            [`bgOffsets.${side}.y`]: 0,
-            [`bgScales.${side}`]: 1,
-            [`bgRotations.${side}`]: 0,
-            currentBgOffsetX: 0,
-            currentBgOffsetY: 0,
-            currentBgScale: 1,
-            currentBgRotation: 0,
-            showIconPicker: false
-          })
-          this._autoSave()
-          return
-        }
-        // 作为图片元素添加
         const path = res.tempFilePaths[0]
-        wx.getImageInfo({
-          src: path,
-          success: (info) => {
+        // 内容安全审核
+        app.checkImageSafety(path).then(safe => {
+          if (!safe) return
+          this._doSelectCustomImage(path)
+        })
+      }
+    })
+  },
+
+  _doSelectCustomImage(path) {
+    if (this.data.iconPickerMode === 'background') {
+      const side = this.data.currentSide
+      this.setData({
+        [`bgImages.${side}`]: path,
+        currentBg: path,
+        [`bgIsTemplate.${side}`]: false,
+        currentBgIsTemplate: false,
+        [`bgOffsets.${side}.x`]: 0,
+        [`bgOffsets.${side}.y`]: 0,
+        [`bgScales.${side}`]: 1,
+        [`bgRotations.${side}`]: 0,
+        currentBgOffsetX: 0,
+        currentBgOffsetY: 0,
+        currentBgScale: 1,
+        currentBgRotation: 0,
+        showIconPicker: false
+      })
+      this._autoSave()
+      return
+    }
+    // 作为图片元素添加
+    wx.getImageInfo({
+      src: path,
+      success: (info) => {
             const ratio = info.width / info.height
             const MAX_INITIAL = 140
             let w, h
@@ -931,8 +942,6 @@ Page({
             this._autoSave()
           }
         })
-      }
-    })
   },
 
   selectIcon(e) {
@@ -1021,22 +1030,27 @@ Page({
             sizeType: ['compressed'],
             sourceType: ['album'],
             success: (res2) => {
-              const side = this.data.currentSide
-              this.setData({
-                [`bgImages.${side}`]: res2.tempFilePaths[0],
-                currentBg: res2.tempFilePaths[0],
-                [`bgIsTemplate.${side}`]: false,
-                currentBgIsTemplate: false,
-                [`bgOffsets.${side}.x`]: 0,
-                [`bgOffsets.${side}.y`]: 0,
-                [`bgScales.${side}`]: 1,
-                [`bgRotations.${side}`]: 0,
-                currentBgOffsetX: 0,
-                currentBgOffsetY: 0,
-                currentBgScale: 1,
-                currentBgRotation: 0
+              const path = res2.tempFilePaths[0]
+              // 内容安全审核
+              app.checkImageSafety(path).then(safe => {
+                if (!safe) return
+                const side = this.data.currentSide
+                this.setData({
+                  [`bgImages.${side}`]: path,
+                  currentBg: path,
+                  [`bgIsTemplate.${side}`]: false,
+                  currentBgIsTemplate: false,
+                  [`bgOffsets.${side}.x`]: 0,
+                  [`bgOffsets.${side}.y`]: 0,
+                  [`bgScales.${side}`]: 1,
+                  [`bgRotations.${side}`]: 0,
+                  currentBgOffsetX: 0,
+                  currentBgOffsetY: 0,
+                  currentBgScale: 1,
+                  currentBgRotation: 0
+                })
+                this._autoSave()
               })
-              this._autoSave()
             }
           })
         } else if (res.tapIndex === 2) {
@@ -1801,120 +1815,141 @@ Page({
 
   /** 生成QSL卡分享卡片 */
   _generateShareCard() {
-    const ctx = wx.createCanvasContext('shareCanvas', this)
+    const query = wx.createSelectorQuery()
+    query.select('#shareCanvas')
+      .fields({ node: true, size: true })
+      .exec((res) => {
+        const canvasRes = res && res[0]
+        if (!canvasRes || !canvasRes.node) {
+          console.error('[QSL] 未获取到 shareCanvas 节点')
+          return
+        }
+        const canvas = canvasRes.node
+        const scale = 2
+        canvas.width = 500 * scale
+        canvas.height = 400 * scale
+        const ctx = canvas.getContext('2d')
+        ctx.scale(scale, scale)
 
-    // Canvas 尺寸
-    const W = 500
-    const H = 400
-    const pad = 30
-    const cardW = W - pad * 2
-    const cardH = 240
-    const cardX = pad
-    const cardY = 80
+        // Canvas 尺寸
+        const W = 500
+        const H = 400
+        const pad = 30
+        const cardW = W - pad * 2
+        const cardH = 240
+        const cardX = pad
+        const cardY = 80
 
-    // 1. 页面背景色
-    ctx.setFillStyle('#F4F7FA')
-    ctx.fillRect(0, 0, W, H)
+        // 1. 页面背景色
+        ctx.fillStyle = '#F4F7FA'
+        ctx.fillRect(0, 0, W, H)
 
-    // 2. 标题区域
-    ctx.setFillStyle('#1A2B42')
-    ctx.setFontSize(24)
-    ctx.font = 'normal bold 24px sans-serif'
-    ctx.setTextAlign('center')
-    ctx.setTextBaseline('middle')
-    ctx.fillText('QSL 卡片设计器', W / 2, 40)
+        // 2. 标题区域
+        ctx.fillStyle = '#1A2B42'
+        ctx.font = 'normal bold 24px sans-serif'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillText('QSL 卡片设计器', W / 2, 40)
 
-    // 3. 绘制QSL卡片预览
-    // 卡片阴影
-    ctx.setShadow(0, 4, 20, 'rgba(58, 85, 130, 0.15)')
+        // 3. 绘制QSL卡片预览
+        // 卡片阴影
+        ctx.shadowOffsetX = 0
+        ctx.shadowOffsetY = 4
+        ctx.shadowBlur = 20
+        ctx.shadowColor = 'rgba(58, 85, 130, 0.15)'
 
-    // 卡片背景（渐变）
-    const cardGrad = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY + cardH)
-    cardGrad.addColorStop(0, '#FFFFFF')
-    cardGrad.addColorStop(1, '#F8F9FA')
-    ctx.setFillStyle(cardGrad)
+        // 卡片背景（渐变）
+        const cardGrad = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY + cardH)
+        cardGrad.addColorStop(0, '#FFFFFF')
+        cardGrad.addColorStop(1, '#F8F9FA')
+        ctx.fillStyle = cardGrad
 
-    // 圆角矩形
-    const r = 12
-    ctx.beginPath()
-    ctx.moveTo(cardX + r, cardY)
-    ctx.lineTo(cardX + cardW - r, cardY)
-    ctx.arcTo(cardX + cardW, cardY, cardX + cardW, cardY + r, r)
-    ctx.lineTo(cardX + cardW, cardY + cardH - r)
-    ctx.arcTo(cardX + cardW, cardY + cardH, cardX + cardW - r, cardY + cardH, r)
-    ctx.lineTo(cardX + r, cardY + cardH)
-    ctx.arcTo(cardX, cardY + cardH, cardX, cardY + cardH - r, r)
-    ctx.lineTo(cardX, cardY + r)
-    ctx.arcTo(cardX, cardY, cardX + r, cardY, r)
-    ctx.closePath()
-    ctx.fill()
-    ctx.setShadow(0, 0, 0, 'transparent')
+        // 圆角矩形
+        const r = 12
+        ctx.beginPath()
+        ctx.moveTo(cardX + r, cardY)
+        ctx.lineTo(cardX + cardW - r, cardY)
+        ctx.arcTo(cardX + cardW, cardY, cardX + cardW, cardY + r, r)
+        ctx.lineTo(cardX + cardW, cardY + cardH - r)
+        ctx.arcTo(cardX + cardW, cardY + cardH, cardX + cardW - r, cardY + cardH, r)
+        ctx.lineTo(cardX + r, cardY + cardH)
+        ctx.arcTo(cardX, cardY + cardH, cardX, cardY + cardH - r, r)
+        ctx.lineTo(cardX, cardY + r)
+        ctx.arcTo(cardX, cardY, cardX + r, cardY, r)
+        ctx.closePath()
+        ctx.fill()
+        // 清除阴影
+        ctx.shadowColor = 'transparent'
+        ctx.shadowBlur = 0
+        ctx.shadowOffsetX = 0
+        ctx.shadowOffsetY = 0
 
-    // 4. 绘制卡片内容（模拟QSL卡片）
-    // 顶部彩色条
-    const barGrad = ctx.createLinearGradient(cardX + 20, 0, cardX + cardW - 20, 0)
-    barGrad.addColorStop(0, '#2C5C97')
-    barGrad.addColorStop(1, '#D84315')
-    ctx.setFillStyle(barGrad)
-    ctx.fillRect(cardX + 20, cardY + 20, cardW - 40, 6)
+        // 4. 绘制卡片内容（模拟QSL卡片）
+        // 顶部彩色条
+        const barGrad = ctx.createLinearGradient(cardX + 20, 0, cardX + cardW - 20, 0)
+        barGrad.addColorStop(0, '#2C5C97')
+        barGrad.addColorStop(1, '#D84315')
+        ctx.fillStyle = barGrad
+        ctx.fillRect(cardX + 20, cardY + 20, cardW - 40, 6)
 
-    // 标题
-    ctx.setFillStyle('#1A2B42')
-    ctx.setFontSize(18)
-    ctx.font = 'normal bold 18px sans-serif'
-    ctx.setTextAlign('left')
-    ctx.fillText('QSL CARD', cardX + 25, cardY + 55)
+        // 标题
+        ctx.fillStyle = '#1A2B42'
+        ctx.font = 'normal bold 18px sans-serif'
+        ctx.textAlign = 'left'
+        ctx.fillText('QSL CARD', cardX + 25, cardY + 55)
 
-    // 分割线
-    ctx.setStrokeStyle('#E8ECF0')
-    ctx.setLineWidth(1)
-    ctx.beginPath()
-    ctx.moveTo(cardX + 25, cardY + 70)
-    ctx.lineTo(cardX + cardW - 25, cardY + 70)
-    ctx.stroke()
+        // 分割线
+        ctx.strokeStyle = '#E8ECF0'
+        ctx.lineWidth = 1
+        ctx.beginPath()
+        ctx.moveTo(cardX + 25, cardY + 70)
+        ctx.lineTo(cardX + cardW - 25, cardY + 70)
+        ctx.stroke()
 
-    // 模拟文字行
-    ctx.setFillStyle('#5B697F')
-    ctx.setFontSize(12)
-    ctx.font = 'normal normal 12px sans-serif'
-    const lines = ['呼号: B____', '日期: ____-__-__', '时间: __:__', '频率: _____MHz', '模式: _____']
-    lines.forEach((line, i) => {
-      ctx.fillText(line, cardX + 30, cardY + 95 + i * 22)
-    })
+        // 模拟文字行
+        ctx.fillStyle = '#5B697F'
+        ctx.font = 'normal normal 12px sans-serif'
+        const lines = ['呼号: B____', '日期: ____-__-__', '时间: __:__', '频率: _____MHz', '模式: _____']
+        lines.forEach((line, i) => {
+          ctx.fillText(line, cardX + 30, cardY + 95 + i * 22)
+        })
 
-    // 右侧模拟图标区域
-    ctx.setFillStyle('#E3F2FD')
-    ctx.fillRect(cardX + cardW - 100, cardY + 90, 70, 70)
-    ctx.setFillStyle('#1E88E5')
-    ctx.setFontSize(32)
-    ctx.setTextAlign('center')
-    ctx.fillText('📻', cardX + cardW - 65, cardY + 125)
+        // 右侧模拟图标区域
+        ctx.fillStyle = '#E3F2FD'
+        ctx.fillRect(cardX + cardW - 100, cardY + 90, 70, 70)
+        ctx.fillStyle = '#1E88E5'
+        ctx.font = '32px sans-serif'
+        ctx.textAlign = 'center'
+        ctx.fillText('📻', cardX + cardW - 65, cardY + 125)
 
-    // 底部提示
-    ctx.setFillStyle('#8E99A8')
-    ctx.setFontSize(13)
-    ctx.setTextAlign('center')
-    ctx.fillText('设计专属QSL卡片 · 记录每一次通联', W / 2, H - 40)
+        // 底部提示
+        ctx.fillStyle = '#8E99A8'
+        ctx.font = 'normal normal 13px sans-serif'
+        ctx.textAlign = 'center'
+        ctx.fillText('设计专属QSL卡片 · 记录每一次通联', W / 2, H - 40)
 
-    // 提交绘制并导出图片
-    ctx.draw(false, () => {
-      setTimeout(() => {
-        wx.canvasToTempFilePath({
-          canvasId: 'shareCanvas',
-          fileType: 'png',
-          quality: 1,
-          destWidth: 1000,
-          destHeight: 800,
-          success: (res) => {
-            this._cache.shareImagePath = res.tempFilePath
-            console.log('QSL分享卡片生成成功:', res.tempFilePath)
-          },
-          fail: (err) => {
-            console.error('生成QSL分享卡片失败', err)
-          }
-        }, this)
-      }, 300)
-    })
+        // 导出图片（2d 即时绘制，少量延迟确保 emoji 字形就绪）
+        setTimeout(() => {
+          wx.canvasToTempFilePath({
+            canvas: canvas,
+            x: 0,
+            y: 0,
+            width: 500 * scale,
+            height: 400 * scale,
+            destWidth: 500 * scale,
+            destHeight: 400 * scale,
+            fileType: 'png',
+            quality: 1,
+            success: (res) => {
+              this._cache.shareImagePath = res.tempFilePath
+              console.log('QSL分享卡片生成成功:', res.tempFilePath)
+            },
+            fail: (err) => {
+              console.error('生成QSL分享卡片失败', err)
+            }
+          })
+        }, 50)
+      })
   },
 
   onShareAppMessage() {

@@ -2,7 +2,7 @@
   <view class="maidenhead-page">
 
     <!-- 分享卡片 canvas（隐藏）- 使用旧版API更可靠 -->
-    <canvas canvas-id="shareCanvas" class="share-canvas"></canvas>
+    <canvas type="2d" id="shareCanvas" class="share-canvas"></canvas>
 
     <!-- 全屏地图 -->
     <view class="map-container">

@@ -21,6 +21,7 @@ const UPDATE_LOGS = [
     date: '2026-06-10',
     title: '功能优化',
     content: [
+      '日志再次分享、分享查看显示',
       '通联日志ADIF文件导出功能',
       'QSL卡片设计功能'
     ]
@@ -130,14 +131,14 @@ Page({
   loadCloudSyncConfig() {
     try {
       const cloudSyncEnabled = app.isCloudSyncEnabled()
-      
+
       let tips = ''
       if (cloudSyncEnabled) {
         tips = '已开启 · 云端最多保存 100 条'
       } else {
         tips = '未开启 · 日志仅保存在本地'
       }
-      
+
       this.setData({
         cloudSyncEnabled,
         cloudSyncTips: tips
@@ -492,38 +493,44 @@ Page({
     wx.vibrateShort({ type: VIBRATE_TYPE })
     const avatarUrl = e.detail.avatarUrl
     if (!avatarUrl) return
-    const fs = wx.getFileSystemManager()
-    // 每次使用唯一文件名，避免 image 组件因路径不变而使用缓存旧图
-    const dest = `${wx.env.USER_DATA_PATH}/wx_mine_avatar_${Date.now()}.jpg`
-    const persist = (path) => {
-      try {
-        // 清理旧头像文件，避免积累
-        const oldPath = wx.getStorageSync(STORAGE_AVATAR)
-        if (oldPath && oldPath !== path) {
-          try { fs.unlinkSync(oldPath) } catch (e) { /* 忽略 */ }
+
+    // 内容安全审核
+    app.checkImageSafety(avatarUrl).then(safe => {
+      if (!safe) return
+
+      const fs = wx.getFileSystemManager()
+      // 每次使用唯一文件名，避免 image 组件因路径不变而使用缓存旧图
+      const dest = `${wx.env.USER_DATA_PATH}/wx_mine_avatar_${Date.now()}.jpg`
+      const persist = (path) => {
+        try {
+          // 清理旧头像文件，避免积累
+          const oldPath = wx.getStorageSync(STORAGE_AVATAR)
+          if (oldPath && oldPath !== path) {
+            try { fs.unlinkSync(oldPath) } catch (e) { /* 忽略 */ }
+          }
+          wx.setStorageSync(STORAGE_AVATAR, path)
+          this.setData({ userAvatarUrl: path })
+          const userInfo = wx.getStorageSync('userInfo') || {}
+          userInfo.avatarUrl = path
+          wx.setStorageSync('userInfo', userInfo)
+          // 清除首页缓存，确保返回首页时显示最新用户信息
+          app._cache.wxMineAvatarUrl = null
+          app._cache.wxMineNickName = null
+          this._syncProfileToCloud()
+        } catch (err) {
+          console.error('保存头像路径失败', err)
         }
-        wx.setStorageSync(STORAGE_AVATAR, path)
-        this.setData({ userAvatarUrl: path })
-        const userInfo = wx.getStorageSync('userInfo') || {}
-        userInfo.avatarUrl = path
-        wx.setStorageSync('userInfo', userInfo)
-        // 清除首页缓存，确保返回首页时显示最新用户信息
-        app._cache.wxMineAvatarUrl = null
-        app._cache.wxMineNickName = null
-        this._syncProfileToCloud()
-      } catch (err) {
-        console.error('保存头像路径失败', err)
       }
-    }
-    // 兼容清理旧版固定路径文件
-    try {
-      fs.unlinkSync(`${wx.env.USER_DATA_PATH}/wx_mine_avatar.jpg`)
-    } catch (e) { /* 不存在则忽略 */ }
-    fs.copyFile({
-      srcPath: avatarUrl,
-      destPath: dest,
-      success: () => persist(dest),
-      fail: () => persist(avatarUrl)
+      // 兼容清理旧版固定路径文件
+      try {
+        fs.unlinkSync(`${wx.env.USER_DATA_PATH}/wx_mine_avatar.jpg`)
+      } catch (e) { /* 不存在则忽略 */ }
+      fs.copyFile({
+        srcPath: avatarUrl,
+        destPath: dest,
+        success: () => persist(dest),
+        fail: () => persist(avatarUrl)
+      })
     })
   },
 

@@ -318,7 +318,7 @@ Page({
     }
   },
 
-  /** 生成梅登黑德分享卡片（使用旧版Canvas API） */
+  /** 生成梅登黑德分享卡片（canvas 2d 接口） */
   _generateShareCard(callback) {
     const { locationReady, currGrid, currLat, currLng, currPrecisionName } = this.data
     if (!locationReady || !currGrid) {
@@ -326,107 +326,133 @@ Page({
       return
     }
 
-    const ctx = wx.createCanvasContext('shareCanvas', this)
-    const width = 500
-    const height = 400
-    
-    // 清空画布 - 使用浅灰色背景
-    ctx.setFillStyle('#F5F7FA')
-    ctx.fillRect(0, 0, width, height)
-    
-    // 绘制卡片背景（白色圆角卡片）
-    const cardX = 25
-    const cardY = 25
-    const cardW = width - 50
-    const cardH = height - 50
-    
-    ctx.setFillStyle('#FFFFFF')
-    ctx.setShadow(0, 4, 20, 'rgba(0, 0, 0, 0.08)')
-    ctx.fillRect(cardX, cardY, cardW, cardH)
-    ctx.setShadow(0, 0, 0, 'transparent')
-    
-    // 绘制顶部蓝色条
-    ctx.setFillStyle('#1E88E5')
-    ctx.fillRect(cardX, cardY, cardW, 8)
-    
-    // 绘制圆形图标背景（纯色）
-    const iconCenterX = width / 2
-    const iconCenterY = 100
-    const iconRadius = 35
-    
-    ctx.beginPath()
-    ctx.arc(iconCenterX, iconCenterY, iconRadius, 0, 2 * Math.PI)
-    ctx.setFillStyle('#1E88E5')
-    ctx.fill()
-    
-    // 绘制地图图标
-    ctx.setFontSize(35)
-    ctx.setTextAlign('center')
-    ctx.setTextBaseline('middle')
-    ctx.setFillStyle('#FFFFFF')
-    ctx.fillText('🗺️', iconCenterX, iconCenterY)
-    
-    // 绘制标题 "梅登黑德定位"
-    ctx.setFillStyle('#333333')
-    ctx.setFontSize(22)
-    ctx.setTextAlign('center')
-    ctx.fillText('梅登黑德定位', iconCenterX, 160)
-    
-    // 绘制描述
-    ctx.setFillStyle('#666666')
-    ctx.setFontSize(13)
-    ctx.fillText('梅登黑德定位网格位置', iconCenterX, 185)
-    
-    // 分隔线
-    ctx.beginPath()
-    ctx.moveTo(width / 2 - 80, 210)
-    ctx.lineTo(width / 2 + 80, 210)
-    ctx.setStrokeStyle('#E0E0E0')
-    ctx.setLineWidth(0.5)
-    ctx.stroke()
-    
-    // 网格代码（大字体，使用主题色）
-    ctx.setFillStyle('#1E88E5')
-    ctx.setFontSize(48)
-    ctx.setTextAlign('center')
-    ctx.fillText(currGrid, iconCenterX, 260)
-    
-    // 精度信息
-    ctx.setFillStyle('#999999')
-    ctx.setFontSize(12)
-    ctx.fillText(currPrecisionName, iconCenterX, 285)
-    
-    // 坐标信息
-    ctx.setFillStyle('#666666')
-    ctx.setFontSize(15)
-    ctx.fillText(`${currLat}°, ${currLng}°`, iconCenterX, 315)
-    
-    // 底部应用名称
-    ctx.setFillStyle('#999999')
-    ctx.setFontSize(11)
-    ctx.fillText('风语纪 · 业余无线电工具', iconCenterX, height - 40)
-    
-    // 提交绘制并导出图片
-    ctx.draw(false, () => {
-      setTimeout(() => {
-        wx.canvasToTempFilePath({
-          canvasId: 'shareCanvas',
-          fileType: 'png',
-          quality: 1,
-          destWidth: 1000,  // 导出图片的目标宽度（像素）
-          destHeight: 800,  // 导出图片的目标高度（像素）
-          success: (res) => {
-            this.setData({ shareImagePath: res.tempFilePath })
-            console.log('分享卡片生成成功:', res.tempFilePath)
-            callback && callback(true, res.tempFilePath)
-          },
-          fail: (err) => {
-            console.error('生成分享卡片失败', err)
-            callback && callback(false)
-          }
-        }, this)
-      }, 300)
-    })
+    const query = wx.createSelectorQuery()
+    query.select('#shareCanvas')
+      .fields({ node: true, size: true })
+      .exec((res) => {
+        const canvasRes = res && res[0]
+        if (!canvasRes || !canvasRes.node) {
+          console.error('[Maidenhead] 未获取到 shareCanvas 节点')
+          callback && callback(false)
+          return
+        }
+        const canvas = canvasRes.node
+        const scale = 2
+        canvas.width = 500 * scale
+        canvas.height = 400 * scale
+        const ctx = canvas.getContext('2d')
+        ctx.scale(scale, scale)
+
+        const width = 500
+        const height = 400
+        
+        // 清空画布 - 使用浅灰色背景
+        ctx.fillStyle = '#F5F7FA'
+        ctx.fillRect(0, 0, width, height)
+        
+        // 绘制卡片背景（白色圆角卡片）
+        const cardX = 25
+        const cardY = 25
+        const cardW = width - 50
+        const cardH = height - 50
+        
+        ctx.fillStyle = '#FFFFFF'
+        ctx.shadowOffsetX = 0
+        ctx.shadowOffsetY = 4
+        ctx.shadowBlur = 20
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.08)'
+        ctx.fillRect(cardX, cardY, cardW, cardH)
+        // 清除阴影
+        ctx.shadowColor = 'transparent'
+        ctx.shadowBlur = 0
+        ctx.shadowOffsetX = 0
+        ctx.shadowOffsetY = 0
+        
+        // 绘制顶部蓝色条
+        ctx.fillStyle = '#1E88E5'
+        ctx.fillRect(cardX, cardY, cardW, 8)
+        
+        // 绘制圆形图标背景（纯色）
+        const iconCenterX = width / 2
+        const iconCenterY = 100
+        const iconRadius = 35
+        
+        ctx.beginPath()
+        ctx.arc(iconCenterX, iconCenterY, iconRadius, 0, 2 * Math.PI)
+        ctx.fillStyle = '#1E88E5'
+        ctx.fill()
+        
+        // 绘制地图图标
+        ctx.font = '35px sans-serif'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillStyle = '#FFFFFF'
+        ctx.fillText('🗺️', iconCenterX, iconCenterY)
+        
+        // 绘制标题 "梅登黑德定位"
+        ctx.fillStyle = '#333333'
+        ctx.font = '22px sans-serif'
+        ctx.textAlign = 'center'
+        ctx.fillText('梅登黑德定位', iconCenterX, 160)
+        
+        // 绘制描述
+        ctx.fillStyle = '#666666'
+        ctx.font = '13px sans-serif'
+        ctx.fillText('梅登黑德定位网格位置', iconCenterX, 185)
+        
+        // 分隔线
+        ctx.beginPath()
+        ctx.moveTo(width / 2 - 80, 210)
+        ctx.lineTo(width / 2 + 80, 210)
+        ctx.strokeStyle = '#E0E0E0'
+        ctx.lineWidth = 0.5
+        ctx.stroke()
+        
+        // 网格代码（大字体，使用主题色）
+        ctx.fillStyle = '#1E88E5'
+        ctx.font = '48px sans-serif'
+        ctx.textAlign = 'center'
+        ctx.fillText(currGrid, iconCenterX, 260)
+        
+        // 精度信息
+        ctx.fillStyle = '#999999'
+        ctx.font = '12px sans-serif'
+        ctx.fillText(currPrecisionName, iconCenterX, 285)
+        
+        // 坐标信息
+        ctx.fillStyle = '#666666'
+        ctx.font = '15px sans-serif'
+        ctx.fillText(`${currLat}°, ${currLng}°`, iconCenterX, 315)
+        
+        // 底部应用名称
+        ctx.fillStyle = '#999999'
+        ctx.font = '11px sans-serif'
+        ctx.fillText('风语纪 · 业余无线电工具', iconCenterX, height - 40)
+        
+        // 导出图片（2d 即时绘制，少量延迟确保 emoji 字形就绪）
+        setTimeout(() => {
+          wx.canvasToTempFilePath({
+            canvas: canvas,
+            x: 0,
+            y: 0,
+            width: 500 * scale,
+            height: 400 * scale,
+            destWidth: 500 * scale,
+            destHeight: 400 * scale,
+            fileType: 'png',
+            quality: 1,
+            success: (res) => {
+              this.setData({ shareImagePath: res.tempFilePath })
+              console.log('分享卡片生成成功:', res.tempFilePath)
+              callback && callback(true, res.tempFilePath)
+            },
+            fail: (err) => {
+              console.error('生成分享卡片失败', err)
+              callback && callback(false)
+            }
+          })
+        }, 50)
+      })
   },
 
   // ==================== 缩放自动切换精度 ====================

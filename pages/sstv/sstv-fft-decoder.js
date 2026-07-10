@@ -340,6 +340,15 @@ const VIS_MAP = {
 
 // 5. SSTV 全量 FFT 解码器
 
+/** 解码被主动取消时抛出的错误 */
+class DecodeCancelled extends Error {
+  constructor() {
+    super('DECODE_CANCELLED')
+    this.name = 'DecodeCancelled'
+    this.cancelled = true
+  }
+}
+
 class SSTVFFTDecoder {
   /**
    * @param {Float32Array} audioBuffer - 归一化音频样本 [-1, +1]
@@ -354,20 +363,39 @@ class SSTVFFTDecoder {
     this.fftSize = options.fftSize || 512
     this.onProgress = options.onProgress || null
     this.mode = null
+    this._cancelled = false
+  }
+
+  // 取消 / 让出控制权
+
+  /** 主动取消解码：正在执行的异步循环会在下一个检查点中止 */
+  cancel() {
+    this._cancelled = true
+  }
+
+  /** 让出 JS 线程，避免长时间阻塞导致 UI 卡顿（如取消按钮、页面返回无响应） */
+  _yield() {
+    return new Promise((resolve) => setTimeout(resolve, 0))
+  }
+
+  /** 检查取消标记，已取消则抛出 DecodeCancelled */
+  _checkCancel() {
+    if (this._cancelled) throw new DecodeCancelled()
   }
 
   // 主入口
 
   /**
-   * 执行完整解码流程
-   * @returns {{ buffer: Uint8ClampedArray, width: number, height: number }}
+   * 执行完整解码流程（异步、可取消、分片让出线程）
+   * @returns {Promise<{ buffer: Uint8ClampedArray, width: number, height: number }>}
    */
-  decode() {
+  async decode() {
     console.log('[FFT-Decoder] 开始解码, 采样数=' + this.samples.length +
       ', 采样率=' + this.sampleRate + ', FFT大小=' + this.fftSize)
 
     // Phase 1: 头部检测
-    const headerEnd = this._findHeader()
+    const headerEnd = await this._findHeader()
+    this._checkCancel()
     if (headerEnd < 0) {
       throw new Error('未在音频中找到 SSTV 信号头')
     }
@@ -379,7 +407,8 @@ class SSTVFFTDecoder {
 
     // Phase 3: 图像数据解码
     const visEnd = headerEnd + Math.round(VIS_BIT_SIZE * 9 * this.sampleRate)
-    const imageData = this._decodeImageData(visEnd)
+    const imageData = await this._decodeImageData(visEnd)
+    this._checkCancel()
 
     // Phase 4: 生成 RGBA 缓冲区
     return this._generateImageBuffer(imageData)
@@ -432,9 +461,9 @@ class SSTVFFTDecoder {
    *   f3: 窗口 310~320ms  → 期望 1900Hz (Leader2)
    *   f4: 窗口 610~620ms  → 期望 1200Hz (VIS Start Bit)
    *
-   * @returns {number} VIS 数据位起始的样本索引（跳过了 VIS Start Bit）
+   * @returns {Promise<number>} VIS 数据位起始的样本索引（跳过了 VIS Start Bit）
    */
-  _findHeader() {
+  async _findHeader() {
     const sr = this.sampleRate
     const headerSize = Math.round(HDR_SIZE * sr)            // 0.64 * sr
     const windowSize = Math.round(HDR_WINDOW_SIZE * sr)     // 0.01 * sr
@@ -451,8 +480,15 @@ class SSTVFFTDecoder {
 
     const totalSamples = this.samples.length
     let lastLogOffset = -1
+    let iter = 0
 
     for (let offset = 0; offset < totalSamples - headerSize; offset += jumpSize) {
+      // 分片让出线程 + 检查取消（每 40 次迭代）
+      if ((++iter % 40) === 0) {
+        this._checkCancel()
+        await this._yield()
+      }
+
       const chunk = this.samples.slice(offset, offset + headerSize)
 
       const f1 = this._peakFreq(chunk.slice(leader1Start, leader1End))
@@ -564,9 +600,9 @@ class SSTVFFTDecoder {
   /**
    * 逐行逐像素解码图像数据
    * @param {number} imageStart - 图像数据起始样本索引
-   * @returns {Array<Array<Array<number>>>} imageData[line][channel][pixel]
+   * @returns {Promise<Array<Array<Array<number>>>>} imageData[line][channel][pixel]
    */
-  _decodeImageData(imageStart) {
+  async _decodeImageData(imageStart) {
     const mode = this.mode
     const width = mode.LINE_WIDTH
     const height = mode.LINE_COUNT
@@ -592,6 +628,10 @@ class SSTVFFTDecoder {
 
     const totalLines = height
     for (let line = 0; line < height; line++) {
+      // 每行让出线程 + 检查取消，保证取消按钮/页面返回即时响应
+      this._checkCancel()
+      await this._yield()
+
       // 进度回调（每 5 行报告一次）
       if (this.onProgress && line % 5 === 0) {
         const percent = 10 + Math.round((line / totalLines) * 90)

@@ -1,4 +1,5 @@
 const VIBRATE_TYPE = 'medium'
+const app = getApp()
 const Robot36 = require('./sstv-robot36')
 const Scottie1 = require('./sstv-scottie1')
 const SSTVFFTDecoder = require('./sstv-fft-decoder')
@@ -70,6 +71,9 @@ Page({
   },
 
   onHide() {
+    // 解码中离开页面：按取消解码处理，避免阻塞导致卡顿
+    this._cancelDecoding(false)
+
     if (this.audioContext) {
       this.audioContext.stop()
       this.audioContext.destroy()
@@ -86,6 +90,9 @@ Page({
   },
 
   onUnload() {
+    // 解码中返回：按取消解码处理，避免阻塞导致卡顿
+    this._cancelDecoding(false)
+
     if (this.updateTimer) {
       clearTimeout(this.updateTimer)
     }
@@ -242,20 +249,22 @@ Page({
           wx.showLoading({ title: '正在解码 SSTV...' })
 
           setTimeout(() => {
-            try {
-              const decoder = new SSTVFFTDecoder(samples, sampleRate, {
-                fftSize: 512,
-                onProgress: (percent) => {
-                  this.setData({
-                    decodeProgress: percent,
-                    scanLine: Math.round(percent / 100 * 240)
-                  })
-                }
-              })
+            const decoder = new SSTVFFTDecoder(samples, sampleRate, {
+              fftSize: 512,
+              onProgress: (percent) => {
+                // 已取消则不再更新进度
+                if (!this.data.isDecoding) return
+                this.setData({
+                  decodeProgress: percent,
+                  scanLine: Math.round(percent / 100 * 240)
+                })
+              }
+            })
+            // 保存实例，供取消解码 / 页面返回时中止
+            this.decoder = decoder
 
-              const result = decoder.decode()
+            decoder.decode().then((result) => {
               const { buffer, width, height } = result
-
               wx.hideLoading()
 
               this.renderDecodedImage(buffer, width, height).then((imagePath) => {
@@ -271,8 +280,13 @@ Page({
                 this.setData({ isDecoding: false })
                 wx.showToast({ title: '渲染失败', icon: 'none' })
               })
-            } catch (err) {
+            }).catch((err) => {
               wx.hideLoading()
+              // 主动取消：静默处理（stopDecode 已给出提示）
+              if (err && err.cancelled) {
+                console.log('[SSTV] 解码已取消')
+                return
+              }
               console.error('[SSTV] 解码失败:', err)
               this.setData({ isDecoding: false })
               wx.showModal({
@@ -280,7 +294,9 @@ Page({
                 content: err.message || '未知错误',
                 showCancel: false
               })
-            }
+            }).then(() => {
+              this.decoder = null
+            })
           }, 100)
 
         } catch (err) {
@@ -303,10 +319,25 @@ Page({
     })
   },
 
-  // 保留 stopDecode 用于取消解码（按钮显示"取消解码"）
+  // 取消解码（按钮显示"取消解码"）
   stopDecode() {
-    this.setData({ isDecoding: false })
-    wx.showToast({ title: '已取消解码', icon: 'none' })
+    this._cancelDecoding(true)
+  },
+
+  /**
+   * 统一的取消解码逻辑：中止解码器、复位状态、关闭 loading
+   * @param {boolean} showToast - 是否提示"已取消解码"
+   */
+  _cancelDecoding(showToast) {
+    if (!this.data.isDecoding) return
+    if (this.decoder) {
+      this.decoder.cancel()
+    }
+    wx.hideLoading()
+    this.setData({ isDecoding: false, decodeProgress: 0, scanLine: 0 })
+    if (showToast) {
+      wx.showToast({ title: '已取消解码', icon: 'none' })
+    }
   },
 
   switchTab(e) {
@@ -322,9 +353,20 @@ Page({
       sourceType: ['album', 'camera'],
       success: (res) => {
         const tempFilePath = res.tempFiles[0].tempFilePath
-        wx.getImageInfo({
-          src: tempFilePath,
-          success: (info) => {
+        // 内容安全审核
+        app.checkImageSafety(tempFilePath).then(safe => {
+          if (!safe) return
+          this._processChosenImage(tempFilePath)
+        })
+      }
+    })
+    wx.vibrateShort({ type: VIBRATE_TYPE })
+  },
+
+  _processChosenImage(tempFilePath) {
+    wx.getImageInfo({
+      src: tempFilePath,
+      success: (info) => {
             // 读取呼号，默认显示为 CQ DE + 个人呼号
             let myCallSign = ''
             let callsign = ''
@@ -349,9 +391,6 @@ Page({
             this.resizeImage(tempFilePath)
           }
         })
-      }
-    })
-    wx.vibrateShort({ type: VIBRATE_TYPE })
   },
 
   resizeImage(path) {
@@ -899,110 +938,132 @@ Page({
 
   // ==================== 分享功能 ====================
 
-  /** 生成SSTV分享卡片 */
+  /** 生成SSTV分享卡片（canvas 2d 接口） */
   _generateShareCard() {
-    const ctx = wx.createCanvasContext('shareCanvas', this)
+    const query = wx.createSelectorQuery()
+    query.select('#shareCanvas')
+      .fields({ node: true, size: true })
+      .exec((res) => {
+        const canvasRes = res && res[0]
+        if (!canvasRes || !canvasRes.node) {
+          console.error('[SSTV] 未获取到 shareCanvas 节点')
+          return
+        }
+        const canvas = canvasRes.node
+        // 导出为 2 倍清晰度（对应旧接口 destWidth/destHeight 1000x800）
+        const scale = 2
+        canvas.width = 500 * scale
+        canvas.height = 400 * scale
+        const ctx = canvas.getContext('2d')
+        ctx.scale(scale, scale)
 
-    // Canvas 尺寸
-    const W = 500
-    const H = 400
-    const pad = 30
-    const cardW = W - pad * 2
-    const cardH = 200
-    const cardX = pad
-    const cardY = 100
+        // Canvas 尺寸（逻辑坐标，与旧代码一致）
+        const W = 500
+        const H = 400
+        const pad = 30
+        const cardW = W - pad * 2
+        const cardH = 200
+        const cardX = pad
+        const cardY = 100
 
-    // 1. 页面背景色
-    ctx.setFillStyle('#F5F6FA')
-    ctx.fillRect(0, 0, W, H)
+        // 1. 页面背景色
+        ctx.fillStyle = '#F5F6FA'
+        ctx.fillRect(0, 0, W, H)
 
-    // 2. 标题区域
-    ctx.setFillStyle('#1A2B42')
-    ctx.setFontSize(24)
-    ctx.font = 'normal bold 24px sans-serif'
-    ctx.setTextAlign('center')
-    ctx.setTextBaseline('middle')
-    ctx.fillText('SSTV 图像传输', W / 2, 40)
+        // 2. 标题区域
+        ctx.fillStyle = '#1A2B42'
+        ctx.font = 'normal bold 24px sans-serif'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillText('SSTV 图像传输', W / 2, 40)
 
-    // 3. 绘制SSTV卡片预览
-    // 卡片阴影
-    ctx.setShadow(0, 4, 20, 'rgba(58, 85, 130, 0.15)')
+        // 3. 绘制SSTV卡片预览
+        // 卡片阴影
+        ctx.shadowOffsetX = 0
+        ctx.shadowOffsetY = 4
+        ctx.shadowBlur = 20
+        ctx.shadowColor = 'rgba(58, 85, 130, 0.15)'
 
-    // 卡片背景（渐变）
-    const cardGrad = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY + cardH)
-    cardGrad.addColorStop(0, '#E8F5E9')
-    cardGrad.addColorStop(1, '#FFFFFF')
-    ctx.setFillStyle(cardGrad)
+        // 卡片背景（渐变）
+        const cardGrad = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY + cardH)
+        cardGrad.addColorStop(0, '#E8F5E9')
+        cardGrad.addColorStop(1, '#FFFFFF')
+        ctx.fillStyle = cardGrad
 
-    // 圆角矩形
-    const r = 12
-    ctx.beginPath()
-    ctx.moveTo(cardX + r, cardY)
-    ctx.lineTo(cardX + cardW - r, cardY)
-    ctx.arcTo(cardX + cardW, cardY, cardX + cardW, cardY + r, r)
-    ctx.lineTo(cardX + cardW, cardY + cardH - r)
-    ctx.arcTo(cardX + cardW, cardY + cardH, cardX + cardW - r, cardY + cardH, r)
-    ctx.lineTo(cardX + r, cardY + cardH)
-    ctx.arcTo(cardX, cardY + cardH, cardX, cardY + cardH - r, r)
-    ctx.lineTo(cardX, cardY + r)
-    ctx.arcTo(cardX, cardY, cardX + r, cardY, r)
-    ctx.closePath()
-    ctx.fill()
-    ctx.setShadow(0, 0, 0, 'transparent')
+        // 圆角矩形
+        const r = 12
+        ctx.beginPath()
+        ctx.moveTo(cardX + r, cardY)
+        ctx.lineTo(cardX + cardW - r, cardY)
+        ctx.arcTo(cardX + cardW, cardY, cardX + cardW, cardY + r, r)
+        ctx.lineTo(cardX + cardW, cardY + cardH - r)
+        ctx.arcTo(cardX + cardW, cardY + cardH, cardX + cardW - r, cardY + cardH, r)
+        ctx.lineTo(cardX + r, cardY + cardH)
+        ctx.arcTo(cardX, cardY + cardH, cardX, cardY + cardH - r, r)
+        ctx.lineTo(cardX, cardY + r)
+        ctx.arcTo(cardX, cardY, cardX + r, cardY, r)
+        ctx.closePath()
+        ctx.fill()
+        // 清除阴影
+        ctx.shadowColor = 'transparent'
+        ctx.shadowBlur = 0
+        ctx.shadowOffsetX = 0
+        ctx.shadowOffsetY = 0
 
-    // 4. 绘制SSTV图标和文字
-    // 左侧图标
-    const iconGrad = ctx.createLinearGradient(cardX + 40, cardY + 60, cardX + 100, cardY + 120)
-    iconGrad.addColorStop(0, '#388E3C')
-    iconGrad.addColorStop(1, '#D84315')
-    ctx.setFillStyle(iconGrad)
-    ctx.fillRect(cardX + 40, cardY + 60, 60, 60)
+        // 4. 绘制SSTV图标和文字
+        // 左侧图标
+        const iconGrad = ctx.createLinearGradient(cardX + 40, cardY + 60, cardX + 100, cardY + 120)
+        iconGrad.addColorStop(0, '#388E3C')
+        iconGrad.addColorStop(1, '#D84315')
+        ctx.fillStyle = iconGrad
+        ctx.fillRect(cardX + 40, cardY + 60, 60, 60)
 
-    ctx.setFillStyle('#FFFFFF')
-    ctx.setFontSize(32)
-    ctx.setTextAlign('center')
-    ctx.setTextBaseline('middle')
-    ctx.fillText('🖼️', cardX + 70, cardY + 90)
+        ctx.fillStyle = '#FFFFFF'
+        ctx.font = '32px sans-serif'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillText('🖼️', cardX + 70, cardY + 90)
 
-    // 右侧文字
-    ctx.setFillStyle('#1A2B42')
-    ctx.setFontSize(18)
-    ctx.font = 'normal bold 18px sans-serif'
-    ctx.setTextAlign('left')
-    ctx.fillText('慢扫描电视', cardX + 130, cardY + 75)
+        // 右侧文字
+        ctx.fillStyle = '#1A2B42'
+        ctx.font = 'normal bold 18px sans-serif'
+        ctx.textAlign = 'left'
+        ctx.fillText('慢扫描电视', cardX + 130, cardY + 75)
 
-    ctx.setFillStyle('#5B697F')
-    ctx.setFontSize(13)
-    ctx.font = 'normal normal 13px sans-serif'
-    ctx.fillText('支持 Robot36 / Scottie1 模式', cardX + 130, cardY + 105)
-    ctx.fillText('编码图片为音频信号', cardX + 130, cardY + 130)
-    ctx.fillText('解码音频为图片', cardX + 130, cardY + 155)
+        ctx.fillStyle = '#5B697F'
+        ctx.font = 'normal normal 13px sans-serif'
+        ctx.fillText('支持 Robot36 / Scottie1 模式', cardX + 130, cardY + 105)
+        ctx.fillText('编码图片为音频信号', cardX + 130, cardY + 130)
+        ctx.fillText('解码音频为图片', cardX + 130, cardY + 155)
 
-    // 底部提示
-    ctx.setFillStyle('#8E99A8')
-    ctx.setFontSize(13)
-    ctx.setTextAlign('center')
-    ctx.fillText('图片与声音的转换 · SSTV编码解码', W / 2, H - 40)
+        // 底部提示
+        ctx.fillStyle = '#8E99A8'
+        ctx.font = 'normal normal 13px sans-serif'
+        ctx.textAlign = 'center'
+        ctx.fillText('图片与声音的转换 · SSTV编码解码', W / 2, H - 40)
 
-    // 提交绘制并导出图片
-    ctx.draw(false, () => {
-      setTimeout(() => {
-        wx.canvasToTempFilePath({
-          canvasId: 'shareCanvas',
-          fileType: 'png',
-          quality: 1,
-          destWidth: 1000,
-          destHeight: 800,
-          success: (res) => {
-            this._shareImagePath = res.tempFilePath
-            console.log('SSTV分享卡片生成成功:', res.tempFilePath)
-          },
-          fail: (err) => {
-            console.error('生成SSTV分享卡片失败', err)
-          }
-        }, this)
-      }, 300)
-    })
+        // 导出图片（2d 为即时绘制，少量延迟确保 emoji 字形就绪）
+        setTimeout(() => {
+          wx.canvasToTempFilePath({
+            canvas: canvas,
+            x: 0,
+            y: 0,
+            width: 500 * scale,
+            height: 400 * scale,
+            destWidth: 500 * scale,
+            destHeight: 400 * scale,
+            fileType: 'png',
+            quality: 1,
+            success: (res) => {
+              this._shareImagePath = res.tempFilePath
+              console.log('SSTV分享卡片生成成功:', res.tempFilePath)
+            },
+            fail: (err) => {
+              console.error('生成SSTV分享卡片失败', err)
+            }
+          })
+        }, 50)
+      })
   },
 
   onShareAppMessage() {

@@ -1,0 +1,9 @@
+{
+  "name": "systemConfig",
+  "version": "1.0.0",
+  "description": "全局系统配置中心：超管修改、普通用户实时订阅",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

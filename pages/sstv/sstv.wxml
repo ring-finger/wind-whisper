@@ -4,7 +4,7 @@
   <canvas type="2d" id="tempCanvas" class="hidden-canvas" style="width: 320px; height: 240px;"></canvas>
   <canvas type="2d" id="pixelCanvas" class="hidden-canvas" style="width: 320px; height: 240px;"></canvas>
   <canvas type="2d" id="decodeCanvas" class="hidden-canvas" style="width: 320px; height: 240px;"></canvas>
-  <canvas canvas-id="shareCanvas" class="share-canvas"></canvas>
+  <canvas type="2d" id="shareCanvas" class="share-canvas"></canvas>
 
     <view class="tab-bar">
       <view class="tab-item {{currentTab === 'encode' ? 'active' : ''}}" bindtap="switchTab" data-tab="encode">
