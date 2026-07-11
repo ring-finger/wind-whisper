@@ -12,7 +12,7 @@ const STORAGE_NICK = 'wxMineNickName'
 const STORAGE_THEME = 'appTheme'
 
 // 当前版本号 - 每次发布新版本时更新
-const CURRENT_VERSION = '1.5.0'
+const CURRENT_VERSION = '1.5.3'
 
 // 更新日志内容
 const UPDATE_LOGS = [
@@ -21,6 +21,8 @@ const UPDATE_LOGS = [
     date: '2026-06-10',
     title: '功能优化',
     content: [
+      '图片内容审核',
+      'SSTV解码取消功能优化',
       '日志再次分享、分享查看显示',
       '通联日志ADIF文件导出功能',
       'QSL卡片设计功能'
