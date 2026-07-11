@@ -2193,20 +2193,8 @@ Page({
     this.setData({ showMoreMenu: false })
     wx.vibrateShort({ type: VIBRATE_TYPE })
     try {
-      const myCallSign = wx.getStorageSync('myCallSign') || ''
-      if (!myCallSign) {
-        wx.showModal({
-          title: '提示',
-          content: '请先在"我的"页面设置个人呼号',
-          confirmText: '去设置',
-          success: (res) => {
-            if (res.confirm) {
-              wx.switchTab({ url: '/pages/mine/mine' })
-            }
-          }
-        })
-        return
-      }
+      // 呼号拦截校验（未设置则弹窗提示并阻断导出）
+      if (!app.requireCallSign()) return
 
       const logs = wx.getStorageSync('contactLogs') || []
       if (logs.length === 0) {
@@ -2334,20 +2322,9 @@ Page({
     this.setData({ showMoreMenu: false })
     wx.vibrateShort({ type: VIBRATE_TYPE })
     try {
+      // 呼号拦截校验（未设置则弹窗提示并阻断导出）
+      if (!app.requireCallSign()) return
       const myCallSign = wx.getStorageSync('myCallSign') || ''
-      if (!myCallSign) {
-        wx.showModal({
-          title: '提示',
-          content: '请先在"我的"页面设置个人呼号',
-          confirmText: '去设置',
-          success: (res) => {
-            if (res.confirm) {
-              wx.switchTab({ url: '/pages/mine/mine' })
-            }
-          }
-        })
-        return
-      }
 
       const logs = wx.getStorageSync('contactLogs') || []
       if (logs.length === 0) {

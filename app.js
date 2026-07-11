@@ -36,7 +36,8 @@ App({
     maxCloudLogCount: null,
     callHistory: null,
     cloudSyncEnabled: null,
-    systemConfig: null
+    systemConfig: null,
+    myCallSign: null
   },
 
   // 系统配置实时订阅(watch)实例与定时刷新句柄
@@ -356,6 +357,49 @@ App({
     } catch (e) {
       console.error('保存呼号历史失败', e)
     }
+  },
+
+  /**
+   * 校验当前用户是否已设置呼号（基于全局缓存，未命中则回退本地存储）
+   * 未设置时弹窗提示并阻断后续执行；已设置时静默放行。
+   * 全局复用：SSTV 编码上传图片前、通联列表导出数据前、开启云同步前等统一调用。
+   * @param {Object} [options]
+   * @param {string} [options.title='请先设置呼号'] 弹窗标题
+   * @param {string} [options.content] 弹窗内容，默认提示去"我的"页面设置
+   * @param {boolean} [options.navigate=true] 确认后是否跳转到"我的"页面
+   * @param {Function} [options.onConfirm] 确认后的自定义回调，传入则替代默认跳转行为
+   * @returns {boolean} true=已设置呼号(放行)，false=未设置(已拦截弹窗)
+   */
+  requireCallSign(options = {}) {
+    try {
+      if (this._cache.myCallSign === null || this._cache.myCallSign === undefined) {
+        this._cache.myCallSign = wx.getStorageSync('myCallSign') || ''
+      }
+    } catch (e) {
+      this._cache.myCallSign = ''
+    }
+    if (this._cache.myCallSign) return true
+
+    const title = options.title || '请先设置呼号'
+    const content = options.content || '该功能需要设置您的呼号，请在"我的"页面先设置个人呼号后再试。'
+    const navigate = options.navigate !== false
+    const onConfirm = typeof options.onConfirm === 'function' ? options.onConfirm : null
+    wx.showModal({
+      title,
+      content,
+      confirmText: '去设置',
+      cancelText: '取消',
+      success: (res) => {
+        if (!res.confirm) return
+        if (onConfirm) {
+          onConfirm()
+        } else if (navigate) {
+          // 项目无 tabBar，"我的"页为主包普通页，需用 navigateTo 跳转
+          wx.navigateTo({ url: '/pages/mine/mine' })
+        }
+      }
+    })
+    return false
   },
 
   /**

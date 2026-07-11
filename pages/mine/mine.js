@@ -4,7 +4,7 @@ const AUTHOR_CALL_SIGN = 'BA4IWA'
 const VIBRATE_TYPE = 'medium'
 
 // 公众号文章链接
-const WECHAT_ARTICLE_URL = 'https://mp.weixin.qq.com/s/v9SCaoojlJ6hPdoODTyTYg'
+const WECHAT_ARTICLE_URL = 'https://mp.weixin.qq.com/mp/appmsgalbum?__biz=MzY0MDMwNDkyOA==&action=getalbum&album_id=4515202379532959751#wechat_redirect'
 
 const SHARE_TITLE = '风语纪<电波有痕，风语为纪> - 我的设置'
 const STORAGE_AVATAR = 'wxMineAvatarUrl'
@@ -156,6 +156,11 @@ Page({
     const newEnabled = e.detail.value
     
     if (newEnabled) {
+      // 呼号拦截校验：未设置则弹窗提示并阻断开启（当前在"我的"页，确认后就地编辑呼号）
+      if (!app.requireCallSign({ onConfirm: () => this.editCallSign() })) {
+        this.setData({ cloudSyncEnabled: false })  // 回退开关状态
+        return
+      }
       // 开启时先显示免责声明
       // 注意：此时开关组件的 checked 已经变为 true，但我们需要等待用户同意
       this.setData({ 
@@ -236,22 +241,9 @@ Page({
       return
     }
     
-    // 检查是否有呼号
-    if (!myCallSign) {
-      wx.showModal({
-        title: '请先设置呼号',
-        content: '云同步需要设置您的呼号，请在"我的"页面先设置呼号后再进行同步。',
-        confirmText: '去设置',
-        success: (res) => {
-          if (res.confirm) {
-            // 跳转到设置呼号
-            this.editCallSign()
-          }
-        }
-      })
-      return
-    }
-    
+    // 呼号拦截校验（未设置则弹窗提示并阻断云同步；当前已在"我的"页，确认后就地编辑呼号）
+    if (!app.requireCallSign({ onConfirm: () => this.editCallSign() })) return
+
     // 为历史日志补充呼号
     logs.forEach(log => {
       if (!log.myCallSign) {
@@ -276,8 +268,8 @@ Page({
     
     wx.showLoading({ title: '同步中...' })
     
-    const db = wx.cloud.database()
-    const collection = db.collection(app.CLOUD_LOGS_CONFIG.collectionName)
+    const cloudDB = wx.cloud.database()
+    const collection = cloudDB.collection(app.CLOUD_LOGS_CONFIG.collectionName)
     const maxCount = 100
     
     // 限制同步条数
@@ -299,7 +291,7 @@ Page({
         return collection.add({
           data: {
             ...logData,
-            _syncTime: db.serverDate()
+            _syncTime: cloudDB.serverDate()
           }
         })
       })
@@ -345,8 +337,8 @@ Page({
   doRestoreFromCloud() {
     wx.showLoading({ title: '恢复中...' })
     
-    const db = wx.cloud.database()
-    const collection = db.collection(app.CLOUD_LOGS_CONFIG.collectionName)
+    const cloudDB = wx.cloud.database()
+    const collection = cloudDB.collection(app.CLOUD_LOGS_CONFIG.collectionName)
     
     collection.orderBy('createdAt', 'desc').get().then(res => {
       const cloudLogs = res.data || []
@@ -586,7 +578,9 @@ Page({
       success: (res) => {
         if (res.confirm && res.content) {
           const callSign = res.content.toUpperCase().replace(/[^A-Z0-9]/g, '')
-            if (callSign) {
+          // 呼号格式正则校验：前缀(数字+字母/字母+数字/1-2字母) + 数字 + 1-3字母后缀
+          const callSignRegExp = /^(?:[0-9][A-Z]|[A-Z][0-9]|[A-Z]{1,2})\d[A-Z]{1,3}$/
+          if (callSign && callSignRegExp.test(callSign)) {
             this.setData({
               myCallSign: callSign
             })
@@ -605,7 +599,7 @@ Page({
                 icon: 'none'
               })
             } catch (e) {
-              console.error('保存呼号失败', e)
+              console.error('呼号格式不正确', e)
             }
           } else {
             wx.showToast({

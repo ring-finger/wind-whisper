@@ -347,6 +347,9 @@ Page({
   },
 
   chooseImage() {
+    // 呼号拦截校验前置：未设置则弹窗提示并阻断后续图片选择/上传/编码
+    if (!app.requireCallSign()) return
+
     wx.chooseMedia({
       count: 1,
       mediaType: ['image'],
