@@ -35,6 +35,24 @@ Page({
     wx.setStorageSync('contactLogs', logs)
   },
 
+  /**
+   * 从全局缓存读取共享 key（未命中回退 getStorageSync）
+   * 用于 appTheme / myCallSign / wxMineAvatarUrl / wxMineNickName 等跨页面不变的值
+   * @param {string} key 存储键名
+   * @param {string} [fallback=''] 未取到时的默认值
+   * @returns {string}
+   */
+  _getFromGlobalCache(key, fallback = '') {
+    try {
+      if (app._cache[key] === null || app._cache[key] === undefined) {
+        app._cache[key] = wx.getStorageSync(key) || fallback
+      }
+      return app._cache[key]
+    } catch (e) {
+      return fallback
+    }
+  },
+
   onLoad() {
     this._cache = {
       appTheme: null,
@@ -56,11 +74,13 @@ Page({
   },
 
   onShow() {
+    // 仅重置可能变化的本地数据（通联日志/统计签名）
+    // appTheme / myCallSign / wxMineAvatarUrl / wxMineNickName 走全局缓存，跨 show 不重复读存储
     this._cache.contactLogs = null
-    this._cache.appTheme = null
-    this._cache.myCallSign = null
+    this._cache.personalStatsSig = null
+    // 头像文件可能被外部删除，每次 onShow 重新校验
     this._cache.wxMineAvatarUrl = null
-    this._cache.wxMineNickName = null
+    app._cache.wxMineAvatarUrl = null
     this.loadTheme()
     this.loadUserInfo()
     this.loadStats()
@@ -69,10 +89,8 @@ Page({
 
   loadTheme() {
     try {
-      if (this._cache.appTheme === null) {
-        this._cache.appTheme = wx.getStorageSync('appTheme') || 'radio'
-      }
-      const savedTheme = this._cache.appTheme
+      const savedTheme = this._getFromGlobalCache('appTheme', 'radio')
+      this._cache.appTheme = savedTheme
       this.setData({ currentTheme: savedTheme })
       const themeConfig = app.THEMES[savedTheme] || app.THEMES.radio
       wx.setNavigationBarColor({
@@ -90,9 +108,8 @@ Page({
 
   loadUserInfo() {
     try {
-      if (this._cache.myCallSign === null) {
-        this._cache.myCallSign = wx.getStorageSync('myCallSign') || ''
-      }
+      const myCallSign = this._getFromGlobalCache('myCallSign', '')
+      this._cache.myCallSign = myCallSign
       if (this._cache.wxMineAvatarUrl === null) {
         const stored = wx.getStorageSync('wxMineAvatarUrl') || ''
         // 校验头像文件是否存在，避免引用已删除的旧路径
@@ -101,19 +118,20 @@ Page({
             wx.getFileSystemManager().accessSync(stored)
           } catch (e) {
             wx.removeStorageSync('wxMineAvatarUrl')
+            app._cache.wxMineAvatarUrl = ''
             this._cache.wxMineAvatarUrl = ''
             return this.setData({ userAvatarUrl: '' })
           }
         }
         this._cache.wxMineAvatarUrl = stored
+        app._cache.wxMineAvatarUrl = stored
       }
-      if (this._cache.wxMineNickName === null) {
-        this._cache.wxMineNickName = wx.getStorageSync('wxMineNickName') || ''
-      }
+      const wxMineNickName = this._getFromGlobalCache('wxMineNickName', '')
+      this._cache.wxMineNickName = wxMineNickName
       this.setData({
-        userCallsign: this._cache.myCallSign || '设置呼号',
+        userCallsign: myCallSign || '设置呼号',
         userAvatarUrl: this._cache.wxMineAvatarUrl,
-        userNickName: this._cache.wxMineNickName
+        userNickName: wxMineNickName
       })
     } catch (e) {
       console.error('加载用户信息失败', e)

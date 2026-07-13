@@ -1,8 +1,7 @@
 {
   "pages": [
     "pages/index/index",
-    "pages/mine/mine",
-    "pages/web-view/web-view"
+    "pages/mine/mine"
   ],
   "window": {
     "backgroundTextStyle": "dark",

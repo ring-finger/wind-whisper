@@ -1,1 +1,0 @@
-<web-view src="{{url}}" binderror="onError" bindload="onLoadSuccess"></web-view>

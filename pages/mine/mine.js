@@ -3,8 +3,9 @@ const db = require('../../utils/db')
 const AUTHOR_CALL_SIGN = 'BA4IWA'
 const VIBRATE_TYPE = 'medium'
 
-// 公众号文章链接
-const WECHAT_ARTICLE_URL = 'https://mp.weixin.qq.com/mp/appmsgalbum?__biz=MzY0MDMwNDkyOA==&action=getalbum&album_id=4515202379532959751#wechat_redirect'
+// 公众号原始ID（gh_ 开头），用于 wx.openOfficialAccountProfile 跳转
+// 请替换为本公众号的真实原始ID（公众号后台「设置与开发 > 公众号设置 > 账号详情」查看）
+const OFFICIAL_ACCOUNT_USERNAME = 'gh_4792af3126a8'
 
 const SHARE_TITLE = '风语纪<电波有痕，风语为纪> - 我的设置'
 const STORAGE_AVATAR = 'wxMineAvatarUrl'
@@ -578,8 +579,8 @@ Page({
       success: (res) => {
         if (res.confirm && res.content) {
           const callSign = res.content.toUpperCase().replace(/[^A-Z0-9]/g, '')
-          // 呼号格式正则校验：前缀(数字+字母/字母+数字/1-2字母) + 数字 + 1-3字母后缀
-          const callSignRegExp = /^(?:[0-9][A-Z]|[A-Z][0-9]|[A-Z]{1,2})\d[A-Z]{1,3}$/
+        // 通用国际呼号正则，[1-2字母] + [1-3数字] + [1-4字母]，兼容国内所有B字头呼号，i忽略大小写
+        const callSignRegExp = /^[A-Z]{1,2}\d{1,3}[A-Z]{1,4}$/i;
           if (callSign && callSignRegExp.test(callSign)) {
             this.setData({
               myCallSign: callSign
@@ -628,14 +629,12 @@ Page({
 
   contactAuthor() {
     wx.vibrateShort({ type: VIBRATE_TYPE })
-    wx.navigateTo({
-      url: '/pages/web-view/web-view?url=' + encodeURIComponent(WECHAT_ARTICLE_URL),
+    // 跳转公众号主页（使用原始ID；基础库 2.18.0+ 支持）
+    wx.openOfficialAccountProfile({
+      username: OFFICIAL_ACCOUNT_USERNAME,
       fail: (err) => {
-        console.error('导航失败', err)
-        wx.showToast({
-          title: '打开失败，请重试',
-          icon: 'none'
-        })
+        console.error('打开公众号失败', err)
+        wx.showToast({ title: '打开失败，请重试', icon: 'none' })
       }
     })
   },

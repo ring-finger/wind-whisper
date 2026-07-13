@@ -37,8 +37,14 @@ App({
     callHistory: null,
     cloudSyncEnabled: null,
     systemConfig: null,
-    myCallSign: null
+    myCallSign: null,
+    wxMineAvatarUrl: null,
+    wxMineNickName: null,
+    lastLocation: null
   },
+
+  // 定位缓存有效期（毫秒）：5 分钟内复用，避免重复调用 getLocation 阻塞渲染
+  LOCATION_CACHE_TTL: 5 * 60 * 1000,
 
   // 系统配置实时订阅(watch)实例与定时刷新句柄
   _watchInstance: null,
@@ -49,10 +55,10 @@ App({
       env: "wind-d9gv5b4ca9c4129ba"
     });
 
-    // 延迟同步操作到启动完成后，避免阻塞
+    // 延迟同步操作到启动完成后，避免阻塞首屏渲染
     setTimeout(() => {
       if (this._cache.maxCloudLogCount === null) {
-        this._cache.maxCloudLogCount = wx.getStorageSync('maxCloudLogCount')
+        this._cache.maxCloudLogCount = this._readStorage('maxCloudLogCount')
       }
       if (!this._cache.maxCloudLogCount) {
         this.setMaxCloudCount(100)
@@ -60,9 +66,13 @@ App({
       this.loadCallHistory()
       this.initTheme()
       this._syncUserProfileFromCloud()
-      // 启动全局系统配置同步：立即拉取 + 实时订阅 + 定时兜底刷新
-      this.startSystemConfigSync()
     }, 0)
+
+    // 全局系统配置同步（云函数拉取 + 实时订阅 + 定时刷新）属于后台网络任务，
+    // 延后到首屏渲染完成后再启动，避免占用启动关键路径
+    setTimeout(() => {
+      this.startSystemConfigSync()
+    }, 1500)
 
     this.getDeviceInfo()
   },
@@ -72,10 +82,28 @@ App({
     platform: ''
   },
 
+  /**
+   * 统一读取本地存储（带全局缓存，避免启动期重复同步读取同一 key）
+   * @param {string} key 存储键名
+   * @param {*} [fallback=''] 未取到时的默认值
+   * @returns {*}
+   */
+  _readStorage(key, fallback = '') {
+    try {
+      if (this._cache[key] === null || this._cache[key] === undefined) {
+        const v = wx.getStorageSync(key)
+        this._cache[key] = (v === '' || v === undefined || v === null) ? fallback : v
+      }
+      return this._cache[key]
+    } catch (e) {
+      return fallback
+    }
+  },
+
   isCloudSyncEnabled() {
     try {
       if (this._cache.cloudSyncEnabled === null) {
-        this._cache.cloudSyncEnabled = wx.getStorageSync(this.CLOUD_LOGS_CONFIG.syncEnabledKey)
+        this._cache.cloudSyncEnabled = this._readStorage(this.CLOUD_LOGS_CONFIG.syncEnabledKey)
       }
       return this._cache.cloudSyncEnabled === true
     } catch (e) {
@@ -207,7 +235,7 @@ App({
   getMaxCloudCount() {
     try {
       if (this._cache.maxCloudLogCount === null) {
-        this._cache.maxCloudLogCount = wx.getStorageSync('maxCloudLogCount')
+        this._cache.maxCloudLogCount = this._readStorage('maxCloudLogCount')
       }
       return this._cache.maxCloudLogCount || this.CLOUD_LOGS_CONFIG.maxCloudCount
     } catch (e) {
@@ -227,7 +255,7 @@ App({
   initTheme() {
     try {
       if (this._cache.appTheme === null) {
-        this._cache.appTheme = wx.getStorageSync(this.STORAGE_THEME) || 'radio'
+        this._cache.appTheme = this._readStorage(this.STORAGE_THEME, 'radio')
       }
       const theme = this._cache.appTheme
       const themeConfig = this.THEMES[theme] || this.THEMES.radio
@@ -277,11 +305,13 @@ App({
    */
   _syncUserProfileFromCloud() {
     try {
-      // 已有本地呼号 → 不是首次使用，跳过
-      const localCallSign = wx.getStorageSync('myCallSign')
+      // 已有本地呼号 → 不是首次使用，跳过（走全局缓存，避免重复同步读取）
+      const localCallSign = this._readStorage('myCallSign', '')
+      this._cache.myCallSign = localCallSign
       if (localCallSign) return
 
-      const localNick = wx.getStorageSync('wxMineNickName')
+      const localNick = this._readStorage('wxMineNickName', '')
+      this._cache.wxMineNickName = localNick
       if (localNick) return
 
       db.loadUserProfile().then(profile => {
@@ -336,7 +366,7 @@ App({
   loadCallHistory() {
     try {
       if (this._cache.callHistory === null) {
-        this._cache.callHistory = wx.getStorageSync('callHistory') || []
+        this._cache.callHistory = this._readStorage('callHistory', [])
       }
       this.globalData.callHistory = this._cache.callHistory
     } catch (e) {
@@ -373,7 +403,7 @@ App({
   requireCallSign(options = {}) {
     try {
       if (this._cache.myCallSign === null || this._cache.myCallSign === undefined) {
-        this._cache.myCallSign = wx.getStorageSync('myCallSign') || ''
+        this._cache.myCallSign = this._readStorage('myCallSign', '')
       }
     } catch (e) {
       this._cache.myCallSign = ''
@@ -400,6 +430,28 @@ App({
       }
     })
     return false
+  },
+
+  /**
+   * 获取缓存的定位结果（有效期内复用，避免重复调用 getLocation 阻塞首屏渲染）
+   * @returns {Object|null} { latitude, longitude, time } 或 null（无/已过期）
+   */
+  getCachedLocation() {
+    const loc = this._cache.lastLocation
+    if (loc && loc.latitude != null && loc.longitude != null &&
+        Date.now() - (loc.time || 0) < this.LOCATION_CACHE_TTL) {
+      return loc
+    }
+    return null
+  },
+
+  /**
+   * 写入定位缓存
+   * @param {number} latitude 纬度
+   * @param {number} longitude 经度
+   */
+  setCachedLocation(latitude, longitude) {
+    this._cache.lastLocation = { latitude, longitude, time: Date.now() }
   },
 
   /**
@@ -431,9 +483,9 @@ App({
         cloudPath,
         filePath: tempFilePath,
         success: (uploadRes) => {
-          // 读取呼号，供违规留痕命名
+          // 读取呼号，供违规留痕命名（走全局缓存，避免重复同步读取）
           let callsign = ''
-          try { callsign = wx.getStorageSync('myCallSign') || '' } catch (e) { /* 忽略 */ }
+          try { callsign = this._readStorage('myCallSign', '') } catch (e) { /* 忽略 */ }
 
           // 调用云函数审核（安全/无法判定时由云函数删除临时文件；违规时同步归档并删原文件）
           wx.cloud.callFunction({

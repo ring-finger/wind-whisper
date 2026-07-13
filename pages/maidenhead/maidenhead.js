@@ -1,3 +1,4 @@
+const app = getApp()
 const VIBRATE_TYPE = 'medium'
 
 // ==================== 梅登黑德编码核心算法 ====================
@@ -172,17 +173,40 @@ Page({
     this.loadTheme()
     this.requestLocation()
     this.mapCtx = wx.createMapContext('maidenheadMap', this)
+    this._timers = []
   },
 
   onShow() {
     this.loadTheme()
   },
 
+  onUnload() {
+    // 清理定时任务，避免页面销毁后回调
+    if (this._timers && this._timers.length) {
+      this._timers.forEach((t) => clearTimeout(t))
+      this._timers = []
+    }
+    // 关闭地图 show-location 启动的实时定位监听（wx.onLocationChange）
+    try { wx.stopLocationUpdate() } catch (e) { /* 忽略 */ }
+    this.mapCtx = null
+  },
+
+  /** 注册可在页面销毁时统一清理的定时器 */
+  _setTimer(fn, delay) {
+    const t = setTimeout(() => {
+      this._timers = (this._timers || []).filter((x) => x !== t)
+      fn()
+    }, delay)
+    this._timers = this._timers || []
+    this._timers.push(t)
+    return t
+  },
+
   // ==================== 主题 ====================
 
   loadTheme() {
     try {
-      const savedTheme = wx.getStorageSync('appTheme') || 'radio'
+      const savedTheme = app._readStorage('appTheme', 'radio')
       const { accentColor, fillColor } = themeColors(savedTheme)
       wx.setNavigationBarColor({
         frontColor: '#000000',
@@ -211,6 +235,13 @@ Page({
   },
 
   requestLocation() {
+    // 优先复用全局定位缓存，避免重复调用 getLocation 阻塞渲染
+    const cached = app.getCachedLocation()
+    if (cached) {
+      this._applyLocation(cached.latitude, cached.longitude)
+      return
+    }
+
     wx.getSetting({
       success: (res) => {
         if (res.authSetting['scope.userLocation'] !== false && res.authSetting['scope.userLocation'] !== true) {
@@ -254,13 +285,13 @@ Page({
   },
 
   retryLocation() {
-    // 重新定位时以精度6（子方级）展示
+    // 重新定位时以精度6（子方级）展示，并强制重新获取位置（绕过缓存）
     this.setData({
       currPrecision: 6,
       currPrecisionName: precisionName(6),
       mapScale: precisionToScale(6)
     })
-    this.requestLocation()
+    this.getLocation()
   },
 
   // ==================== 获取位置 + 地图标记 ====================
@@ -274,18 +305,9 @@ Page({
       success: (res) => {
         wx.hideLoading()
         const { latitude, longitude } = res
-        const grid = Maidenhead.encode(latitude, longitude, this.data.currPrecision)
-        const latStr = latitude.toFixed(6)
-        const lngStr = longitude.toFixed(6)
-
-        this.updateMapMarker(latitude, longitude, grid, latStr, lngStr)
-        this.setData({
-          locationReady: true,
-          locationFailed: false
-        })
-        
-        // 定位成功后生成分享卡片
-        setTimeout(() => this._generateShareCard(), 1000)
+        // 写入全局定位缓存，供后续进入本页复用
+        app.setCachedLocation(latitude, longitude)
+        this._applyLocation(latitude, longitude)
       },
       fail: (err) => {
         wx.hideLoading()
@@ -294,6 +316,22 @@ Page({
         this.setData({ locationFailed: true })
       }
     })
+  },
+
+  /** 应用定位结果：编码网格 + 更新地图标记 + 标记就绪 + 生成分享卡片 */
+  _applyLocation(latitude, longitude) {
+    const grid = Maidenhead.encode(latitude, longitude, this.data.currPrecision)
+    const latStr = latitude.toFixed(6)
+    const lngStr = longitude.toFixed(6)
+
+    this.updateMapMarker(latitude, longitude, grid, latStr, lngStr)
+    this.setData({
+      locationReady: true,
+      locationFailed: false
+    })
+
+    // 定位成功后生成分享卡片
+    this._setTimer(() => this._generateShareCard(), 1000)
   },
 
   updateMapMarker(lat, lng, grid, latStr, lngStr) {
@@ -314,7 +352,7 @@ Page({
   onReady() {
     // 页面渲染完成后，如果已经定位成功，生成分享卡片
     if (this.data.locationReady && this.data.currGrid) {
-      setTimeout(() => this._generateShareCard(), 500)
+      this._setTimer(() => this._generateShareCard(), 500)
     }
   },
 
@@ -430,7 +468,7 @@ Page({
         ctx.fillText('风语纪 · 业余无线电工具', iconCenterX, height - 40)
         
         // 导出图片（2d 即时绘制，少量延迟确保 emoji 字形就绪）
-        setTimeout(() => {
+        this._setTimer(() => {
           wx.canvasToTempFilePath({
             canvas: canvas,
             x: 0,
@@ -505,7 +543,7 @@ Page({
       success: () => {
         this.setData({ mapGridCopied: true })
         wx.showToast({ title: `${this.data.currGrid} 已复制`, icon: 'success' })
-        setTimeout(() => this.setData({ mapGridCopied: false }), 2000)
+        this._setTimer(() => this.setData({ mapGridCopied: false }), 2000)
       }
     })
   },
