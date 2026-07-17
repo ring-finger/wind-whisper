@@ -1,0 +1,114 @@
+<view class="theme-wrapper {{currentTheme === 'morandi' ? 'theme-morandi' : ''}}">
+  <view class="wc-page">
+
+    <!-- 页面简介 -->
+    <view class="wc-intro">
+      <text class="wc-intro-text">集结友台电波辅助工具，丰富你的通联装备库</text>
+    </view>
+
+    <!-- 上方：标签筛选区 -->
+    <view class="wc-filter-bar">
+      <view class="wc-tags">
+        <view
+          wx:for="{{tags}}"
+          wx:key="name"
+          class="wc-tag {{activeTag === item.name ? 'wc-tag-active' : ''}}"
+          bindtap="onTagTap"
+          data-tag="{{item.name}}"
+        >
+          <text class="wc-tag-name">{{item.name}}</text>
+          <text class="wc-tag-count">{{item.count}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 下方：卡片展示区（每张卡片独占一行） -->
+    <view class="wc-list">
+      <view
+        wx:for="{{displayList}}"
+        wx:key="_id"
+        class="wc-card"
+        hover-class="wc-card-hover"
+        bindtap="onCardTap"
+        bindlongpress="onCardLongPress"
+        data-index="{{index}}"
+      >
+        <view class="wc-card-main">
+          <view class="wc-card-head">
+            <text class="wc-card-title">{{item.title}}</text>
+            <view class="wc-card-tags" wx:if="{{item.tags.length}}">
+              <text wx:for="{{item.tags}}" wx:for-item="t" wx:key="*this" class="wc-card-tag">{{t}}</text>
+            </view>
+          </view>
+          <text class="wc-card-desc">{{item.description}}</text>
+        </view>
+        <text class="wc-card-arrow">›</text>
+      </view>
+
+      <view wx:if="{{loading}}" class="wc-foot">加载中…</view>
+      <view wx:elif="{{displayList.length === 0}}" class="wc-foot wc-empty">暂无内容</view>
+      <view wx:elif="{{hasMore}}" class="wc-foot">上拉加载更多</view>
+      <view wx:else class="wc-foot">没有更多了</view>
+    </view>
+
+    <!-- 页脚：版权与联系声明 -->
+    <view class="wc-footer">
+      <view class="wc-footer-line">© {{year}} 风语纪 WindWhispe · 风语集</view>
+      <view class="wc-footer-note">风语集里的好用工具，由友台们一起共建 ❤️ 如果某条内容不小心侵权了，别担心，联系客服我们马上处理下架；手里有好用的小程序也欢迎甩给客服，审核通过就帮你上墙～</view>
+      <button class="wc-footer-contact" open-type="contact">
+        <text class="wc-footer-link">联系客服</text>
+      </button>
+    </view>
+
+    <!-- 悬浮按钮（仅管理员可见）：刷新统计 + 新增 -->
+    <view wx:if="{{isAdmin}}" class="wc-fabs">
+      <view class="wc-fab wc-fab-refresh {{refreshing ? 'wc-fab-loading' : ''}}" bindtap="onRefreshTags">↻</view>
+      <view class="wc-fab" bindtap="openAdd">＋</view>
+    </view>
+
+    <!-- 管理弹窗（新增 / 编辑） -->
+    <view wx:if="{{manageOpen}}" class="wc-mask" bindtap="closeManage">
+      <view class="wc-sheet" catchtap="noop">
+        <view class="wc-sheet-head">
+          <text class="wc-sheet-title">{{manageMode === 'edit' ? '编辑' : '新增'}}工具</text>
+          <text class="wc-sheet-close" bindtap="closeManage">✕</text>
+        </view>
+
+        <view class="wc-field">
+          <text class="wc-label">名称 *</text>
+          <input class="wc-input" placeholder="如：APRS 实时地图" value="{{form.title}}" data-field="title" bindinput="onFormInput" />
+        </view>
+        <view class="wc-field">
+          <text class="wc-label">简介</text>
+          <input class="wc-input" placeholder="一句话描述" value="{{form.description}}" data-field="description" bindinput="onFormInput" />
+        </view>
+        <view class="wc-field">
+          <text class="wc-label">标签</text>
+          <input class="wc-input" placeholder="用逗号分隔，如：地图，气象" value="{{form.tagsText}}" data-field="tagsText" bindinput="onFormInput" />
+        </view>
+        <view class="wc-field">
+          <text class="wc-label">appId</text>
+          <input class="wc-input" placeholder="跳转小程序，可留空" value="{{form.appId}}" data-field="appId" bindinput="onFormInput" />
+        </view>
+        <view class="wc-field">
+          <text class="wc-label">path</text>
+          <input class="wc-input" placeholder="小程序内路径，可留空" value="{{form.path}}" data-field="path" bindinput="onFormInput" />
+        </view>
+        <view class="wc-field">
+          <text class="wc-label">shortLink</text>
+          <input class="wc-input" placeholder="小程序短链，可留空" value="{{form.shortLink}}" data-field="shortLink" bindinput="onFormInput" />
+        </view>
+        <view class="wc-field">
+          <text class="wc-label">排序权重</text>
+          <input class="wc-input" type="number" placeholder="数字越大越靠前" value="{{form.priority}}" data-field="priority" bindinput="onFormInput" />
+        </view>
+
+        <view class="wc-sheet-actions">
+          <button wx:if="{{manageMode === 'edit'}}" class="wc-btn wc-btn-danger" bindtap="deleteItem">删除</button>
+          <button class="wc-btn wc-btn-primary" bindtap="saveManage">保存</button>
+        </view>
+      </view>
+    </view>
+
+  </view>
+</view>

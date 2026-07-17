@@ -39,6 +39,12 @@
       "pages": [
         "maidenhead"
       ]
+    },
+    {
+      "root": "pages/wind-collection",
+      "pages": [
+        "wind-collection"
+      ]
     }
   ],
   "permission": {

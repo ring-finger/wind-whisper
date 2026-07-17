@@ -1,0 +1,9 @@
+{
+  "name": "windCollection",
+  "version": "1.0.0",
+  "description": "风语集：小程序推荐数据的管理与加载",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

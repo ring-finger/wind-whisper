@@ -337,6 +337,20 @@
   font-weight: 500;
 }
 
+.switch-chevron-group {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.section-chevron {
+  transition: transform 0.2s ease;
+}
+
+.section-chevron-expanded {
+  transform: rotate(90deg);
+}
+
 .cell-switch {
   display: flex;
   align-items: center;

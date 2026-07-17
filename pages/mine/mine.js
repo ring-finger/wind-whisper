@@ -13,7 +13,7 @@ const STORAGE_NICK = 'wxMineNickName'
 const STORAGE_THEME = 'appTheme'
 
 // 当前版本号 - 每次发布新版本时更新
-const CURRENT_VERSION = '1.5.3'
+const CURRENT_VERSION = '1.6.0'
 
 // 更新日志内容
 const UPDATE_LOGS = [
@@ -22,6 +22,7 @@ const UPDATE_LOGS = [
     date: '2026-06-10',
     title: '功能优化',
     content: [
+      '风语集——好用的三方工具',
       '图片内容审核',
       'SSTV解码取消功能优化',
       '日志再次分享、分享查看显示',
@@ -68,6 +69,7 @@ Page({
     // 云同步配置
     cloudSyncEnabled: false,
     cloudSyncTips: '',
+    cloudSyncExpanded: false,  // 云端同步面板是否展开（默认折叠）
     // 免责声明
     showCloudDisclaimer: false,
     cloudDisclaimerAgreed: false,
@@ -152,6 +154,14 @@ Page({
   },
 
   // 切换云同步开关
+  toggleCloudSyncPanel() {
+    wx.vibrateShort({ type: VIBRATE_TYPE })
+    this.setData({ cloudSyncExpanded: !this.data.cloudSyncExpanded })
+  },
+
+  // 阻止 switch 的点击冒泡到「开启云同步」行的折叠切换
+  noop() {},
+
   toggleCloudSync(e) {
     wx.vibrateShort({ type: VIBRATE_TYPE })
     const newEnabled = e.detail.value
@@ -489,43 +499,39 @@ Page({
     const avatarUrl = e.detail.avatarUrl
     if (!avatarUrl) return
 
-    // 内容安全审核
-    app.checkImageSafety(avatarUrl).then(safe => {
-      if (!safe) return
-
-      const fs = wx.getFileSystemManager()
-      // 每次使用唯一文件名，避免 image 组件因路径不变而使用缓存旧图
-      const dest = `${wx.env.USER_DATA_PATH}/wx_mine_avatar_${Date.now()}.jpg`
-      const persist = (path) => {
-        try {
-          // 清理旧头像文件，避免积累
-          const oldPath = wx.getStorageSync(STORAGE_AVATAR)
-          if (oldPath && oldPath !== path) {
-            try { fs.unlinkSync(oldPath) } catch (e) { /* 忽略 */ }
-          }
-          wx.setStorageSync(STORAGE_AVATAR, path)
-          this.setData({ userAvatarUrl: path })
-          const userInfo = wx.getStorageSync('userInfo') || {}
-          userInfo.avatarUrl = path
-          wx.setStorageSync('userInfo', userInfo)
-          // 清除首页缓存，确保返回首页时显示最新用户信息
-          app._cache.wxMineAvatarUrl = null
-          app._cache.wxMineNickName = null
-          this._syncProfileToCloud()
-        } catch (err) {
-          console.error('保存头像路径失败', err)
-        }
-      }
-      // 兼容清理旧版固定路径文件
+    // 头像设置不走图片内容审核（用户自有头像，直接保存）
+    const fs = wx.getFileSystemManager()
+    // 每次使用唯一文件名，避免 image 组件因路径不变而使用缓存旧图
+    const dest = `${wx.env.USER_DATA_PATH}/wx_mine_avatar_${Date.now()}.jpg`
+    const persist = (path) => {
       try {
-        fs.unlinkSync(`${wx.env.USER_DATA_PATH}/wx_mine_avatar.jpg`)
-      } catch (e) { /* 不存在则忽略 */ }
-      fs.copyFile({
-        srcPath: avatarUrl,
-        destPath: dest,
-        success: () => persist(dest),
-        fail: () => persist(avatarUrl)
-      })
+        // 清理旧头像文件，避免积累
+        const oldPath = wx.getStorageSync(STORAGE_AVATAR)
+        if (oldPath && oldPath !== path) {
+          try { fs.unlinkSync(oldPath) } catch (e) { /* 忽略 */ }
+        }
+        wx.setStorageSync(STORAGE_AVATAR, path)
+        this.setData({ userAvatarUrl: path })
+        const userInfo = wx.getStorageSync('userInfo') || {}
+        userInfo.avatarUrl = path
+        wx.setStorageSync('userInfo', userInfo)
+        // 清除首页缓存，确保返回首页时显示最新用户信息
+        app._cache.wxMineAvatarUrl = null
+        app._cache.wxMineNickName = null
+        this._syncProfileToCloud()
+      } catch (err) {
+        console.error('保存头像路径失败', err)
+      }
+    }
+    // 兼容清理旧版固定路径文件
+    try {
+      fs.unlinkSync(`${wx.env.USER_DATA_PATH}/wx_mine_avatar.jpg`)
+    } catch (e) { /* 不存在则忽略 */ }
+    fs.copyFile({
+      srcPath: avatarUrl,
+      destPath: dest,
+      success: () => persist(dest),
+      fail: () => persist(avatarUrl)
     })
   },
 
@@ -609,6 +615,20 @@ Page({
             })
           }
         }
+      }
+    })
+  },
+
+  goToWindCollection() {
+    wx.vibrateShort({ type: VIBRATE_TYPE })
+    wx.navigateTo({
+      url: '/pages/wind-collection/wind-collection',
+      fail: (err) => {
+        console.error('导航到风语集页面失败', err)
+        wx.showToast({
+          title: '打开失败，请重试',
+          icon: 'none'
+        })
       }
     })
   },
