@@ -10,11 +10,9 @@ const THEMES = {
 const CACHE_TTL = 5 * 60 * 1000
 // 每次懒加载渲染的卡片数量
 const PAGE_SIZE = 10
-// 标签统计缓存键与有效期（与列表分开缓存，可异步补齐）
+// 标签统计缓存键与有效期（直接读 windCollectionStats 单文档，缓存避免重复请求）
 const TAGS_CACHE_KEY = 'windCollection_tags_v2'
 const TAGS_CACHE_TTL = 60 * 1000
-// 数据版本号缓存键（云端数据变更时递增，用于失效列表缓存）
-const TAGS_VERSION_KEY = 'windCollection_tags_version'
 
 Page({
   data: {
@@ -39,6 +37,7 @@ Page({
   onLoad() {
     this.loadTheme()
     this.checkAdmin()
+    this.loadTags()          // 打开即直接读 windCollectionStats（单文档，极快）
     this.loadData('全部', false)
   },
 
@@ -70,14 +69,14 @@ Page({
   },
 
   // 加载数据：先用本地缓存即时渲染首屏，再始终从云端拉取最新列表
-  // （列表为单次查询、开销小；标签聚合已独立优化并持久化，避免卡顿）
+  // （列表为单次查询、开销小；标签统计走独立 action，直接读统计文档）
   loadData(tag, force) {
     this.setData({ loading: true })
     const cacheKey = 'windCollection_' + tag
-    const cached = this._readCache(cacheKey)
-    // 先用缓存即时渲染首屏（若有），保证首屏速度
+    const cached = this._readCache(cacheKey, CACHE_TTL)
+    // 先用缓存即时渲染首屏（若有且在有效期内），保证首屏速度
     if (cached) {
-      this._applyData(tag, cached.data, this.data.tags)
+      this._applyData(tag, cached, this.data.tags)
     }
 
     return wx.cloud.callFunction({
@@ -86,9 +85,7 @@ Page({
     }).then(res => {
       if (res.result && res.result.success) {
         const list = res.result.list || []
-        const version = res.result.version || 0
         this._writeCache(cacheKey, list)
-        wx.setStorageSync(TAGS_VERSION_KEY, version) // 记录数据版本，用于失效判断
         // 用云端最新数据覆盖（即便刚用缓存渲染过，也无缝更新）
         this._applyData(tag, list, this.data.tags)
       } else if (!cached) {
@@ -104,46 +101,28 @@ Page({
       }
     }).then(() => {
       this.setData({ loading: false })
-      this._ensureTags() // 首屏渲染后异步补齐标签数量，避免阻塞
     })
   },
 
-  // 异步加载标签统计（独立 action，不阻塞首屏）
-  // 统计走单文档读取 + count 轻量自检，开销极小；始终拉取以保证数量最新
-  _ensureTags() {
+  // 加载标签统计：先用本地缓存即时渲染（带 TTL），再直接读 windCollectionStats
+  // 单文档（O(1)，极快）。统计的写入完全由管理员 refreshTags 触发，这里不触发任何计算。
+  loadTags() {
+    const cached = this._readCache(TAGS_CACHE_KEY, TAGS_CACHE_TTL)
+    if (cached) {
+      this.setData({ tags: this._normalizeTags(cached) })
+    }
     wx.cloud.callFunction({
       name: 'windCollection',
       data: { action: 'tags' }
     }).then(res => {
-      console.log('[windCollection] tags 原始返回:', JSON.stringify(res.result))
       if (res.result && res.result.success) {
         const allTags = res.result.allTags || []
-        const version = res.result.version || 0
-        this._writeCache(TAGS_CACHE_KEY, allTags)
         this.setData({ tags: this._normalizeTags(allTags) })
-        // 数据版本变化（有人增删改过数据）→ 列表缓存已失效，清掉并强制刷新
-        const prevVersion = wx.getStorageSync(TAGS_VERSION_KEY) || 0
-        if (prevVersion && prevVersion !== version) {
-          this._clearListCaches()
-          this.loadData(this.data.activeTag, true)
-        }
-        wx.setStorageSync(TAGS_VERSION_KEY, version)
+        this._writeCache(TAGS_CACHE_KEY, allTags)
       }
     }).catch(err => {
       console.error('[windCollection] 标签统计失败', err)
     })
-  },
-
-  // 清除所有按标签缓存的列表数据（保留标签统计相关缓存）
-  _clearListCaches() {
-    try {
-      const info = wx.getStorageInfoSync()
-      info.keys.forEach(k => {
-        if (k.indexOf('windCollection_') === 0 && k !== TAGS_CACHE_KEY && k !== TAGS_VERSION_KEY) {
-          wx.removeStorageSync(k)
-        }
-      })
-    } catch (e) { /* 忽略 */ }
   },
 
   // 应用数据并重置分页（按优先级已排序，直接切片懒加载）
@@ -248,8 +227,8 @@ Page({
     }).then(res => {
       if (res.result && res.result.success) {
         const allTags = res.result.allTags || []
-        this.setData({ tags: allTags })
-        wx.setStorageSync(TAGS_CACHE_KEY, { ts: Date.now(), data: allTags })
+        this.setData({ tags: this._normalizeTags(allTags) })
+        this._writeCache(TAGS_CACHE_KEY, allTags)
         wx.showToast({ title: '统计已更新', icon: 'success' })
         this.loadData(this.data.activeTag, true) // 同步刷新列表
       } else {
@@ -355,10 +334,14 @@ Page({
     })
   },
 
-  _readCache(key) {
+  _readCache(key, ttl) {
     try {
       const raw = wx.getStorageSync(key)
-      return raw ? JSON.parse(raw) : null
+      if (!raw) return null
+      const obj = JSON.parse(raw)
+      // 命中有效期校验（ttl 未传则不过期）
+      if (ttl && obj.ts && Date.now() - obj.ts > ttl) return null
+      return obj.data
     } catch (e) {
       return null
     }

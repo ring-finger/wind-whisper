@@ -74,12 +74,7 @@ function initOnce() {
       await ensureCollection()
       await ensureCollection(STATS_COLLECTION)
       await seedIfEmpty()
-      // 统计文档缺失时补算一次（之后仅在数据变更时更新）
-      try {
-        await db.collection(STATS_COLLECTION).doc(STATS_ID).get()
-      } catch (e) {
-        await recomputeTagStats()
-      }
+      // 注意：标签统计文档不再自动生成/补算，完全由管理员 refreshTags 触发写入
     })()
   }
   return _initPromise
@@ -114,29 +109,17 @@ async function recomputeTagStats() {
   return allTags
 }
 
-// 读取标签统计：优先读统计集合中的单文档（O(1)，极快）
-// 并做轻量自检——统计中的「全部」总数与实际集合总数不一致、或统计里
-// 没有具体标签但集合里其实有数据，则重算，以覆盖「未经过 manage action」
-// 直接改库 / 统计文档只写入了「全部」等导致统计未更新的场景
+// 读取标签统计：直接读取统计集合中的单文档（O(1)，极快）
+// 统计的更新完全由管理员的 refreshTags 动作触发，这里不做任何聚合 / 自愈，
+// 以保证页面打开时查询足够快
 async function loadTagStats() {
   try {
     const res = await db.collection(STATS_COLLECTION).doc(STATS_ID).get()
-    const total = await db.collection(COLLECTION).count()
-    console.log('[windCollection] loadTagStats: collection total =', total.total)
-    if (res.data && Array.isArray(res.data.tags)) {
-      const storedTags = res.data.tags
-      const statTotal = (storedTags[0] && storedTags[0].name === '全部')
-        ? storedTags[0].count : 0
-      const tagCount = storedTags.length - 1 // 排除「全部」后的具体标签数
-      if (total.total !== statTotal || (total.total > 0 && tagCount <= 0)) {
-        console.log('[windCollection] 标签统计自愈：total=%d, statTotal=%d, tagCount=%d',
-          total.total, statTotal, tagCount)
-        return recomputeTagStats() // 数量对不上 / 缺标签，重算
-      }
-      return storedTags
+    if (res.data && Array.isArray(res.data.tags) && res.data.tags.length) {
+      return res.data.tags
     }
-  } catch (e) { /* 统计文档不存在，回退重算 */ }
-  return recomputeTagStats()
+  } catch (e) { /* 统计文档不存在 */ }
+  return [{ name: '全部', count: 0 }]
 }
 
 // 列表查询：按标签过滤 + 按优先级降序（仅返回列表，标签统计走独立 action）
@@ -191,7 +174,7 @@ async function manage(action, payload, wxContext) {
     const added = await db.collection(COLLECTION).add({
       data: Object.assign({ updatedAt: db.serverDate() }, payload)
     })
-    await recomputeTagStats() // 数据变更，刷新标签统计
+    // 标签统计不再自动刷新，统一由管理员 refreshTags 触发
     return { _id: added._id }
   }
   if (action === 'update') {
@@ -200,13 +183,13 @@ async function manage(action, payload, wxContext) {
     await db.collection(COLLECTION).doc(_id).update({
       data: Object.assign({ updatedAt: db.serverDate() }, rest)
     })
-    await recomputeTagStats() // 数据变更，刷新标签统计
+    // 标签统计不再自动刷新，统一由管理员 refreshTags 触发
     return { success: true }
   }
   if (action === 'remove') {
     if (!payload || !payload._id) return { error: 'INVALID', message: '缺少 _id' }
     await db.collection(COLLECTION).doc(payload._id).remove()
-    await recomputeTagStats() // 数据变更，刷新标签统计
+    // 标签统计不再自动刷新，统一由管理员 refreshTags 触发
     return { success: true }
   }
   return { error: 'UNKNOWN_ACTION', message: '未知操作' }
