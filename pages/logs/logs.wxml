@@ -159,7 +159,10 @@
 
 
     <view class="float-card">
-      <view class="form-label">信号报告 RST</view>
+      <view class="form-label-row">
+        <text class="form-label">信号报告 RST</text>
+        <view class="rst-full-btn" bindtap="onRstFull">一键满格</view>
+      </view>
       <view class="rst-inputs-row">
         <!-- 对方RST -->
         <view class="rst-group">
@@ -271,8 +274,8 @@
     </view>
 
     <view class="float-card">
-      <view class="form-label">天线 ANTENNA</view>
-      <input class="form-input input-minimal" value="{{formData.antenna}}" bindinput="onAntennaInput" placeholder="天线" />
+      <view class="form-label">天馈 ANTENNA</view>
+      <input class="form-input input-minimal" value="{{formData.antenna}}" bindinput="onAntennaInput" placeholder="天馈" />
     </view>
 
     <view class="float-card">

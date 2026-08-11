@@ -18,8 +18,7 @@
       "root": "pages/sstv",
       "pages": [
         "sstv"
-      ],
-      "independent": true
+      ]
     },
     {
       "root": "pages/logs",

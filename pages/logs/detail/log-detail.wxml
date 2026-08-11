@@ -49,8 +49,8 @@
           <text class="info-label">设备</text>
           <text class="info-value">{{log.equipment}}</text>
         </view>
-        <view class="info-item copyable-item" hover-class="copyable-item-hover" bindtap="copyField" data-field="antenna" data-label="天线" wx:if="{{log.antenna}}">
-          <text class="info-label">天线</text>
+        <view class="info-item copyable-item" hover-class="copyable-item-hover" bindtap="copyField" data-field="antenna" data-label="天馈" wx:if="{{log.antenna}}">
+          <text class="info-label">天馈</text>
           <text class="info-value">{{log.antenna}}</text>
         </view>
         <view class="info-item copyable-item" hover-class="copyable-item-hover" bindtap="copyField" data-field="power" data-label="功率" data-value="{{powerDisplay}}" wx:if="{{powerDisplay}}">

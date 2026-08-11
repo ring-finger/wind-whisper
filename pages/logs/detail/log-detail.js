@@ -423,7 +423,7 @@ Page({
 
     if (log.qth) lines.push(`位置: ${log.qth}`)
     if (log.equipment) lines.push(`设备: ${log.equipment}`)
-    if (log.antenna) lines.push(`天线: ${log.antenna}`)
+    if (log.antenna) lines.push(`天馈: ${log.antenna}`)
     if (this.data.powerDisplay) lines.push(`功率: ${this.data.powerDisplay}`)
     if (log.weather) lines.push(`天气: ${this.data.weatherText || log.weather}`)
     if (log.notes) lines.push(`备注: ${log.notes}`)

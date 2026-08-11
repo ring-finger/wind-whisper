@@ -370,6 +370,25 @@
   font-weight: 500;
 }
 
+/* 信号报告标题行：标题 + 一键满格按钮 */
+.form-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12rpx;
+}
+.form-label-row .form-label {
+  margin-bottom: 0;
+}
+.rst-full-btn {
+  font-size: 22rpx;
+  color: var(--accent-primary);
+  border: 1rpx solid var(--accent-primary);
+  border-radius: 999rpx;
+  padding: 6rpx 20rpx;
+  line-height: 1.4;
+}
+
 .lcd-wrap {
   display: flex;
   align-items: center;

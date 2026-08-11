@@ -54,6 +54,33 @@ App({
     wx.cloud.init({
       env: "wind-d9gv5b4ca9c4129ba"
     });
+    // 标记云初始化已发起（实际 ws 登录为异步，watch 会在就绪前暂挂、就绪后再启动）
+    this._isCloudReady = false
+
+    // 微信隐私合规：真机上若用户未同意隐私协议，showModal/showToast 等 UI 接口会被
+    // 静默拦截（开发者工具不强制，故只在真机暴露）。启动即检查并在需要时拉起系统隐私
+    // 授权弹窗；同时注册 onNeedPrivacyAuthorize，覆盖后续隐私敏感接口（如相册/摄像头）的授权。
+    if (wx.getPrivacySetting) {
+      wx.getPrivacySetting({
+        success: (res) => {
+          if (res && res.needAuthorization) {
+            wx.requirePrivacyAuthorize({
+              success: () => console.log('[privacy] 用户已同意隐私协议'),
+              fail: () => console.warn('[privacy] 隐私授权失败/被拒绝')
+            })
+          }
+        }
+      })
+    }
+    if (wx.onNeedPrivacyAuthorize) {
+      wx.onNeedPrivacyAuthorize((resolve) => {
+        wx.requirePrivacyAuthorize({
+          success: () => resolve(),
+          fail: () => resolve()
+        })
+      })
+    }
+
 
     // 延迟同步操作到启动完成后，避免阻塞首屏渲染
     setTimeout(() => {
@@ -163,6 +190,14 @@ App({
       }).then(res => {
         if (res.result && res.result.success && res.result.config) {
           this._applySystemConfig(res.result.config)
+        }
+        // 云函数调用成功即代表云连接已就绪，可安全启动实时订阅
+        if (this._isCloudReady !== true) {
+          this._isCloudReady = true
+          if (this._watchScheduled) {
+            this._watchScheduled = false
+            this.watchSystemConfig()
+          }
         } else {
           // 云函数返回失败（如集合未创建导致初始化失败）：明确告警，便于排查
           console.error('[systemConfig] 拉取配置失败：', (res.result && res.result.message) || '未知错误',
@@ -179,8 +214,16 @@ App({
   /**
    * 实时订阅云数据库配置变更（推送式，超管改完立即对所有客户端生效）
    * 依赖 systemConfig 集合的「所有用户可读」权限；断线按上限重连。
+   * 冷启动时云 WebSocket 可能尚未登录，watch 会立即失败（errCode -402002），
+   * 此时不应立即递归重连（会瞬间打满重连次数并产生大量报错），
+   * 而是等到云连接就绪后或较长延时后再尝试。
    */
   watchSystemConfig(reconnectCount = 0) {
+    // 云连接尚未就绪（典型冷启动）：暂挂起，待登录状态就绪后再启动，避免无效重试
+    if (wx.cloud && typeof wx.cloud.init === 'function' && this._isCloudReady !== true) {
+      this._scheduleWatchWhenReady(reconnectCount)
+      return
+    }
     try {
       const db = wx.cloud.database()
       const watcher = db.collection(SYSTEM_CONFIG.COLLECTION)
@@ -192,8 +235,14 @@ App({
             }
           },
           onError: (err) => {
-            console.warn('[systemConfig] watch 断开', err)
+            const msg = (err && (err.errMsg || err.message)) || ''
+            console.warn('[systemConfig] watch 断开:', msg)
             this._watchInstance = null
+            // 登录/ws 未就绪导致的失败：等云连接就绪后再试，不计重连次数
+            if (/login fail|ws connection not exists|init watch fail|realtime/.test(msg)) {
+              this._scheduleWatchWhenReady(reconnectCount)
+              return
+            }
             if (reconnectCount < SYSTEM_CONFIG.WATCH_MAX_RECONNECT) {
               setTimeout(() => this.watchSystemConfig(reconnectCount + 1), SYSTEM_CONFIG.WATCH_RECONNECT_DELAY)
             } else {
@@ -203,8 +252,29 @@ App({
         })
       this._watchInstance = watcher
     } catch (e) {
-      console.error('[systemConfig] 启动 watch 失败', e)
+      console.warn('[systemConfig] 启动 watch 失败，等待云连接就绪后重试', e)
+      this._scheduleWatchWhenReady(reconnectCount)
     }
+  },
+
+  /**
+   * 在云连接就绪后启动 watch（仅注册一次监听，避免重复绑定）
+   */
+  _scheduleWatchWhenReady(reconnectCount = 0) {
+    if (this._watchScheduled) return
+    this._watchScheduled = true
+    const start = () => {
+      this._watchScheduled = false
+      this.watchSystemConfig(reconnectCount)
+    }
+    // 优先使用云登录状态变化事件（基础库 2.11.0+）
+    if (wx.cloud && typeof wx.cloud.onLoginStateExpire === 'function') {
+      try {
+        wx.cloud.onLoginStateExpire(() => start())
+      } catch (e) { /* 忽略 */ }
+    }
+    // 兜底：固定延时后尝试（此时云连接通常已建立）
+    setTimeout(start, SYSTEM_CONFIG.WATCH_RECONNECT_DELAY * 2)
   },
 
   /**
@@ -332,6 +402,10 @@ App({
         if (profile.cloudSyncEnabled !== undefined) {
           wx.setStorageSync('cloudSyncEnabled', profile.cloudSyncEnabled)
         }
+        // 已写入本地存储，清空全局缓存以便首页/校验处重新读取最新值
+        this._cache.myCallSign = null
+        this._cache.wxMineNickName = null
+        this._cache.wxMineAvatarUrl = null
 
         // 主题可能变了，重新应用
         this._cache.appTheme = null
@@ -398,6 +472,9 @@ App({
    * @param {string} [options.content] 弹窗内容，默认提示去"我的"页面设置
    * @param {boolean} [options.navigate=true] 确认后是否跳转到"我的"页面
    * @param {Function} [options.onConfirm] 确认后的自定义回调，传入则替代默认跳转行为
+   * @param {boolean} [options.allowRewardedAd=false] 是否允许"看激励广告临时使用一次"。开启后（如 SSTV 场景），
+   *        未设置呼号时弹窗额外提供"看广告使用"选项，观看完成后回调 onReward 放行本次功能。
+   * @param {Function} [options.onReward] 观看完整激励广告后的回调，用于放行本次功能（仅在 allowRewardedAd 时生效）
    * @returns {boolean} true=已设置呼号(放行)，false=未设置(已拦截弹窗)
    */
   requireCallSign(options = {}) {
@@ -414,6 +491,32 @@ App({
     const content = options.content || '该功能需要设置您的呼号，请在"我的"页面先设置个人呼号后再试。'
     const navigate = options.navigate !== false
     const onConfirm = typeof options.onConfirm === 'function' ? options.onConfirm : null
+    const onReward = typeof options.onReward === 'function' ? options.onReward : null
+
+    // 允许看广告临时使用一次（如 SSTV）：弹窗提供"看广告使用" + "去设置"双路径
+    if (options.allowRewardedAd) {
+      wx.showModal({
+        title,
+        content: options.content || '您还未设置呼号，可前往设置，或观看一段激励视频后临时使用一次该功能。',
+        confirmText: '看广告',
+        cancelText: '去设置',
+        success: (res) => {
+          if (res.confirm) {
+            // 看广告，完整观看后放行本次功能
+            this.showRewardedAd({ onReward })
+          } else if (res.cancel) {
+            // 去设置呼号
+            if (onConfirm) {
+              onConfirm()
+            } else if (navigate) {
+              wx.navigateTo({ url: '/pages/mine/mine' })
+            }
+          }
+        }
+      })
+      return false
+    }
+
     wx.showModal({
       title,
       content,
@@ -430,6 +533,57 @@ App({
       }
     })
     return false
+  },
+
+  /**
+   * 展示激励视频广告（全局复用，广告实例懒创建并缓存，避免重复创建）
+   * 仅当用户完整观看（res.isEnded === true）时才触发 onReward 放行。
+   * @param {Object} [options]
+   * @param {Function} [options.onReward] 完整观看后的回调，用于发放"使用一次"的权益
+   * @param {Function} [options.onFail] 广告加载/展示失败或未看完时的回调
+   */
+  showRewardedAd(options = {}) {
+    const onReward = typeof options.onReward === 'function' ? options.onReward : null
+    const onFail = typeof options.onFail === 'function' ? options.onFail : null
+
+    if (!wx.createRewardedVideoAd) {
+      wx.showToast({ title: '当前版本暂不支持广告，请升级微信', icon: 'none' })
+      if (onFail) onFail()
+      return
+    }
+
+    // 懒创建并缓存广告实例（onError 只需绑定一次）
+    if (!this._rewardedVideoAd) {
+      this._rewardedVideoAd = wx.createRewardedVideoAd({ adUnitId: 'adunit-eb0e06b75c9659dc' })
+      this._rewardedVideoAd.onError((err) => {
+        console.error('激励视频广告加载失败', err)
+      })
+    }
+    const ad = this._rewardedVideoAd
+
+    // 每次展示单独绑定 onClose，回调触发后立即解绑，避免闭包串场 / 多次触发
+    const closeHandler = (res) => {
+      ad.offClose(closeHandler)
+      if (res && res.isEnded) {
+        if (onReward) onReward()
+      } else {
+        wx.showToast({ title: '需完整观看广告才能使用本次功能', icon: 'none' })
+        if (onFail) onFail()
+      }
+    }
+    ad.onClose(closeHandler)
+
+    ad.show().catch(() => {
+      // 首次展示失败时，重新拉取后再展示
+      ad.load()
+        .then(() => ad.show())
+        .catch((err) => {
+          console.error('激励视频广告显示失败', err)
+          ad.offClose(closeHandler)
+          wx.showToast({ title: '广告加载失败，请稍后再试', icon: 'none' })
+          if (onFail) onFail()
+        })
+    })
   },
 
   /**

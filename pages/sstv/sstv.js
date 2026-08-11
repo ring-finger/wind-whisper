@@ -1,5 +1,4 @@
 const VIBRATE_TYPE = 'medium'
-const app = getApp()
 const Robot36 = require('./sstv-robot36')
 const Scottie1 = require('./sstv-scottie1')
 const SSTVFFTDecoder = require('./sstv-fft-decoder')
@@ -347,9 +346,27 @@ Page({
   },
 
   chooseImage() {
-    // 呼号拦截校验前置：未设置则弹窗提示并阻断后续图片选择/上传/编码
-    if (!app.requireCallSign()) return
+    const app = getApp()
+    if (!app || typeof app.requireCallSign !== 'function') {
+      wx.showToast({ title: '初始化中，请稍后再试', icon: 'none' })
+      return
+    }
+    // 呼号拦截校验前置：未设置则弹窗提示；SSTV 场景允许"看激励广告临时使用一次"
+    if (!app.requireCallSign({
+      allowRewardedAd: true,
+      onReward: () => this._startChooseImage()
+    })) return
 
+    this._startChooseImage()
+  },
+
+  // 实际的选图/审核流程，供"已设置呼号"与"看完广告放行"两条路径复用
+  _startChooseImage() {
+    const app = getApp()
+    if (!app || typeof app.checkImageSafety !== 'function') {
+      wx.showToast({ title: '初始化中，请稍后再试', icon: 'none' })
+      return
+    }
     wx.chooseMedia({
       count: 1,
       mediaType: ['image'],

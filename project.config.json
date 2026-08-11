@@ -55,5 +55,6 @@
   "editorSetting": {},
   "cloudfunctionTemplateRoot": "cloudfunctionTemplate/",
   "cloudfunctionRoot": "cloudfunctions/",
-  "miniprogramRoot": "./"
+  "miniprogramRoot": "./",
+  "testRoot": "minitest/"
 }

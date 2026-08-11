@@ -66,25 +66,35 @@ Page({
 
     this.loadTheme()
     this.loadUserInfo()
-    this.loadStats()
-    this.loadPersonalStats()
-    
+    // 统计与图表非首屏必需，延迟到启动完成后执行，避免同步读取大体积日志阻塞启动线程
+    setTimeout(() => {
+      this.loadStats()
+      this.loadPersonalStats()
+    }, 0)
+
     // 预生成分享图片
     setTimeout(() => this._generateShareCard(), 1000)
   },
 
   onShow() {
-    // 仅重置可能变化的本地数据（通联日志/统计签名）
-    // appTheme / myCallSign / wxMineAvatarUrl / wxMineNickName 走全局缓存，跨 show 不重复读存储
+    // 重置可能变化的本地数据（通联日志/统计签名）
     this._cache.contactLogs = null
     this._cache.personalStatsSig = null
-    // 头像文件可能被外部删除，每次 onShow 重新校验
+    // 用户信息（呼号/昵称/头像）可能被"我的"页修改或云端同步覆盖，
+    // 重置全局与页面缓存，确保返回首页时从本地存储重新读取最新值
+    this._cache.myCallSign = null
+    this._cache.wxMineNickName = null
     this._cache.wxMineAvatarUrl = null
+    app._cache.myCallSign = null
+    app._cache.wxMineNickName = null
     app._cache.wxMineAvatarUrl = null
     this.loadTheme()
     this.loadUserInfo()
-    this.loadStats()
-    this.loadPersonalStats()
+    // 统计与图表非首屏必需，延迟到当前同步启动流程结束后再读取，减少对 JS 线程的阻塞
+    setTimeout(() => {
+      this.loadStats()
+      this.loadPersonalStats()
+    }, 0)
   },
 
   loadTheme() {
@@ -110,27 +120,27 @@ Page({
     try {
       const myCallSign = this._getFromGlobalCache('myCallSign', '')
       this._cache.myCallSign = myCallSign
-      if (this._cache.wxMineAvatarUrl === null) {
-        const stored = wx.getStorageSync('wxMineAvatarUrl') || ''
-        // 校验头像文件是否存在，避免引用已删除的旧路径
-        if (stored) {
-          try {
-            wx.getFileSystemManager().accessSync(stored)
-          } catch (e) {
-            wx.removeStorageSync('wxMineAvatarUrl')
-            app._cache.wxMineAvatarUrl = ''
-            this._cache.wxMineAvatarUrl = ''
-            return this.setData({ userAvatarUrl: '' })
-          }
+      // 头像路径统一走全局缓存（_getFromGlobalCache 内部已用 app._cache 去重，
+      // onShow 在返回首页时会置空 app._cache.wxMineAvatarUrl 以强制重新读取）
+      const storedAvatar = this._getFromGlobalCache('wxMineAvatarUrl', '')
+      let avatarUrl = storedAvatar
+      if (storedAvatar) {
+        // 校验头像文件是否存在，避免引用已删除的旧路径（仅命中已缓存路径时执行一次）
+        try {
+          wx.getFileSystemManager().accessSync(storedAvatar)
+        } catch (e) {
+          wx.removeStorageSync('wxMineAvatarUrl')
+          app._cache.wxMineAvatarUrl = ''
+          this._cache.wxMineAvatarUrl = ''
+          avatarUrl = ''
         }
-        this._cache.wxMineAvatarUrl = stored
-        app._cache.wxMineAvatarUrl = stored
       }
+      this._cache.wxMineAvatarUrl = avatarUrl
       const wxMineNickName = this._getFromGlobalCache('wxMineNickName', '')
       this._cache.wxMineNickName = wxMineNickName
       this.setData({
         userCallsign: myCallSign || '设置呼号',
-        userAvatarUrl: this._cache.wxMineAvatarUrl,
+        userAvatarUrl: avatarUrl,
         userNickName: wxMineNickName
       })
     } catch (e) {

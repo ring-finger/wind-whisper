@@ -570,7 +570,7 @@ Page({
         content: `您已有 ${this.data.myShareCount} 条分享记录（含未过期），请先删除部分分享记录后再分享。`,
         showCancel: true,
         cancelText: '我知道了',
-        confirmText: '查看我的分享',
+        confirmText: '查看分享',
         success: (res) => {
           if (res.confirm) {
             // 用户选择查看我的分享
@@ -1591,6 +1591,21 @@ Page({
     }
   },
 
+  // 一键满格：根据当前频段模式填充 RST
+  // RS 模式（VHF/UHF，T 为 + 号切换）→ 双方填入 5 9
+  // RST 模式（HF，T 为数字）→ 双方填入 5 9 9
+  onRstFull() {
+    const { isVHF, isUHF, formData } = this.data
+    const isRS = isVHF || isUHF
+    const full = isRS ? { r: '5', s: '9' } : { r: '5', s: '9', t: '9' }
+    const rst = {
+      theirRst: { ...formData.rst.theirRst, ...full },
+      myRst: { ...formData.rst.myRst, ...full }
+    }
+    this.setData({ 'formData.rst': rst })
+    wx.vibrateShort({ type: VIBRATE_TYPE })
+  },
+
   // 获取完整的RST字符串 - 提供给外部调用
   getFullRst(type = 'theirRst') {
     const { formData } = this.data
@@ -2204,7 +2219,7 @@ Page({
 
       // 构建 CSV 格式（UTF-8 BOM 兼容 Excel）
       const today = formatDate(new Date())
-      const headers = ['日期', '时间(BJT)', '呼号', '频率(MHz)', '模式', '己方RST', '对方RST', '天气', '位置', '功率', '设备', '天线', '备注']
+      const headers = ['日期', '时间(BJT)', '呼号', '频率(MHz)', '模式', '己方RST', '对方RST', '天气', '位置', '功率', '设备', '天馈', '备注']
       let csv = '\uFEFF' + headers.join(',') + '\n'
 
       logs.forEach(log => {
