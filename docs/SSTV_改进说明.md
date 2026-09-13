@@ -1,5 +1,11 @@
 # SSTV 解码器改进总结
 
+> ⚠️ **历史存档（已过期）**
+> 本文档记录的是**早期 Goertzel 灰度实时解码器**（8kHz / 64 采样窗 / 麦克风实时监听）的改造过程。
+> 当前实现已完全替换为 `pages/sstv/sstv-fft-decoder.js`（移植自 [colaclanth/sstv](https://github.com/colaclanth/sstv)）：
+> 全量音频 + FFT 滑动窗 + Hann 窗 + 亚 bin 插值，VIS 自动识别 7 种模式，无麦克风实时监听。
+> 文中提到的部分参数结论仍可参考，但整体描述不代表现状。
+
 ## 参考项目
 - **GitHub**: https://github.com/CKegel/Web-SSTV
 - **MIT License**: Christian Kegel

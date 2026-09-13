@@ -100,8 +100,9 @@ page {
 }
 
 .upload-preview {
-  width: 100%;
-  height: 400rpx;
+  /* 与出图画布严格同尺寸（320x240），配合 mode="scaleToFill" 保证预览即出图效果 */
+  width: 320px;
+  height: 240px;
   border-radius: 16rpx;
   display: block;
 }
@@ -266,81 +267,59 @@ button.action-btn::after {
   border: none !important;
 }
 
-/* 设置区域 */
-.encode-settings, .decode-settings {
-  padding: 20rpx;
-  background: #FFFFFF;
-  margin: 20rpx;
-  border-radius: 16rpx;
-}
-
-.setting-item {
-  display: flex;
-  align-items: center;
-  gap: 20rpx;
-}
-
-.setting-label {
-  font-size: 28rpx;
-  color: #1A1A2E;
-  width: 140rpx;
-}
-
-.setting-slider {
-  flex: 1;
-}
-
-.setting-value {
-  font-size: 26rpx;
-  color: #4A90D9;
-  width: 80rpx;
-  text-align: right;
-}
-
-/* 解码状态 */
-.decode-status {
-  text-align: center;
-  padding: 40rpx 20rpx;
-}
-
-.status-circle {
-  width: 160rpx;
-  height: 160rpx;
-  border-radius: 50%;
-  background: #F5F5F5;
-  margin: 0 auto 20rpx;
+/* 图片校验等待提示（选图后 → 图片就绪之间的空白期） */
+.checking-mask {
+  position: fixed;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(26, 26, 46, 0.45);
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.3s;
+  z-index: 9999;
 }
 
-.status-circle.active {
-  background: linear-gradient(135deg, #5BA3E6, #82B1FF);
-  animation: pulse 1s infinite;
+.checking-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 340rpx;
+  padding: 44rpx 48rpx;
+  background: #FFFFFF;
+  border-radius: 24rpx;
+  box-shadow: 0 12rpx 40rpx rgba(0, 0, 0, 0.18);
 }
 
-@keyframes pulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.05); }
+.checking-spinner {
+  width: 56rpx;
+  height: 56rpx;
+  border: 6rpx solid #E3F2FD;
+  border-top-color: #4A90D9;
+  border-radius: 50%;
+  animation: checking-spin 0.8s linear infinite;
+  margin-bottom: 24rpx;
 }
 
-.status-icon {
-  font-size: 60rpx;
+@keyframes checking-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
-.status-text {
-  display: block;
-  font-size: 32rpx;
+.checking-title {
+  font-size: 30rpx;
   color: #1A1A2E;
+  font-weight: 600;
   margin-bottom: 10rpx;
 }
 
-.status-hint {
+.checking-hint {
   font-size: 24rpx;
-  color: #666666;
+  color: #8E99A8;
 }
 
+/* 解码控制 */
 .decode-controls {
   padding: 0 20rpx;
   display: flex;
@@ -352,38 +331,6 @@ button.action-btn::after {
   width: 100%;
   font-size: 28rpx;
   padding: 24rpx 20rpx;
-}
-
-/* 解码预览 */
-.decode-preview {
-  background: #FFFFFF;
-  margin: 20rpx;
-  padding: 20rpx;
-  border-radius: 16rpx;
-  text-align: center;
-}
-
-.preview-header {
-  margin-bottom: 15rpx;
-}
-
-.preview-title {
-  font-size: 26rpx;
-  color: #1A1A2E;
-  font-weight: 600;
-}
-
-.preview-canvas {
-  border-radius: 12rpx;
-  background: #FFFFFF;
-  display: block;
-  margin: 0 auto;
-}
-
-.preview-info {
-  margin-top: 15rpx;
-  font-size: 24rpx;
-  color: #666666;
 }
 
 /* 解码进度 */
@@ -506,17 +453,19 @@ button.action-btn::after {
 .ack-item {
   display: block;
   font-size: 24rpx;
-  color: #1A1A2E;
+  color: #4A90D9;
   line-height: 1.6;
 }
 
-.ack-link {
+.ack-item:active {
+  opacity: 0.6;
+}
+
+.ack-hint {
   display: block;
-  font-size: 22rpx;
-  color: #4A90D9;
+  font-size: 20rpx;
+  color: #8E99A8;
   line-height: 1.6;
-  padding-left: 20rpx;
-  word-break: break-all;
 }
 
 /* 新音频面板样式 */
@@ -672,13 +621,15 @@ button.action-btn::after {
   margin: 0 auto;  /* 居中显示 */
 }
 
-/* 呼号覆盖层 - 可拖动 */
+/* 呼号覆盖层 - 可拖动
+   与画布坐标 1:1 对应：字号/行高/内边距都用 px，且不设背景与内边距，
+   平时看起来就等于出图效果；仅在拖拽时高亮，方便识别可拖动区域。 */
 .callsign-overlay {
   position: absolute;
   z-index: 999;
-  padding: 8rpx 16rpx;
-  background: rgba(26,26,46,0.7);
-  border-radius: 8rpx;
+  /* 不设内边距与边框：任何额外盒子都会让文字偏离画布坐标 */
+  padding: 0;
+  border: none;
   display: none;
   cursor: move;
   user-select: none;
@@ -692,11 +643,23 @@ button.action-btn::after {
   display: block !important;
 }
 
+/* 拖拽高亮（用 box-shadow 描边，不占布局，不破坏 1:1 坐标） */
+.callsign-overlay.dragging {
+  background: rgba(74,144,217,0.35);
+  box-shadow: 0 0 0 2rpx rgba(255,255,255,0.85);
+}
+
 .callsign-text {
-  font-size: 32rpx;
+  font-size: 24px;
+  line-height: 24px;
   font-weight: bold;
   color: #FFFFFF;
-  text-shadow: 2rpx 2rpx 4rpx rgba(26,26,46,0.8);
+  /* 近似画布上的 3px 黑色描边（fillText + strokeText） */
+  text-shadow:
+    -1px -1px 0 #000000,
+    1px -1px 0 #000000,
+    -1px 1px 0 #000000,
+    1px 1px 0 #000000;
   font-family: monospace;
   white-space: nowrap;
 }

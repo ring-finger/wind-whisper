@@ -1,10 +1,16 @@
 <view class="container">
-  <canvas type="2d" id="resizeCanvas" class="hidden-canvas" style="width: 320px; height: 240px;"></canvas>
   <canvas type="2d" id="encodeCanvas" class="hidden-canvas" style="width: 320px; height: 240px;"></canvas>
-  <canvas type="2d" id="tempCanvas" class="hidden-canvas" style="width: 320px; height: 240px;"></canvas>
-  <canvas type="2d" id="pixelCanvas" class="hidden-canvas" style="width: 320px; height: 240px;"></canvas>
   <canvas type="2d" id="decodeCanvas" class="hidden-canvas" style="width: 320px; height: 240px;"></canvas>
   <canvas type="2d" id="shareCanvas" class="share-canvas"></canvas>
+
+  <!-- 图片内容校验等待提示：覆盖"选图后 → 图片就绪"之间的空白期 -->
+  <view class="checking-mask" wx:if="{{isCheckingImage}}">
+    <view class="checking-card">
+      <view class="checking-spinner"></view>
+      <text class="checking-title">正在校验图片</text>
+      <text class="checking-hint">正在确认图片内容合规，请稍候…</text>
+    </view>
+  </view>
 
     <view class="tab-bar">
       <view class="tab-item {{currentTab === 'encode' ? 'active' : ''}}" bindtap="switchTab" data-tab="encode">
@@ -27,13 +33,16 @@
       <!-- 选择图片后显示图片和操作按钮 -->
       <view class="upload-area has-image" wx:else>
         <view class="image-container">
-          <image class="upload-preview" src="{{uploadImage}}" mode="aspectFit" />
-          <!-- 可拖动的呼号文字 -->
+          <!-- scaleToFill：预览与出图都用 320x240 拉伸，保证呼号位置所见即所得 -->
+          <image class="upload-preview" src="{{uploadImage}}" mode="scaleToFill" />
+          <!-- 可拖动的呼号文字（坐标与画布 1:1 对应） -->
           <view 
-            class="callsign-overlay {{showCallsign ? 'show' : ''}}"
-            style="left: {{callsignX}}px; bottom: {{240 - callsignY}}px;"
+            class="callsign-overlay {{showCallsign ? 'show' : ''}} {{isDraggingCallsign ? 'dragging' : ''}}"
+            style="left: {{callsignX}}px; bottom: {{240 - callsignY - 24}}px;"
             catchtouchstart="onCallsignTouchStart"
             catchtouchmove="onCallsignTouchMove"
+            catchtouchend="onCallsignTouchEnd"
+            catchtouchcancel="onCallsignTouchEnd"
           >
             <text class="callsign-text">{{callsign}}</text>
           </view>
@@ -89,17 +98,9 @@
           </button>
           <view class="audio-info-tags">
             <text class="info-tag">Robot36</text>
-            <text class="info-tag">8kHz</text>
+            <text class="info-tag">48kHz</text>
             <text class="info-tag">单声道</text>
           </view>
-        </view>
-      </view>
-
-      <view class="encode-settings">
-        <view class="setting-item">
-          <text class="setting-label">图片质量:</text>
-          <slider class="setting-slider" min="1" max="100" value="{{quality}}" bindchange="onQualityChange" />
-          <text class="setting-value">{{quality}}%</text>
         </view>
       </view>
     </view>
@@ -118,7 +119,7 @@
       <!-- 解码进度 -->
       <view class="decode-progress" wx:if="{{isDecoding}}">
         <view class="progress-info">
-          <text class="progress-scan-line">扫描线: {{scanLine}} / 240</text>
+          <text class="progress-scan-line">扫描线: {{scanLine}} / {{decodeTotalLines}}</text>
         </view>
         <view class="progress-bar">
           <view class="progress-fill" style="{{'width:' + decodeProgress + '%;'}}"></view>
@@ -133,14 +134,6 @@
         <view class="result-actions">
           <button class="action-btn primary" bindtap="saveToAlbum">保存到相册</button>
           <button class="action-btn secondary" bindtap="clearResult">删除</button>
-        </view>
-      </view>
-
-      <view class="decode-settings">
-        <view class="setting-item">
-          <text class="setting-label">灵敏度:</text>
-          <slider class="setting-slider" min="10" max="100" value="{{sensitivity}}" bindchange="onSensitivityChange" />
-          <text class="setting-value">{{sensitivity}}%</text>
         </view>
       </view>
     </view>
@@ -164,15 +157,17 @@
 
     <!-- 开源项目致谢 -->
     <view class="acknowledgment" wx:if="{{currentTab === 'encode'}}">
-      <text class="ack-title"> 感谢开源项目</text>
+      <text class="ack-title">🙏 感谢开源项目</text>
       <view class="ack-content">
-        <text class="ack-item">SSTVEncoder2 (olgamiller)</text>
+        <text class="ack-item" bindtap="openEncoderRepo">SSTVEncoder2 (olgamiller)</text>
+        <text class="ack-hint">点击复制源码链接</text>
       </view>
     </view>
     <view class="acknowledgment" wx:if="{{currentTab === 'decode'}}">
-      <text class="ack-title"> 感谢开源项目</text>
+      <text class="ack-title">🙏 感谢开源项目</text>
       <view class="ack-content">
-        <text class="ack-item">sstv-decoder (Equinoxis)</text>
+        <text class="ack-item" bindtap="openDecoderRepo">sstv (colaclanth)</text>
+        <text class="ack-hint">点击复制源码链接</text>
       </view>
     </view>
   </view>

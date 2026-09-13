@@ -161,25 +161,6 @@ function yuvToRgb(y, u, v) {
   return [r, g, b]
 }
 
-/** FFT 包装函数：padding + Hann + 计算幅度谱 */
-function fft(data, sampleRate, fftSizeHint) {
-  const nextPow2 = Math.pow(2, Math.ceil(Math.log2(data.length)))
-  const fftSize = Math.max(fftSizeHint || 64, nextPow2)
-
-  const padded = new Float32Array(fftSize)
-  padded.set(data)
-
-  const fftInst = new FFT(fftSize, sampleRate)
-  fftInst.forward(padded)
-
-  const spectrum = fftInst.spectrum.slice()
-  const n = spectrum.length
-  for (let i = 1; i < n - 1; i++) {
-    spectrum[i] *= 2  // 补偿单边谱
-  }
-  return spectrum
-}
-
 // 3. SSTV 模式参数（支持全部 7 种模式）
 
 const COL_FMT = { RGB: 'RGB', GBR: 'GBR', YUV: 'YUV', BW: 'BW' }
@@ -364,6 +345,83 @@ class SSTVFFTDecoder {
     this.onProgress = options.onProgress || null
     this.mode = null
     this._cancelled = false
+    // 音频提前用尽（解码被截断，图片底部为黑）时置位，供上层提示
+    this.truncated = false
+
+    // 取频是整帧最热的路径（约 11.5 万次调用），Hann 窗表 / 加窗缓冲 / FFT 实例
+    // 全部按尺寸复用，避免每次取频都重建三角函数表与临时数组。
+    this._hannCache = Object.create(null)
+    this._fftCache = Object.create(null)
+    this._windowBuf = null
+    this._paddedBuf = null
+    this._specBuf = null
+  }
+
+  // 取频资源复用
+  /** 按长度缓存 Hann 窗 */
+  _hann(length) {
+    let w = this._hannCache[length]
+    if (!w) {
+      w = hannWindow(length)
+      this._hannCache[length] = w
+    }
+    return w
+  }
+
+  /** 按尺寸缓存 FFT 实例（forward() 每次都会完整重算内部缓冲，复用安全） */
+  _fftInstance(fftSize) {
+    let inst = this._fftCache[fftSize]
+    if (!inst) {
+      inst = new FFT(fftSize, this.sampleRate)
+      this._fftCache[fftSize] = inst
+    }
+    return inst
+  }
+
+  /**
+   * 计算一段数据的幅度谱（Hann 加窗 + FFT + 单边谱补偿）
+   * 返回的是内部复用缓冲，调用方只读、不可保存引用。
+   */
+  _spectrum(data) {
+    const len = data.length
+    const win = this._hann(len)
+
+    let buf = this._windowBuf
+    if (!buf || buf.length < len) {
+      buf = new Float32Array(len)
+      this._windowBuf = buf
+    }
+    for (let i = 0; i < len; i++) {
+      buf[i] = data[i] * win[i]
+    }
+
+    const nextPow2 = Math.pow(2, Math.ceil(Math.log2(len)))
+    const fftSize = Math.max(this.fftSize || 64, nextPow2)
+
+    let padded = this._paddedBuf
+    if (!padded || padded.length !== fftSize) {
+      padded = new Float32Array(fftSize)
+      this._paddedBuf = padded
+    } else {
+      padded.fill(0)
+    }
+    padded.set(buf.subarray(0, len))
+
+    const inst = this._fftInstance(fftSize)
+    inst.forward(padded)
+
+    // 拷贝出谱：后续要缩放单边谱，不能改动 FFT 实例内部缓冲
+    const half = fftSize / 2
+    let out = this._specBuf
+    if (!out || out.length !== half) {
+      out = new Float64Array(half)
+      this._specBuf = out
+    }
+    out.set(inst.spectrum)
+    for (let i = 1; i < half - 1; i++) {
+      out[i] *= 2
+    }
+    return out
   }
 
   // 取消 / 让出控制权
@@ -428,13 +486,7 @@ class SSTVFFTDecoder {
   _peakFreq(data) {
     if (!data || data.length < 2) return 0
 
-    const window = hannWindow(data.length)
-    const windowedData = []
-    for (let i = 0; i < data.length; i++) {
-      windowedData.push(data[i] * window[i])
-    }
-
-    const spectrum = fft(windowedData, this.sampleRate, this.fftSize)
+    const spectrum = this._spectrum(data)
 
     // 找最大 bin
     let maxIndex = 0
@@ -489,12 +541,12 @@ class SSTVFFTDecoder {
         await this._yield()
       }
 
-      const chunk = this.samples.slice(offset, offset + headerSize)
-
-      const f1 = this._peakFreq(chunk.slice(leader1Start, leader1End))
-      const f2 = this._peakFreq(chunk.slice(breakStart, breakEnd))
-      const f3 = this._peakFreq(chunk.slice(leader2Start, leader2End))
-      const f4 = this._peakFreq(chunk.slice(visStart, visEnd))
+      // 直接用 subarray 取视图（不复制）：此前先整段 slice(0.64s) 再切 4 个小窗，
+      // 40s 音频约 2 万次迭代 = 约 2.4GB 无效内存搬运
+      const f1 = this._peakFreq(this.samples.subarray(offset + leader1Start, offset + leader1End))
+      const f2 = this._peakFreq(this.samples.subarray(offset + breakStart, offset + breakEnd))
+      const f3 = this._peakFreq(this.samples.subarray(offset + leader2Start, offset + leader2End))
+      const f4 = this._peakFreq(this.samples.subarray(offset + visStart, offset + visEnd))
 
       if (lastLogOffset < 0 || (offset - lastLogOffset) / sr > 2.0) {
         console.log('[FFT-Decoder] 搜寻头部: offset=' + (offset / sr).toFixed(1) + 's' +
@@ -535,7 +587,7 @@ class SSTVFFTDecoder {
     let bitLog = ''
     for (let i = 0; i < 8; i++) {
       const start = visStart + i * bitSize
-      const section = this.samples.slice(start, start + bitSize)
+      const section = this.samples.subarray(start, start + bitSize)
       const freq = this._peakFreq(section)
       const bit = freq <= 1200 ? 1 : 0
       visBits.push(bit)
@@ -569,6 +621,15 @@ class SSTVFFTDecoder {
 
   /**
    * 从 alignStart 开始搜索同步脉冲 (1200Hz)
+   *
+   * 粗定位：12.6ms 大窗逐样本前移，找到首个峰值 >1350Hz 的位置（此时窗口已含
+   * 同步之后的门廊/图像内容）。粗定位偏差随行内容（Y 亮度）漂移，可达 ±1ms。
+   *
+   * 精定位：在粗定位附近用 2ms 小窗细扫「同步(1200Hz)→门廊(1500Hz)」的跳变沿。
+   * 这两个音是固定频率、与图像内容无关，故边界可以定位到采样级精度。
+   * 不做精定位时，锚点偏晚会让行尾像素的取频窗越入下一行同步音，
+   * 色度被钳为 0 → 解码图片最右列出现绿色色块。
+   *
    * @param {number} alignStart - 搜索起始样本索引
    * @param {boolean} [startOfSync=true] - true 返回脉冲起始，false 返回结束
    * @returns {number|null} 对齐后的样本索引
@@ -578,15 +639,50 @@ class SSTVFFTDecoder {
     const mode = this.mode
     const sr = this.sampleRate
     const syncWindow = Math.round(mode.SYNC_PULSE * 1.4 * sr)
-    const alignStop = this.samples.length - syncWindow
+    // 只在"期望位置"附近一段内搜索。
+    // 原实现把上界设为文件末尾（samples.length - syncWindow），一旦某行同步检测失败，
+    // 就会逐采样做 FFT 一直扫到音频结尾（可达百万次），表现为页面卡死。
+    // 稳态下真实同步位置与名义推进位置相差不超过几毫秒，半行是非常宽的余量。
+    const searchSpan = Math.max(syncWindow * 3, Math.round(0.5 * mode.LINE_TIME * sr))
+    const alignStop = Math.min(this.samples.length - syncWindow, alignStart + searchSpan)
 
     if (alignStop <= alignStart) return null
 
     for (let i = alignStart; i < alignStop; i++) {
-      const section = this.samples.slice(i, i + syncWindow)
+      // 长距离搜索时保证"取消解码 / 页面返回"能及时打断
+      if (((i - alignStart) & 0x3FF) === 0) this._checkCancel()
+
+      const section = this.samples.subarray(i, i + syncWindow)
       const freq = this._peakFreq(section)
       if (freq > 1350) {
-        const syncEnd = i + Math.floor(syncWindow / 2)
+        // ---- 精定位：细扫同步→门廊跳变沿 ----
+        // 扫描起点用名义推进位置（alignStart，通常已落在同步脉冲内部），
+        // 而非粗触发点 i（其位置随内容漂移）
+        const fineWin = Math.round(0.002 * sr)                 // 2ms 小窗
+        const step = Math.max(1, Math.round(0.00025 * sr))     // 0.25ms 步进
+        const scanFrom = alignStart
+        const scanTo = i + Math.floor(syncWindow / 2)
+
+        let lastInSync = -1
+        let firstOutSync = -1
+        for (let p = scanFrom; p <= scanTo; p += step) {
+          const w = this.samples.subarray(p, Math.min(p + fineWin, this.samples.length))
+          if (this._peakFreq(w) > 1350) {
+            firstOutSync = p
+            break
+          }
+          lastInSync = p
+        }
+
+        let syncEnd
+        if (firstOutSync > 0 && lastInSync >= 0) {
+          // 小窗过半进入门廊时峰值翻转：边界 ≈ 翻转点中点 + 半窗
+          syncEnd = Math.round((lastInSync + firstOutSync) / 2 + fineWin / 2)
+        } else {
+          // 细扫失败（起点已在门廊/图像段，或信噪比差）：退回粗定位
+          syncEnd = i + Math.floor(syncWindow / 2)
+        }
+
         return startOfSync
           ? syncEnd - Math.round(mode.SYNC_PULSE * sr)
           : syncEnd
@@ -654,6 +750,16 @@ class SSTVFFTDecoder {
           if (aligned !== null) seqStart = aligned
         }
 
+        // 本通道段的起止边界（样本索引）：取频窗不得越出段外，
+        // 否则首尾像素的窗口会混入同步音 / 间隔音 / 相邻通道
+        // （行尾像素读进下一行 1200Hz 同步音 → 色度钳为 0 → 最右列偏绿的来源之一）
+        const chanDuration = (mode.HAS_HALF_SCAN && chan > 0)
+          ? mode.HALF_SCAN_TIME
+          : mode.SCAN_TIME
+        const chanOffset = mode.CHAN_OFFSETS[chan]
+        const segStart = Math.round(seqStart + chanOffset * this.sampleRate)
+        const segEnd = Math.round(seqStart + (chanOffset + chanDuration) * this.sampleRate)
+
         // 逐像素 FFT
         for (let px = 0; px < width; px++) {
           const pixelTime = (mode.HAS_HALF_SCAN && chan > 0)
@@ -661,18 +767,43 @@ class SSTVFFTDecoder {
             : mode.PIXEL_TIME
 
           const windowHalf = (pixelTime * windowFactor) / 2
-          const chanOffset = mode.CHAN_OFFSETS[chan]
 
           const pxCenter = seqStart + (chanOffset + px * pixelTime) * this.sampleRate
-          const pxStart = Math.round(pxCenter - windowHalf * this.sampleRate)
-          const pxEnd = Math.round(pxCenter + windowHalf * this.sampleRate)
+          let pxStart = Math.round(pxCenter - windowHalf * this.sampleRate)
+          let pxEnd = Math.round(pxCenter + windowHalf * this.sampleRate)
 
-          if (pxEnd >= this.samples.length) {
-            console.warn('[FFT-Decoder] 音频数据不足 (line=' + line + ' chan=' + chan + ' px=' + px + ')')
-            return imageData
+          // 窗口平移钳制在本通道段内（首像素窗越入同步/门廊，尾像素窗越入下一段）。
+          // 采用整体平移而非截断，保持窗口长度（频率分辨率）不变
+          if (pxEnd > segEnd) {
+            pxStart -= (pxEnd - segEnd)
+            pxEnd = segEnd
+          }
+          if (pxStart < segStart) {
+            pxEnd += (segStart - pxStart)
+            pxStart = segStart
+          }
+          if (pxEnd > segEnd) pxEnd = segEnd // 窗口长于整段时的兜底截断
+          if (pxEnd - pxStart < 2) {
+            pxStart = segEnd - 2
+            pxEnd = segEnd
           }
 
-          const pixelArea = this.samples.slice(Math.max(0, pxStart), pxEnd)
+          if (pxEnd >= this.samples.length) {
+            // 音频提前用尽。注意：即使音频完整，最后一行的最后一两个像素的取频窗
+            // 也会按设计略微越出音频末端（窗口以像素中心对称展开），这属于正常现象，
+            // 因此只有"在最后一行之前就用尽"才判定为音频不完整。
+            // 处理上不再整体放弃剩余像素：在可用范围内继续解；可用数据不足半个窗口时
+            // 该像素保持 0（黑），避免把噪声当信号解出杂色。
+            if (line < height - 1) this.truncated = true
+            const nominalLen = pxEnd - pxStart
+            pxEnd = this.samples.length
+            if (pxEnd - pxStart < Math.max(2, Math.round(nominalLen / 2))) {
+              imageData[line][chan][px] = 0
+              continue
+            }
+          }
+
+          const pixelArea = this.samples.subarray(Math.max(0, pxStart), pxEnd)
           const freq = this._peakFreq(pixelArea)
           imageData[line][chan][px] = freqToLum(freq)
         }

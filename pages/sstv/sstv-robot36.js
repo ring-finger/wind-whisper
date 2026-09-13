@@ -81,6 +81,7 @@ class Robot36 extends SSTVMode {
     console.log('[SSTV] 预分配采样数:', totalSamples)
     this.audioBuffer = new Float32Array(totalSamples)
     this.bufferIndex = 0
+    this.elapsedMs = 0  // 重置时序累加器（编码器实例复用时必须归零）
 
     // 标准校准头
     this.addTone(1900, LEADER1_DURATION)

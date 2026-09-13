@@ -3,6 +3,12 @@ const Robot36 = require('./sstv-robot36')
 const Scottie1 = require('./sstv-scottie1')
 const SSTVFFTDecoder = require('./sstv-fft-decoder')
 
+// 呼号文字字号（px）。预览区与画布共用同一坐标系（320x240），
+// 预览样式、画布绘制、拖拽收边三处必须使用同一个字号，才能保证所见即所得。
+const CALLSIGN_FONT_SIZE = 24
+// monospace 单字符宽度约为字号的 0.6 倍，用于拖拽收边估算
+const CALLSIGN_CHAR_WIDTH_RATIO = 0.6
+
 /**
  * SSTV 模式工厂方法
  * @param {string} modeName - 模式名称
@@ -26,10 +32,10 @@ Page({
     uploadImage: '',
     imageWidth: 0,
     imageHeight: 0,
-    quality: 80,
-    sensitivity: 50,
     isEncoding: false,
     isDecoding: false,
+    // 选图后的内容安全校验等待期（覆盖"上传云存储 + 云函数审核"这段空白期）
+    isCheckingImage: false,
     audioFilePath: '',
     isPlaying: false,
     audioDuration: 0,
@@ -42,13 +48,15 @@ Page({
     decodedImage: '',
     decodeProgress: 0,
     scanLine: 0,
+    // 当前解码模式的总行数（由解码器识别出的模式决定，Robot 240 / Martin、Scottie 256）
+    decodeTotalLines: 240,
     audioContext: null,
     // 呼号相关
     callsign: '',
     showCallsign: false,
-    showCallsignInput: false,
     callsignX: 20,
     callsignY: 200,
+    isDraggingCallsign: false,
     callsignTouchStartX: 0,
     callsignTouchStartY: 0
   },
@@ -62,8 +70,11 @@ Page({
     })
     this.initSSTV()
 
-    // 预生成分享图片
-    setTimeout(() => this._generateShareCard(), 1000)
+    // 预生成分享图片（保存句柄，页面提前卸载时清理，避免回调在卸载后执行）
+    this._shareCardTimer = setTimeout(() => {
+      this._shareCardTimer = null
+      this._generateShareCard()
+    }, 1000)
   },
 
   onShow() {
@@ -72,19 +83,8 @@ Page({
   onHide() {
     // 解码中离开页面：按取消解码处理，避免阻塞导致卡顿
     this._cancelDecoding(false)
+    this._stopAudio()
 
-    if (this.audioContext) {
-      this.audioContext.stop()
-      this.audioContext.destroy()
-      this.audioContext = null
-      this.setData({ 
-        isPlaying: false,
-        audioCurrentTime: 0,
-        audioCurrentTimeStr: '0:00',
-        audioProgress: 0
-      })
-    }
-    
     console.log('页面隐藏')
   },
 
@@ -95,13 +95,41 @@ Page({
     if (this.updateTimer) {
       clearTimeout(this.updateTimer)
     }
+    if (this._shareCardTimer) {
+      clearTimeout(this._shareCardTimer)
+      this._shareCardTimer = null
+    }
+    if (this._checkingTimer) {
+      clearTimeout(this._checkingTimer)
+      this._checkingTimer = null
+    }
+    // 卸载时不再回写 UI 状态
+    this._stopAudio(false)
+
+    console.log('页面卸载，资源已清理')
+  },
+
+  /**
+   * 停止并释放当前音频播放器
+   * @param {boolean} [withUi=true] - 是否同步复位播放相关 UI 状态
+   */
+  _stopAudio(withUi) {
     if (this.audioContext) {
-      this.audioContext.stop()
-      this.audioContext.destroy()
+      try {
+        this.audioContext.stop()
+      } catch (e) { /* 上下文已销毁，忽略 */ }
+      try {
+        this.audioContext.destroy()
+      } catch (e) { /* 忽略 */ }
       this.audioContext = null
     }
-    
-    console.log('页面卸载，资源已清理')
+    if (withUi === false) return
+    this.setData({
+      isPlaying: false,
+      audioCurrentTime: 0,
+      audioCurrentTimeStr: '0:00',
+      audioProgress: 0
+    })
   },
 
   initSSTV() {
@@ -231,7 +259,8 @@ Page({
       isDecoding: true,
       decodedImage: '',
       decodeProgress: 0,
-      scanLine: 0
+      scanLine: 0,
+      decodeTotalLines: 240
     })
 
     wx.showLoading({ title: '读取音频文件...' })
@@ -253,9 +282,13 @@ Page({
               onProgress: (percent) => {
                 // 已取消则不再更新进度
                 if (!this.data.isDecoding) return
+                // 总行数按解码器实际识别出的模式取（Martin / Scottie 为 256 行，Robot 为 240 行）
+                const cur = this.decoder
+                const totalLines = (cur && cur.mode && cur.mode.LINE_COUNT) || 240
                 this.setData({
                   decodeProgress: percent,
-                  scanLine: Math.round(percent / 100 * 240)
+                  scanLine: Math.round(percent / 100 * totalLines),
+                  decodeTotalLines: totalLines
                 })
               }
             })
@@ -264,6 +297,8 @@ Page({
 
             decoder.decode().then((result) => {
               const { buffer, width, height } = result
+              // 音频中途用尽时解码会被截断（图片底部为黑），不能当成功结果提示
+              const truncated = !!decoder.truncated
               wx.hideLoading()
 
               this.renderDecodedImage(buffer, width, height).then((imagePath) => {
@@ -271,9 +306,13 @@ Page({
                   isDecoding: false,
                   decodedImage: imagePath,
                   decodeProgress: 100,
-                  scanLine: 240
+                  scanLine: this.data.decodeTotalLines || 240
                 })
-                wx.showToast({ title: '解码完成', icon: 'success' })
+                if (truncated) {
+                  wx.showToast({ title: '解码完成，但音频不完整', icon: 'none', duration: 2500 })
+                } else {
+                  wx.showToast({ title: '解码完成', icon: 'success' })
+                }
               }).catch((err) => {
                 console.error('渲染解码图片失败:', err)
                 this.setData({ isDecoding: false })
@@ -373,14 +412,82 @@ Page({
       sourceType: ['album', 'camera'],
       success: (res) => {
         const tempFilePath = res.tempFiles[0].tempFilePath
-        // 内容安全审核
-        app.checkImageSafety(tempFilePath).then(safe => {
-          if (!safe) return
-          this._processChosenImage(tempFilePath)
-        })
+        this._verifyAndProcessImage(tempFilePath)
+      },
+      fail: (err) => {
+        const msg = (err && err.errMsg) || ''
+        // 用户主动取消不算失败
+        if (msg.indexOf('cancel') >= 0) return
+        console.error('[SSTV] 选择图片失败:', err)
+        // 权限被拒（相册/相机）时引导去设置页开启
+        if (msg.indexOf('auth') >= 0 || msg.indexOf('authorize') >= 0 || msg.indexOf('permission') >= 0) {
+          wx.showModal({
+            title: '无法访问相册/相机',
+            content: '请在设置中允许使用相册与相机后重试',
+            confirmText: '去设置',
+            success: (r) => {
+              if (r.confirm) wx.openSetting()
+            }
+          })
+          return
+        }
+        wx.showToast({ title: '选择图片失败', icon: 'none' })
       }
     })
     wx.vibrateShort({ type: VIBRATE_TYPE })
+  },
+
+  /**
+   * 内容安全校验 → 处理图片
+   * 选图后到图片真正就绪之间存在"上传云存储 + 云函数审核"的等待期，
+   * 期间展示校验提示，直到图片渲染完成或校验结束才收起。
+   */
+  _verifyAndProcessImage(tempFilePath) {
+    const app = getApp()
+    // 审核关闭时链路是同步放行的，不必闪一下提示
+    const needCheck = typeof app.getContentCheckEnabled === 'function'
+      ? app.getContentCheckEnabled()
+      : true
+    if (needCheck) this._beginImageChecking()
+
+    app.checkImageSafety(tempFilePath).then((safe) => {
+      if (!safe) {
+        // 违规：app.checkImageSafety 内部已给出提示
+        this._endImageChecking()
+        return
+      }
+      this._processChosenImage(tempFilePath)
+    }).catch((err) => {
+      // 审核链路异常按放行处理（与 checkImageSafety 的 fail-open 策略保持一致），
+      // 仅记录日志，避免用户"选完图没反应"
+      console.error('[SSTV] 图片校验异常，按放行处理:', err)
+      this._processChosenImage(tempFilePath)
+    })
+  },
+
+  /** 展示"正在校验图片"提示 */
+  _beginImageChecking() {
+    if (this._checkingTimer) {
+      clearTimeout(this._checkingTimer)
+      this._checkingTimer = null
+    }
+    this.setData({ isCheckingImage: true })
+    // 兜底：审核链路若异常挂起，10s 后自动收起，避免遮罩长期挡住页面
+    this._checkingTimer = setTimeout(() => {
+      this._checkingTimer = null
+      this._endImageChecking()
+    }, 10000)
+  },
+
+  /** 收起"正在校验图片"提示 */
+  _endImageChecking() {
+    if (this._checkingTimer) {
+      clearTimeout(this._checkingTimer)
+      this._checkingTimer = null
+    }
+    if (this.data.isCheckingImage) {
+      this.setData({ isCheckingImage: false })
+    }
   },
 
   _processChosenImage(tempFilePath) {
@@ -408,36 +515,15 @@ Page({
               callsign: callsign,
               showCallsign: showCallsign
             })
-            this.resizeImage(tempFilePath)
-          }
-        })
-  },
-
-  resizeImage(path) {
-    const targetWidth = 320
-    const targetHeight = 240
-    const query = wx.createSelectorQuery()
-    query.select('#resizeCanvas')
-      .node((res) => {
-        const canvas = res.node
-        canvas.width = targetWidth
-        canvas.height = targetHeight
-        const ctx = canvas.getContext('2d')
-        const img = canvas.createImage()
-        img.onload = () => {
-          ctx.drawImage(img, 0, 0, targetWidth, targetHeight)
-        }
-        img.src = path
-      })
-    query.exec()
-  },
-
-  onQualityChange(e) {
-    this.setData({ quality: e.detail.value })
-  },
-
-  onSensitivityChange(e) {
-    this.setData({ sensitivity: e.detail.value })
+            // 图片已就绪，收起校验提示
+            this._endImageChecking()
+          },
+      fail: (err) => {
+        console.error('[SSTV] 读取图片信息失败:', err)
+        this._endImageChecking()
+        wx.showToast({ title: '图片读取失败，请换一张', icon: 'none' })
+      }
+    })
   },
 
   onEncodeTap() {
@@ -447,6 +533,8 @@ Page({
 
   async startEncode() {
 
+    // 重新生成会覆盖同名 wav 文件，先停掉正在播放的音频，避免边写边播
+    this._stopAudio()
     this.setData({ isEncoding: true, audioFilePath: '' })
     wx.showLoading({ title: '正在生成...' })
 
@@ -465,7 +553,7 @@ Page({
             
             if (this.data.showCallsign && this.data.callsign) {
               ctx.save()
-              ctx.font = 'bold 24px monospace'
+              ctx.font = 'bold ' + CALLSIGN_FONT_SIZE + 'px monospace'
               ctx.fillStyle = '#FFFFFF'
               ctx.strokeStyle = '#000000'
               ctx.lineWidth = 3
@@ -710,11 +798,21 @@ Page({
     }
   },
 
+  /** 呼号在画布坐标系下的估算尺寸（用于拖拽收边，保证文字完整落在 320x240 画面内） */
+  _callsignBoxSize() {
+    const len = (this.data.callsign || '').length || 1
+    return {
+      width: Math.min(320, Math.round(len * CALLSIGN_FONT_SIZE * CALLSIGN_CHAR_WIDTH_RATIO)),
+      height: CALLSIGN_FONT_SIZE
+    }
+  },
+
   // 呼号拖动 - 触摸开始
   onCallsignTouchStart(e) {
     const touch = e.touches[0]
     // 使用 pageX/pageY（相对于页面的坐标）
     this.setData({
+      isDraggingCallsign: true,
       callsignTouchStartX: touch.pageX,
       callsignTouchStartY: touch.pageY
     })
@@ -729,11 +827,10 @@ Page({
     let newX = this.data.callsignX + deltaX
     let newY = this.data.callsignY + deltaY
     
-    // 限制边界 (图片320x240，呼号文字大约120px宽，30px高)
-    const callsignWidth = 120  // 估算呼号宽度
-    const callsignHeight = 30  // 估算呼号高度
-    newX = Math.max(0, Math.min(320 - callsignWidth, newX))
-    newY = Math.max(0, Math.min(240 - callsignHeight, newY))
+    // 限制边界：按呼号实际宽高收边，避免拖出画面（出图时被裁掉）
+    const box = this._callsignBoxSize()
+    newX = Math.max(0, Math.min(320 - box.width, newX))
+    newY = Math.max(0, Math.min(240 - box.height, newY))
     
     this.setData({
       callsignX: newX,
@@ -741,6 +838,13 @@ Page({
       callsignTouchStartX: touch.pageX,
       callsignTouchStartY: touch.pageY
     })
+  },
+
+  // 呼号拖动 - 触摸结束：退出拖拽高亮，恢复与出图一致的观感
+  onCallsignTouchEnd() {
+    if (this.data.isDraggingCallsign) {
+      this.setData({ isDraggingCallsign: false })
+    }
   },
 
   // 移除已选择的图片
@@ -764,12 +868,8 @@ Page({
     })
     
     // 停止音频播放
-    if (this.audioContext) {
-      this.audioContext.stop()
-      this.audioContext.destroy()
-      this.audioContext = null
-    }
-    
+    this._stopAudio(false)
+
     wx.showToast({ title: '已移除图片', icon: 'none' })
   },
 
@@ -777,17 +877,7 @@ Page({
   togglePlayAudio() {
     if (this.data.isPlaying) {
       // 停止播放
-      if (this.audioContext) {
-        this.audioContext.stop()
-        this.audioContext.destroy()
-        this.audioContext = null
-      }
-      this.setData({ 
-        isPlaying: false,
-        audioCurrentTime: 0,
-        audioCurrentTimeStr: '0:00',
-        audioProgress: 0
-      })
+      this._stopAudio()
     } else {
       // 开始播放 - 每次都创建新的音频上下文
       const audioContext = wx.createInnerAudioContext()
@@ -936,23 +1026,17 @@ Page({
     })
   },
 
-  // 打开编码项目仓库
+  // 打开编码项目仓库（复制链接由系统提示，无需再补一条 toast）
   openEncoderRepo() {
     wx.setClipboardData({
-      data: 'https://github.com/olgamiller/SSTVEncoder2',
-      success: () => {
-        wx.showToast({ title: '链接已复制', icon: 'success' })
-      }
+      data: 'https://github.com/olgamiller/SSTVEncoder2'
     })
   },
 
-  // 打开解码项目仓库
+  // 打开解码项目仓库：本页解码器移植自 colaclanth/sstv（见 sstv-fft-decoder.js 头部说明）
   openDecoderRepo() {
     wx.setClipboardData({
-      data: 'https://github.com/xdsopl/robot36',
-      success: () => {
-        wx.showToast({ title: '链接已复制', icon: 'success' })
-      }
+      data: 'https://github.com/colaclanth/sstv'
     })
   },
 
@@ -1052,7 +1136,7 @@ Page({
 
         ctx.fillStyle = '#5B697F'
         ctx.font = 'normal normal 13px sans-serif'
-        ctx.fillText('支持 Robot36 / Scottie1 模式', cardX + 130, cardY + 105)
+        ctx.fillText('编码 Robot36 · 解码 7 种模式', cardX + 130, cardY + 105)
         ctx.fillText('编码图片为音频信号', cardX + 130, cardY + 130)
         ctx.fillText('解码音频为图片', cardX + 130, cardY + 155)
 

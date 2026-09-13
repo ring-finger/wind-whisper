@@ -5,6 +5,7 @@ class SSTVMode {
     this.audioBuffer = null
     this.bufferIndex = 0
     this.currentPhase = 0  // 保持相位连续，避免音频不连续
+    this.elapsedMs = 0     // 已编码累计时长(ms)，用于累加器式定位每个音的起止采样
   }
 
   calculateTotalSamples(width, height) {
@@ -17,9 +18,18 @@ class SSTVMode {
 
   /**
    * 生成指定频率的单频音，保持相位连续
+   *
+   * 时序采用「累加器定位」：每个音的起止采样由累计时长换算（start / end 各取整一次），
+   * 取整误差不会跨音累积。若对每个音单独 Math.round，0.275ms 像素音（= 13.2 采样）
+   * 每音亏 0.2 采样，每行累计短 96 采样（2ms）——解码端按名义时序取频时，
+   * 行尾的取频窗会整窗落进下一行的 1200Hz 同步音，色度被钳为 0，
+   * 表现为解码图片最右侧出现一列绿色色块。
    */
   addTone(freq, durationMs) {
-    const sampleCount = Math.round(this.sampleRate * (durationMs / 1000))
+    const startSample = Math.round(this.elapsedMs * this.sampleRate / 1000)
+    this.elapsedMs += durationMs
+    const endSample = Math.round(this.elapsedMs * this.sampleRate / 1000)
+    const sampleCount = endSample - startSample
     const angularVelocity = 2 * Math.PI * freq / this.sampleRate
 
     for (let i = 0; i < sampleCount; i++) {

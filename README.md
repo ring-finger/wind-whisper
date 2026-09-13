@@ -46,11 +46,11 @@
 
 ### SSTV 图像传输 `pages/sstv`
 
-**编码**：选图 → 生成 SSTV 音频，当前支持 Robot36 模式，生成标准 48kHz 单声道 WAV，可试听、下载、保存到相册；可叠加呼号水印。
+**编码**：选图（含内容安全校验）→ 生成 SSTV 音频，当前支持 Robot36 模式，输出标准 48kHz 单声道 WAV，可试听、下载、保存；呼号水印可拖动定位，预览区与出图画布严格 1:1 对应（所见即所得）。
 
-**解码**：监听麦克风或选择音频文件，用 Goertzel / FFT 算法实时解码，支持 VIS 自动识别，覆盖 Robot 36/72、Martin 1/2、Scottie 1/2/DX 共 7 种模式，边解边预览，完成后可保存到相册。
+**解码**：从聊天记录选择 WAV 音频文件，全量 FFT 解码 + VIS 自动识别模式，覆盖 Robot 36/72、Martin 1/2、Scottie 1/2/DX 共 7 种模式，完成后可保存到相册；音频提前用尽时会提示"音频不完整"而非当作成功结果。
 
-相关实现见 `docs/SSTV_改进说明.md`（参考 CKegel/Web-SSTV 项目修正了同步脉冲、颜色频率范围等标准参数）。
+编码参考 [SSTVEncoder2](https://github.com/olgamiller/SSTVEncoder2)，解码器移植自 [colaclanth/sstv](https://github.com/colaclanth/sstv)（页面致谢处可点击复制链接）。`docs/SSTV_改进说明.md` 是早期 Goertzel 灰度方案的存档，已不代表当前实现。
 
 ### 梅登黑德网格定位 `pages/maidenhead`
 
