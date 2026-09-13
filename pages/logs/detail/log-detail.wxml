@@ -65,11 +65,11 @@
       <view class="info-grid">
         <view class="info-item copyable-item" hover-class="copyable-item-hover" bindtap="copyField" data-field="myRst" data-label="己方RST" data-value="{{myRst}}">
           <text class="info-label">己方 RST</text>
-          <text class="info-value font-mono rst-accent">{{myRst}}</text>
+          <text class="info-value font-mono rst-accent">{{myRst || '-'}}</text>
         </view>
         <view class="info-item copyable-item" hover-class="copyable-item-hover" bindtap="copyField" data-field="theirRst" data-label="对方RST" data-value="{{theirRst}}">
           <text class="info-label">对方 RST</text>
-          <text class="info-value font-mono rst-accent">{{theirRst}}</text>
+          <text class="info-value font-mono rst-accent">{{theirRst || '-'}}</text>
         </view>
       </view>
     </view>

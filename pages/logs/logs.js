@@ -1,5 +1,6 @@
 const app = getApp()
 const db = require('../../utils/db')
+const rst = require('../../utils/rst')
 const VIBRATE_TYPE = 'medium'
 
 const BJT_OFFSET_MS = 8 * 60 * 60 * 1000
@@ -76,19 +77,34 @@ function buildTimeFields(ms) {
   }
 }
 
-function formatRstBlock(rst) {
-  if (!rst) return { my: '', their: '' }
+function formatRstBlock(rstData) {
+  if (!rstData) return { my: '', their: '' }
   let my = ''
   let their = ''
-  if (rst.myRst) {
-    my = `${rst.myRst.r || ''}${rst.myRst.s || ''}${rst.myRst.t || ''}`
-  } else if (rst.r || rst.s || rst.t) {
-    my = `${rst.r || ''}${rst.s || ''}${rst.t || ''}`
+  if (rstData.myRst) {
+    my = `${rstData.myRst.r || ''}${rstData.myRst.s || ''}${rstData.myRst.t || ''}`
+  } else if (rstData.r || rstData.s || rstData.t) {
+    my = `${rstData.r || ''}${rstData.s || ''}${rstData.t || ''}`
   }
-  if (rst.theirRst) {
-    their = `${rst.theirRst.r || ''}${rst.theirRst.s || ''}${rst.theirRst.t || ''}`
+  if (rstData.theirRst) {
+    their = `${rstData.theirRst.r || ''}${rstData.theirRst.s || ''}${rstData.theirRst.t || ''}`
   }
   return { my, their }
+}
+
+// 把日志列表里的 RST 字段统一转成展示用的 rstMy / rstTheir / rstSummary。
+// 这是列表型展示的唯一入口，避免每个调用点各写一遍。
+// 注意：日志可能来自本地老数据或云端分享数据，rst 字段可能整个缺失。
+function mapRstForDisplay(list) {
+  return (list || []).map((log) => {
+    const { my, their } = formatRstBlock(log && log.rst)
+    return {
+      ...log,
+      rstMy: my,
+      rstTheir: their,
+      rstSummary: [my, their].filter(Boolean).join(' / ')
+    }
+  })
 }
 
 Page({
@@ -136,14 +152,12 @@ Page({
     frequencySuggestions: [],
     isUHF: false,
     isVHF: false,
-    rstPlusSelected: {
-      myRst: false,
-      theirRst: false
-    },
-    // RST焦点状态 - 控制哪个输入框可编辑
+    // RST 焦点状态 - 逐格布尔值，控制 focus 绑定。
+    // 结构必须与 focusRstInput() 的输出一致（{r,s,t} 布尔对象），
+    // 早期这里写成字符串（如 theirRst: 'r'），会导致状态被写坏、键盘闪烁。
     rstFocus: {
-      theirRst: 'r',  // 默认聚焦对方R
-      myRst: 'r'
+      theirRst: { r: false, s: false, t: false },
+      myRst: { r: false, s: false, t: false }
     },
     currentTheme: 'radio',
     // 编辑功能
@@ -234,8 +248,7 @@ Page({
     if (this._switchToAddOnShow) {
       this._switchToAddOnShow = false
       this.setData({
-        currentTab: 'add',
-        rstFocus: { theirRst: 'r', myRst: 'r' }
+        currentTab: 'add'
       }, () => {
         setTimeout(() => { wx.pageScrollTo({ scrollTop: 0, duration: 0 }) }, 100)
       })
@@ -385,15 +398,7 @@ Page({
     }
     
     // 格式化分享的记录
-    const sharedLogs = shareData.logs.map(log => {
-      const { my, their } = formatRstBlock(log.rst)
-      return {
-        ...log,
-        rstMy: my,
-        rstTheir: their,
-        rstSummary: [my, their].filter(Boolean).join(' / ')
-      }
-    })
+    const sharedLogs = mapRstForDisplay(shareData.logs)
     
     this.setData({
       filteredLogs: sharedLogs,
@@ -436,11 +441,7 @@ Page({
     
     this.setData({ 
       currentTab: tab,
-      editingLogId: null,
-      rstFocus: {
-        theirRst: 'r',
-        myRst: 'r'
-      }
+      editingLogId: null
     }, () => {
       // 滚动到顶部
       wx.pageScrollTo({ scrollTop: 0, duration: 0 })
@@ -551,7 +552,8 @@ Page({
         cancelText: '取消',
         success: (res) => {
           if (res.confirm) {
-            wx.switchTab({
+            // 项目无 tabBar，"我的"页为主包普通页，需用 navigateTo 跳转
+            wx.navigateTo({
               url: '/pages/mine/mine'
             })
           }
@@ -892,15 +894,7 @@ Page({
       }
       
       const shareData = res.data
-      const logs = (shareData.logs || []).map(log => {
-        const { my, their } = formatRstBlock(log.rst)
-        return {
-          ...log,
-          rstMy: my,
-          rstTheir: their,
-          rstSummary: [my, their].filter(Boolean).join(' / ')
-        }
-      })
+      const logs = mapRstForDisplay(shareData.logs)
       
       this.setData({
         shareDetailLoading: false,
@@ -1134,15 +1128,7 @@ Page({
       return true
     })
 
-    const list = filtered.map((log) => {
-      const { my, their } = formatRstBlock(log.rst)
-      return {
-        ...log,
-        rstMy: my,
-        rstTheir: their,
-        rstSummary: [my, their].filter(Boolean).join(' / ')
-      }
-    })
+    const list = mapRstForDisplay(filtered)
 
     this.setData({ filteredLogs: list })
   },
@@ -1380,15 +1366,42 @@ Page({
     wx.vibrateShort({ type: VIBRATE_TYPE })
   },
 
+  // 按频率更新频段状态。
+  // UV 段（VHF/UHF，30MHz 以上）按惯例只报 RS，不展示也不采集 T，
+  // 因此跨频段切换时必须把 T 归一到目标形态，否则 HF 下填的 T 会残留到 UV 记录里，
+  // 导出 ADIF 时得到语义错误的 3 位 RST（如 UV 段的 "599"）。
+  // 首参可传频率值或事件对象（既支持编程调用，也支持直接 bind）。
   updateFrequencyRangeStatus(frequency) {
-    const freq = parseFloat(frequency)
-    const isUHF = !isNaN(freq) && freq >= 300 && freq <= 3000
-    const isVHF = !isNaN(freq) && freq >= 30 && freq < 300
-    
-    this.setData({ 
-      isUHF: isUHF, 
-      isVHF: isVHF
-    })
+    if (frequency && typeof frequency === 'object' && frequency.detail) {
+      frequency = frequency.detail.value
+    }
+    const band = rst.bandFromFrequency(frequency)
+    const isUHF = band === rst.BAND_UHF
+    const isVHF = band === rst.BAND_VHF
+
+    const payload = { isUHF, isVHF }
+
+    if (isVHF || isUHF) {
+      // UV 段：清空残留的 T 值
+      const cur = this.data.formData && this.data.formData.rst
+      const hasT = cur && ((cur.myRst && cur.myRst.t) || (cur.theirRst && cur.theirRst.t))
+      if (hasT) {
+        payload['formData.rst'] = {
+          myRst: { ...cur.myRst, t: '' },
+          theirRst: { ...cur.theirRst, t: '' }
+        }
+        // T 已失效，若焦点正停在 T 上，要挪回 R，否则键盘会指向已不存在的输入框
+        const f = this.data.rstFocus || {}
+        if ((f.theirRst && f.theirRst.t) || (f.myRst && f.myRst.t)) {
+          payload.rstFocus = {
+            theirRst: { r: false, s: false, t: false },
+            myRst: { r: false, s: false, t: false }
+          }
+        }
+      }
+    }
+
+    this.setData(payload)
   },
 
   selectMode(e) {
@@ -1399,25 +1412,68 @@ Page({
     wx.vibrateShort({ type: VIBRATE_TYPE })
   },
 
+  // 聚焦到指定 RST 输入格。
+  // UV 段没有 T 输入框（只有 R、S 两格），若被要求聚焦 T，就近落到 S；
+  // 焦点状态统一为「全 false + 目标格 true」，不做任何字符串形式的中间态。
   focusRstInput(type, field) {
     const { isVHF, isUHF } = this.data
-    
-    // 重置所有焦点
+    let targetType = type
+    let targetField = field
+
+    if (targetField === 't' && (isVHF || isUHF)) {
+      // UV 段无 T 格，回落到本组 S
+      targetField = 's'
+    }
+    if (!targetType || !targetField) return
+
     const rstFocus = {
       theirRst: { r: false, s: false, t: false },
       myRst: { r: false, s: false, t: false }
     }
-    
-    // VHF/UHF频段时，跳过T字段
-    if (field === 't' && (isVHF || isUHF)) {
-      if (type === 'theirRst') {
-        rstFocus.myRst.r = true
-      }
-    } else {
-      rstFocus[type][field] = true
-    }
-    
+    rstFocus[targetType][targetField] = true
+
     this.setData({ rstFocus })
+  },
+
+  // RST 焦点向前推进一格。返回下一个位置，走完整个序列返回 null。
+  // 这是 RST 焦点序列的唯一来源，输入与删除共用。
+  nextRstPosition(type, field) {
+    const isUV = this.data.isVHF || this.data.isUHF
+    const order = isUV
+      // UV 段：对方 R → 对方 S → 己方 R → 己方 S
+      ? [['theirRst', 'r'], ['theirRst', 's'], ['myRst', 'r'], ['myRst', 's']]
+      // HF 段：完整 RST，对方三格 → 己方三格
+      : [['theirRst', 'r'], ['theirRst', 's'], ['theirRst', 't'],
+         ['myRst', 'r'], ['myRst', 's'], ['myRst', 't']]
+
+    const idx = order.findIndex(([t, f]) => t === type && f === field)
+    if (idx < 0 || idx === order.length - 1) return null
+    const [nt, nf] = order[idx + 1]
+    return { type: nt, field: nf }
+  },
+
+  // RST 焦点后退一格。返回上一个位置，已在开头返回 null。
+  // 与 nextRstPosition 共用同一序列 —— 早期实现里 HF 的反向跳转漏掉了 T，
+  // 导致「对方T」在退格路径上永远回不去。
+  prevRstPosition(type, field) {
+    const isUV = this.data.isVHF || this.data.isUHF
+    const order = isUV
+      ? [['theirRst', 'r'], ['theirRst', 's'], ['myRst', 'r'], ['myRst', 's']]
+      : [['theirRst', 'r'], ['theirRst', 's'], ['theirRst', 't'],
+         ['myRst', 'r'], ['myRst', 's'], ['myRst', 't']]
+
+    const idx = order.findIndex(([t, f]) => t === type && f === field)
+    if (idx <= 0) return null
+    const [nt, nf] = order[idx - 1]
+    return { type: nt, field: nf }
+  },
+
+  // 统一的焦点移动入口。位置为 null 表示不动。
+  // 只做一次 setData：focusRstInput 自己会写 rstFocus，不需要外层先写一遍
+  // （早期实现里外层先写坏状态、再在回调里修好，共 2 次 setData，键盘会闪）。
+  moveRstFocus(pos) {
+    if (!pos) return
+    this.focusRstInput(pos.type, pos.field)
   },
 
   // RST输入处理 - 核心交互逻辑
@@ -1451,166 +1507,62 @@ Page({
     }
 
     // 更新RST数据
-    const rst = {
+    const rstData = {
       myRst: { ...formData.rst.myRst },
       theirRst: { ...formData.rst.theirRst }
     }
-    const cur = { ...rst[type] }
+    const cur = { ...rstData[type] }
     const prevValue = cur[field]  // 保存之前的值用于判断是输入还是删除
     cur[field] = value
-    rst[type] = cur
-    this.setData({ 'formData.rst': rst })
+    rstData[type] = cur
+    this.setData({ 'formData.rst': rstData })
 
     wx.vibrateShort({ type: VIBRATE_TYPE })
 
-    // 判断是输入还是删除
-    if (value && !prevValue) {
-      // 正向输入：自动跳转下一个
-      this.rstForwardFocus(type, field, isVHF, isUHF)
-    } else if (!value && prevValue) {
-      // 反向删除：自动跳转上一个
-      this.rstBackwardFocus(type, field)
+    // 判断是输入还是删除。
+    // 注意合法值判定用 cur[field] 而不是 value：value 在校验失败时会被置空，
+    // 早期实现据此判定为「删除」并自动跳走，用户想改一个错值时焦点反而被弹回上一格。
+    const isAccepted = !!cur[field]
+
+    if (isAccepted && !prevValue) {
+      // 从空到有值：向前推进一格
+      this.moveRstFocus(this.nextRstPosition(type, field))
+    } else if (isAccepted && prevValue) {
+      // 在已填值的格子里改值：留在原地，让用户可以连续修正。
+      // 早期实现会走到「删除」分支被弹走，必须点回来才能重输。
+      this.focusRstInput(type, field)
     }
+    // 清空 / 输入非法：都不移动焦点，由用户主动点走或按退格键
   },
 
-  // RST正向跳转 - 输入完成后自动聚焦下一个
-  rstForwardFocus(type, field, isVHF, isUHF) {
-    const nextFocus = {}
-    let nextType = type
-    let nextField = ''
-
-    if (field === 'r') {
-      // R → S
-      nextField = 's'
-      nextFocus.rstFocus = { ...this.data.rstFocus, [type]: 's' }
-    } else if (field === 's') {
-      if (isVHF || isUHF) {
-        // VHF/UHF频段：S → 己方R (跳过T)
-        nextType = 'myRst'
-        nextField = 'r'
-        nextFocus.rstFocus = { ...this.data.rstFocus, myRst: 'r' }
-      } else {
-        // HF频段：S → T
-        nextField = 't'
-        nextFocus.rstFocus = { ...this.data.rstFocus, [type]: 't' }
-      }
-    } else if (field === 't') {
-      // T → 己方R
-      nextType = 'myRst'
-      nextField = 'r'
-      nextFocus.rstFocus = { ...this.data.rstFocus, myRst: 'r' }
-    }
-
-    if (Object.keys(nextFocus).length > 0) {
-      this.setData(nextFocus, () => {
-        // 真正聚焦到下一个输入框
-        this.focusRstInput(nextType, nextField)
-      })
-    }
-  },
-
-  // RST反向跳转 - 删除时自动聚焦上一个
-  rstBackwardFocus(type, field) {
-    const nextFocus = {}
-    let nextType = type
-    let nextField = ''
-
-    if (field === 't') {
-      // T → S
-      nextField = 's'
-      nextFocus.rstFocus = { ...this.data.rstFocus, [type]: 's' }
-    } else if (field === 's') {
-      // S → R
-      nextField = 'r'
-      nextFocus.rstFocus = { ...this.data.rstFocus, [type]: 'r' }
-    } else if (field === 'r') {
-      // R → 对方S (如果当前是己方)
-      if (type === 'myRst') {
-        nextType = 'theirRst'
-        nextField = 's'
-        nextFocus.rstFocus = { ...this.data.rstFocus, theirRst: 's' }
-      }
-    }
-
-    if (Object.keys(nextFocus).length > 0) {
-      this.setData(nextFocus, () => {
-        // 真正聚焦到上一个输入框
-        this.focusRstInput(nextType, nextField)
-      })
-    }
-  },
-
-  // RST获取焦点 - 点击输入框时聚焦
+  // RST获取焦点 - 点击输入框时聚焦（只做一次 setData，避免键盘闪动）
   onRstFocus(e) {
     const type = e.currentTarget.dataset.type
     const field = e.currentTarget.dataset.field
-    this.setData({
-      rstFocus: { ...this.data.rstFocus, [type]: field }
-    }, () => {
-      // 真正聚焦到输入框
-      this.focusRstInput(type, field)
-    })
+    this.focusRstInput(type, field)
   },
 
-  // RST点击切换 - 点击占位符切换焦点
+  // RST点击切换 - 点击占位符切换焦点（只做一次 setData）
   rstTapToFocus(e) {
     const type = e.currentTarget.dataset.type
     const field = e.currentTarget.dataset.field
     wx.vibrateShort({ type: VIBRATE_TYPE })
-    this.setData({
-      rstFocus: { ...this.data.rstFocus, [type]: field }
-    }, () => {
-      // 真正聚焦到输入框
-      this.focusRstInput(type, field)
-    })
+    this.focusRstInput(type, field)
   },
 
-  // 设置RST的T为+号（VHF/UHF频段）- 可切换选中/非选中
-  setRstPlus(e) {
-    const type = e.currentTarget.dataset.type
-    const { formData } = this.data
-    const rst = {
-      myRst: { ...formData.rst.myRst },
-      theirRst: { ...formData.rst.theirRst }
-    }
-    const cur = { ...rst[type] }
-    // 切换+号状态：如果已有+则清除，否则设置为+
-    cur.t = cur.t === '+' ? '' : '+'
-    rst[type] = cur
-    this.setData({ 'formData.rst': rst })
-    wx.vibrateShort({ type: VIBRATE_TYPE })
-
-    // 设置+后跳到己方R
-    if (type === 'theirRst' && cur.t === '+') {
-      this.setData({
-        rstFocus: { ...this.data.rstFocus, myRst: 'r' }
-      }, () => {
-        // 真正聚焦到己方R输入框
-        this.focusRstInput('myRst', 'r')
-      })
-    }
-  },
-
-  // 一键满格：根据当前频段模式填充 RST
-  // RS 模式（VHF/UHF，T 为 + 号切换）→ 双方填入 5 9
-  // RST 模式（HF，T 为数字）→ 双方填入 5 9 9
+  // 一键满格：根据当前频段填充 RST
+  // UV 段（VHF/UHF）只报 RS → 双方填入 5 9
+  // HF 段报完整 RST → 双方填入 5 9 9
   onRstFull() {
     const { isVHF, isUHF, formData } = this.data
     const isRS = isVHF || isUHF
-    const full = isRS ? { r: '5', s: '9' } : { r: '5', s: '9', t: '9' }
+    const full = isRS ? { r: '5', s: '9', t: '' } : { r: '5', s: '9', t: '9' }
     const rst = {
       theirRst: { ...formData.rst.theirRst, ...full },
       myRst: { ...formData.rst.myRst, ...full }
     }
     this.setData({ 'formData.rst': rst })
     wx.vibrateShort({ type: VIBRATE_TYPE })
-  },
-
-  // 获取完整的RST字符串 - 提供给外部调用
-  getFullRst(type = 'theirRst') {
-    const { formData } = this.data
-    const rst = formData.rst[type]
-    return `${rst.r || ''}${rst.s || ''}${rst.t || ''}`
   },
 
   selectPower(e) {
@@ -1660,8 +1612,10 @@ Page({
       return
     }
 
-    // 预填表单数据
-    const rst = log.rst || { myRst: {}, theirRst: {} }
+    // 预填表单数据。
+    // RST 必须按「本条日志的频率」归一化：历史数据里可能存在 UV 段却带着 T 的脏数据
+    // （早期版本允许在 UV 段填 T 且切频段时不清理），原样带入会在 HF 下显示成 3 位。
+    const normalizedRst = rst.normalizeRst(log.rst, log.frequency)
     const formUpdate = {
       editingLogId: id,
       currentTab: 'add',
@@ -1674,13 +1628,16 @@ Page({
       'formData.weather': log.weather || '',
       'formData.frequency': log.frequency || '',
       'formData.mode': log.mode || '',
-      'formData.rst': rst,
+      'formData.rst': normalizedRst,
       'formData.qth': log.qth || '',
       'formData.power': log.power || '',
       'formData.equipment': log.equipment || '',
       'formData.antenna': log.antenna || '',
       'formData.notes': log.notes || '',
-      rstFocus: { theirRst: 'r', myRst: 'r' }
+      rstFocus: {
+        theirRst: { r: false, s: false, t: false },
+        myRst: { r: false, s: false, t: false }
+      }
     }
 
     // 根据现有频率计算波段
@@ -1725,14 +1682,32 @@ Page({
       return
     }
 
-    if (!formData.rst.myRst.r || !formData.rst.myRst.s) {
-      wx.showToast({ title: '请填写己方信号报告RS', icon: 'none' })
+    // 校验提示拆到单个字段，避免「只缺 R」时仍提示「请填写…RS」让人找不到缺哪一项。
+    // 另：本函数后续不再使用 this.data.isVHF，频段一律按提交内容里的频率判定。
+    const myRst = formData.rst.myRst || {}
+    if (!myRst.r) {
+      wx.showToast({ title: '请填写己方 R', icon: 'none' })
+      return
+    }
+    if (!myRst.s) {
+      wx.showToast({ title: '请填写己方 S', icon: 'none' })
       return
     }
 
-    if (!formData.rst.theirRst.r || !formData.rst.theirRst.s) {
-      wx.showToast({ title: '请填写对方信号报告RS', icon: 'none' })
+    const theirRstInput = formData.rst.theirRst || {}
+    if (!theirRstInput.r) {
+      wx.showToast({ title: '请填写对方 R', icon: 'none' })
       return
+    }
+    if (!theirRstInput.s) {
+      wx.showToast({ title: '请填写对方 S', icon: 'none' })
+      return
+    }
+
+    // 落库前按最终频率再做一次归一化，确保 UV 记录不会带着 T 存进去。
+    formData = {
+      ...formData,
+      rst: rst.normalizeRst(formData.rst, formData.frequency)
     }
 
     var log = {}
@@ -2042,13 +2017,9 @@ Page({
       frequencySuggestions: [],
       isUHF: false,
       isVHF: false,
-      rstPlusSelected: {
-        myRst: false,
-        theirRst: false
-      },
       rstFocus: {
-        theirRst: 'r',
-        myRst: 'r'
+        theirRst: { r: false, s: false, t: false },
+        myRst: { r: false, s: false, t: false }
       }
     }, () => {
       // 重置后聚焦到对方R输入框
@@ -2223,13 +2194,10 @@ Page({
       let csv = '\uFEFF' + headers.join(',') + '\n'
 
       logs.forEach(log => {
-        let myRst = ''
-        if (log.rst.myRst) {
-          myRst = `${log.rst.myRst.r || ''}${log.rst.myRst.s || ''}${log.rst.myRst.t || ''}`
-        } else if (log.rst.r || log.rst.s || log.rst.t) {
-          myRst = `${log.rst.r || ''}${log.rst.s || ''}${log.rst.t || ''}`
-        }
-        const theirRst = log.rst.theirRst ? `${log.rst.theirRst.r || ''}${log.rst.theirRst.s || ''}${log.rst.theirRst.t || ''}` : ''
+        // 归一化后再导出：UV 记录不会带 T，且老数据缺 rst 字段也不会抛错中断整个导出
+        const rowRst = rst.normalizeRst(log.rst, log.frequency)
+        const myRst = rst.formatRstPart(rowRst.myRst)
+        const theirRst = rst.formatRstPart(rowRst.theirRst)
 
         const row = [
           log.date || '',
@@ -2356,13 +2324,10 @@ Page({
       adif += `<EOH>\n\n`
 
       logs.forEach(log => {
-        let myRst = ''
-        if (log.rst.myRst) {
-          myRst = `${log.rst.myRst.r || ''}${log.rst.myRst.s || ''}${log.rst.myRst.t || ''}`
-        } else if (log.rst.r || log.rst.s || log.rst.t) {
-          myRst = `${log.rst.r || ''}${log.rst.s || ''}${log.rst.t || ''}`
-        }
-        const theirRst = log.rst.theirRst ? `${log.rst.theirRst.r || ''}${log.rst.theirRst.s || ''}${log.rst.theirRst.t || ''}` : ''
+        // 归一化后再导出：UV 记录不会带 T，且老数据缺 rst 字段也不会抛错中断整个导出
+        const rowRst = rst.normalizeRst(log.rst, log.frequency)
+        const myRst = rst.formatRstPart(rowRst.myRst)
+        const theirRst = rst.formatRstPart(rowRst.theirRst)
 
         // 日期转 ADIF 格式 YYYYMMDD
         const qsoDate = (log.date || '').replace(/-/g, '')
@@ -2370,24 +2335,8 @@ Page({
         const rawTime = (log.utcTime || log.btcTime || '').replace(/:/g, '')
         const timeOn = rawTime.length >= 4 ? rawTime.substring(0, 4) : rawTime
 
-        // 频段推断
-        const freq = parseFloat(log.frequency)
-        let band = ''
-        if (freq >= 0.136 && freq < 0.138) band = '2190m'
-        else if (freq >= 0.472 && freq < 0.479) band = '630m'
-        else if (freq >= 1.8 && freq < 2.0) band = '160m'
-        else if (freq >= 3.5 && freq < 4.0) band = '80m'
-        else if (freq >= 5.2 && freq < 5.5) band = '60m'
-        else if (freq >= 7.0 && freq < 7.3) band = '40m'
-        else if (freq >= 10.1 && freq < 10.15) band = '30m'
-        else if (freq >= 14.0 && freq < 14.35) band = '20m'
-        else if (freq >= 18.068 && freq < 18.168) band = '17m'
-        else if (freq >= 21.0 && freq < 21.45) band = '15m'
-        else if (freq >= 24.89 && freq < 24.99) band = '12m'
-        else if (freq >= 28.0 && freq < 29.7) band = '10m'
-        else if (freq >= 50 && freq < 54) band = '6m'
-        else if (freq >= 144 && freq < 148) band = '2m'
-        else if (freq >= 430 && freq < 450) band = '70cm'
+        // 频段推断（口径统一收敛在 utils/rst.js，与表单的频段判定共用一份）
+        const band = rst.bandNameFromFrequency(log.frequency)
 
         adif += `<STATION_CALLSIGN:${myCallSign.length}>${myCallSign} `
         adif += `<CALL:${log.callSign.length}>${log.callSign} `

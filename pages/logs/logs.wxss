@@ -601,39 +601,13 @@
 
 /* 输入框占位符样式 */
 .rst-input::placeholder {
-  color: var(--text-hint);
+  color: var(--text-hint, var(--text-placeholder));
   font-weight: 400;
-}
-
-/* +号按钮样式 */
-.rst-plus-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 80rpx;
-  font-size: 40rpx;
-  font-weight: 700;
-  color: var(--text-hint);
-  background: var(--bg-primary);
-  border: 2rpx dashed var(--border-color);
-  border-radius: 12rpx;
-  transition: all 0.2s ease;
-}
-
-.rst-plus-btn:active {
-  transform: scale(0.95);
-}
-
-.rst-plus-selected {
-  color: var(--accent-primary);
-  border-color: var(--accent-primary);
-  border-style: solid;
-  background: rgba(44, 92, 151, 0.08);
 }
 
 .rst-tips {
   font-size: 22rpx;
-  color: var(--text-hint);
+  color: var(--text-hint, var(--text-placeholder));
   margin-top: 12rpx;
   text-align: center;
 }

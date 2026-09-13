@@ -192,7 +192,8 @@ Page({
 
   goToAllLogs() {
     wx.vibrateShort({ type: VIBRATE_TYPE })
-    wx.switchTab({
+    // 项目无 tabBar，logs 为分包页，必须用 navigateTo（switchTab 仅对 tabBar 页生效）
+    wx.navigateTo({
       url: '/pages/logs/logs'
     })
   },

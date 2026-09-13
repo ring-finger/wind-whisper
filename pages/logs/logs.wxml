@@ -198,10 +198,9 @@
                 id="theirRst-s"
               />
             </view>
-            <!-- T输入框 - VHF/UHF显示+号按钮，可切换选中状态 -->
-            <view class="rst-input-wrapper">
-              <view wx:if="{{isVHF || isUHF}}" class="rst-input rst-plus-btn {{formData.rst.theirRst.t ? 'rst-plus-selected' : ''}}" bindtap="setRstPlus" data-type="theirRst">+</view>
-              <input wx:else type="number" class="rst-input font-mono" maxlength="1" value="{{formData.rst.theirRst.t}}" placeholder="T" bindinput="onRstInput" focus="{{rstFocus.theirRst.t}}" data-type="theirRst" data-field="t" id="theirRst-t" />
+            <!-- T输入格：UV 段（VHF/UHF）只报 RS，整格不展示 -->
+            <view class="rst-input-wrapper" wx:if="{{!isVHF && !isUHF}}">
+              <input type="number" class="rst-input font-mono" maxlength="1" value="{{formData.rst.theirRst.t}}" placeholder="T" bindinput="onRstInput" focus="{{rstFocus.theirRst.t}}" data-type="theirRst" data-field="t" id="theirRst-t" />
             </view>
           </view>
         </view>
@@ -239,10 +238,9 @@
                 id="myRst-s"
               />
             </view>
-            <!-- T输入框 - VHF/UHF显示+号按钮，可切换选中状态 -->
-            <view class="rst-input-wrapper">
-              <view wx:if="{{isVHF || isUHF}}" class="rst-input rst-plus-btn {{formData.rst.myRst.t ? 'rst-plus-selected' : ''}}" bindtap="setRstPlus" data-type="myRst">+</view>
-              <input wx:else type="number" class="rst-input font-mono" maxlength="1" value="{{formData.rst.myRst.t}}" placeholder="T" bindinput="onRstInput" focus="{{rstFocus.myRst.t}}" data-type="myRst" data-field="t" id="myRst-t" />
+            <!-- T输入格：UV 段（VHF/UHF）只报 RS，整格不展示 -->
+            <view class="rst-input-wrapper" wx:if="{{!isVHF && !isUHF}}">
+              <input type="number" class="rst-input font-mono" maxlength="1" value="{{formData.rst.myRst.t}}" placeholder="T" bindinput="onRstInput" focus="{{rstFocus.myRst.t}}" data-type="myRst" data-field="t" id="myRst-t" />
             </view>
           </view>
         </view>

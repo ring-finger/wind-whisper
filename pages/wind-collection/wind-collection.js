@@ -13,6 +13,8 @@ const PAGE_SIZE = 10
 // 标签统计缓存键与有效期（直接读 windCollectionStats 单文档，缓存避免重复请求）
 const TAGS_CACHE_KEY = 'windCollection_tags_v2'
 const TAGS_CACHE_TTL = 60 * 1000
+// 管理员身份缓存键：本地留存，避免每次打开都要等云端返回才显示管理悬浮按钮
+const ADMIN_CACHE_KEY = 'windCollection_isAdmin'
 
 Page({
   data: {
@@ -36,21 +38,10 @@ Page({
 
   onLoad() {
     this.loadTheme()
-    this.checkAdmin()
-    this.loadTags()          // 打开即直接读 windCollectionStats（单文档，极快）
+    // 管理员身份先用本地缓存即时渲染，避免悬浮按钮延迟出现；真实值随首屏请求一起返回
+    this.setData({ isAdmin: wx.getStorageSync(ADMIN_CACHE_KEY) === true })
+    // 列表 / 标签统计 / 管理员身份合并为一次云函数调用（后端 home action）
     this.loadData('全部', false)
-  },
-
-  // 查询当前用户是否为管理员（决定新增 / 刷新按钮是否可见）
-  checkAdmin() {
-    wx.cloud.callFunction({
-      name: 'windCollection',
-      data: { action: 'isAdmin' }
-    }).then(res => {
-      if (res.result && res.result.success) {
-        this.setData({ isAdmin: !!res.result.isAdmin })
-      }
-    }).catch(() => { /* 失败则保持不可见 */ })
   },
 
   loadTheme() {
@@ -68,26 +59,35 @@ Page({
     this.loadMore()
   },
 
-  // 加载数据：先用本地缓存即时渲染首屏，再始终从云端拉取最新列表
-  // （列表为单次查询、开销小；标签统计走独立 action，直接读统计文档）
+  // 加载数据：先用本地缓存即时渲染首屏，再由**一次**云函数调用统一拉取
+  // 列表 / 标签统计 / 管理员身份（后端 home action 内部把列表与统计文档并行查询）。
+  // 原实现并发 3 次 callFunction（list + tags + isAdmin），每次都是独立的函数握手，
+  // 冷启动还要各付一次初始化开销，这是首屏慢的主因。
   loadData(tag, force) {
     this.setData({ loading: true })
     const cacheKey = 'windCollection_' + tag
     const cached = this._readCache(cacheKey, CACHE_TTL)
+    const cachedTags = this._readCache(TAGS_CACHE_KEY, TAGS_CACHE_TTL)
     // 先用缓存即时渲染首屏（若有且在有效期内），保证首屏速度
     if (cached) {
-      this._applyData(tag, cached, this.data.tags)
+      this._applyData(tag, cached, cachedTags || this.data.tags)
+    } else if (cachedTags) {
+      this.setData({ tags: this._normalizeTags(cachedTags) })
     }
 
     return wx.cloud.callFunction({
       name: 'windCollection',
-      data: { action: 'list', tag }
+      data: { action: 'home', tag }
     }).then(res => {
-      if (res.result && res.result.success) {
-        const list = res.result.list || []
+      const r = res.result
+      if (r && r.success) {
+        const list = r.list || []
+        const allTags = r.allTags || []
         this._writeCache(cacheKey, list)
+        this._writeCache(TAGS_CACHE_KEY, allTags)
+        this._cacheAdmin(!!r.isAdmin)
         // 用云端最新数据覆盖（即便刚用缓存渲染过，也无缝更新）
-        this._applyData(tag, list, this.data.tags)
+        this._applyData(tag, list, allTags)
       } else if (!cached) {
         // 无缓存且拉取失败才提示
         this._applyData(tag, [], this.data.tags)
@@ -104,25 +104,10 @@ Page({
     })
   },
 
-  // 加载标签统计：先用本地缓存即时渲染（带 TTL），再直接读 windCollectionStats
-  // 单文档（O(1)，极快）。统计的写入完全由管理员 refreshTags 触发，这里不触发任何计算。
-  loadTags() {
-    const cached = this._readCache(TAGS_CACHE_KEY, TAGS_CACHE_TTL)
-    if (cached) {
-      this.setData({ tags: this._normalizeTags(cached) })
-    }
-    wx.cloud.callFunction({
-      name: 'windCollection',
-      data: { action: 'tags' }
-    }).then(res => {
-      if (res.result && res.result.success) {
-        const allTags = res.result.allTags || []
-        this.setData({ tags: this._normalizeTags(allTags) })
-        this._writeCache(TAGS_CACHE_KEY, allTags)
-      }
-    }).catch(err => {
-      console.error('[windCollection] 标签统计失败', err)
-    })
+  // 写入管理员身份（内存 + 本地缓存），避免每次打开都要等网络才显示管理悬浮按钮
+  _cacheAdmin(isAdmin) {
+    this.setData({ isAdmin })
+    try { wx.setStorageSync(ADMIN_CACHE_KEY, isAdmin) } catch (e) { /* 忽略 */ }
   },
 
   // 应用数据并重置分页（按优先级已排序，直接切片懒加载）

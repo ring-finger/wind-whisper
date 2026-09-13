@@ -1,5 +1,6 @@
 const app = getApp()
 const db = require('../../../utils/db')
+const rst = require('../../../utils/rst')
 const SHARE_TITLE_PREFIX = '风语纪: '
 const VIBRATE_TYPE = 'medium'
 
@@ -142,31 +143,24 @@ Page({
     }
   },
 
+  // 把一条日志的 RST 转成展示字符串（缺失位补 '-'）。
+  // 先按频率归一化，UV 段的历史脏数据（带 T）不会在这里显示成 3 位。
+  // 这是详情页展示 RST 的唯一入口，processLogData / loadLogDetail 共用。
+  formatRstPair(log) {
+    const normalized = rst.normalizeRst(log && log.rst, log && log.frequency)
+    const build = (part) => {
+      if (!part.r && !part.s && !part.t) return ''
+      return `${part.r || '-'}${part.s || '-'}${part.t || ''}`
+    }
+    return {
+      myRst: build(normalized.myRst),
+      theirRst: build(normalized.theirRst)
+    }
+  },
+
   // 处理日志数据（通用方法）
   processLogData(log) {
-    let myRst = ''
-    let theirRst = ''
-    
-    if (log.rst) {
-      if (log.rst.myRst) {
-        myRst = `${log.rst.myRst.r || '-'}${log.rst.myRst.s || '-'}`
-        if (log.rst.myRst.t) {
-          myRst += log.rst.myRst.t
-        }
-      } else if (log.rst.r || log.rst.s || log.rst.t) {
-        myRst = `${log.rst.r || '-'}${log.rst.s || '-'}`
-        if (log.rst.t) {
-          myRst += log.rst.t
-        }
-      }
-      
-      if (log.rst.theirRst) {
-        theirRst = `${log.rst.theirRst.r || '-'}${log.rst.theirRst.s || '-'}`
-        if (log.rst.theirRst.t) {
-          theirRst += log.rst.theirRst.t
-        }
-      }
-    }
+    const { myRst, theirRst } = this.formatRstPair(log)
     
     let recordTime = ''
     if (log.createdAt) {
@@ -245,29 +239,7 @@ Page({
       const log = logs.find(item => item.id === logId)
       
       if (log) {
-        let myRst = ''
-        let theirRst = ''
-        
-        if (log.rst) {
-          if (log.rst.myRst) {
-            myRst = `${log.rst.myRst.r || '-'}${log.rst.myRst.s || '-'}`
-            if (log.rst.myRst.t) {
-              myRst += log.rst.myRst.t
-            }
-          } else if (log.rst.r || log.rst.s || log.rst.t) {
-            myRst = `${log.rst.r || '-'}${log.rst.s || '-'}`
-            if (log.rst.t) {
-              myRst += log.rst.t
-            }
-          }
-          
-          if (log.rst.theirRst) {
-            theirRst = `${log.rst.theirRst.r || '-'}${log.rst.theirRst.s || '-'}`
-            if (log.rst.theirRst.t) {
-              theirRst += log.rst.theirRst.t
-            }
-          }
-        }
+        const { myRst, theirRst } = this.formatRstPair(log)
         
         let recordTime = ''
         if (log.createdAt) {
@@ -389,7 +361,8 @@ Page({
         cancelText: '继续复制',
         success: (res) => {
           if (res.confirm) {
-            wx.switchTab({
+            // 项目无 tabBar，"我的"页为主包普通页，需用 navigateTo 跳转
+            wx.navigateTo({
               url: '/pages/mine/mine'
             })
           } else {

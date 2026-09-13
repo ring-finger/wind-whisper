@@ -114,7 +114,7 @@
 .rst-accent {
   color: var(--accent-orange);
   font-weight: 700;
-  letter-spacing: 2rpx;
+  letter-spacing: 1rpx;
 }
 
 .log-footer {

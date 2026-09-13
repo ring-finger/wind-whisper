@@ -24,6 +24,7 @@ build/
 .vscode/
 *.swp
 *.swo
+.workbuddy/
 
 # Node.js依赖
 node_modules/

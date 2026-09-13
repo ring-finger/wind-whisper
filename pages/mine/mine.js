@@ -15,6 +15,11 @@ const STORAGE_THEME = 'appTheme'
 // 当前版本号 - 每次发布新版本时更新
 const CURRENT_VERSION = '1.6.0'
 
+// 风语集云函数预热：同一会话内最多每 5 分钟触发一次，避免无谓的调用次数消耗。
+// 仅用内存变量节流（不落盘）—— app 重启后实例大概率已冷，此时应当重新预热。
+const PREWARM_INTERVAL = 5 * 60 * 1000
+let _lastPrewarmAt = 0
+
 // 更新日志内容
 const UPDATE_LOGS = [
   {
@@ -80,11 +85,6 @@ Page({
     currentVersion: CURRENT_VERSION
   },
 
-  onLoad() {
-    // 检查是否需要显示更新日志
-    this.checkAndShowUpdateLog()
-  },
-
   // 检查并显示更新日志
   checkAndShowUpdateLog() {
     try {
@@ -124,12 +124,31 @@ Page({
     this.loadContactCount()
     this.loadTheme()
     this.loadCloudSyncConfig()
+    // 静默预热风语集云函数（不阻塞渲染，失败无感知）
+    this.prewarmWindCollection()
   },
 
   onShow() {
     this.loadUserProfile()
     this.loadContactCount()
     this.loadCloudSyncConfig()
+    // 用户回到本页时再热一次实例（带节流），延长预热有效期
+    this.prewarmWindCollection()
+  },
+
+  // 静默预热风语集云函数实例
+  // 目的：风语集首屏慢的主因是云函数冷启动（实例空闲回收后首次触发需 0.5–2s），
+  // 提前打一次极轻的 ping（服务端不读库）把实例焐热，用户随后进入风语集即可直接命中热实例。
+  // 节流：同一会话内 5 分钟一次；失败静默忽略，绝不影响页面任何功能。
+  prewarmWindCollection() {
+    if (!wx.cloud) return
+    const now = Date.now()
+    if (now - _lastPrewarmAt < PREWARM_INTERVAL) return
+    _lastPrewarmAt = now
+    wx.cloud.callFunction({
+      name: 'windCollection',
+      data: { action: 'ping' }
+    }).catch(() => { /* 预热失败无需提示 */ })
   },
 
   // 加载云同步配置
